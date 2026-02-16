@@ -3,6 +3,7 @@ Tournament state management and business logic
 """
 from typing import Dict, List, Optional, Tuple
 from decimal import Decimal
+from game import Game, Card
 
 
 class TourneyStatus:
@@ -245,6 +246,90 @@ class Tourney:
         if not occupied:
             return False
         return all(s.ready for s in occupied)
+
+    def start_game(self) -> Game:
+        """
+        Start a new game
+        Returns: Game instance
+        """
+        # Create game with player IDs in seat order
+        player_ids = [s.player_id for s in self.seats]
+        game = Game(player_ids)
+
+        # Deal cards
+        starting_player = game.deal()
+
+        # Store as current game
+        self.current_game = game.to_dict()
+        self.current_game['gameNumber'] = len(self.game_history) + 1
+
+        # Reset ready flags
+        for seat in self.seats:
+            seat.ready = False
+
+        return game
+
+    def complete_game(self, win_order: List[int]) -> Tuple[bool, bool]:
+        """
+        Complete the current game and award points
+
+        Args:
+            win_order: List of player positions in finishing order
+
+        Returns: (success: bool, tournament_complete: bool)
+        """
+        if not self.current_game:
+            return False, False
+
+        # Award points: 4/2/1/0 for 1st/2nd/3rd/4th
+        points_awarded = [4, 2, 1, 0]
+
+        for i, position in enumerate(win_order):
+            seat = self.seats[position]
+            points = points_awarded[i]
+            seat.score += points
+            seat.last_game_points = points
+            if i == 0:  # Winner
+                seat.games_won += 1
+
+        # Record in game history
+        self.game_history.append({
+            'gameNumber': len(self.game_history) + 1,
+            'winOrder': win_order,
+            'pointsAwarded': points_awarded,
+            'timestamp': None  # Will be set by Lambda
+        })
+
+        # Clear current game
+        self.current_game = None
+
+        # Check if tournament is complete
+        max_score = max(s.score for s in self.seats)
+        tournament_complete = max_score >= self.target_score
+
+        if tournament_complete:
+            self.status = TourneyStatus.COMPLETED
+        else:
+            self.status = TourneyStatus.BETWEEN_GAMES
+
+        return True, tournament_complete
+
+    def get_leaderboard(self) -> List[Dict]:
+        """Get leaderboard sorted by score"""
+        leaderboard = []
+        for seat in self.seats:
+            if seat.is_occupied():
+                leaderboard.append({
+                    'position': seat.position,
+                    'playerName': seat.player_name,
+                    'totalScore': seat.score,
+                    'lastGamePoints': seat.last_game_points,
+                    'gamesWon': seat.games_won
+                })
+
+        # Sort by score descending
+        leaderboard.sort(key=lambda x: x['totalScore'], reverse=True)
+        return leaderboard
 
     def to_client_state(self) -> Dict:
         """Convert to client-friendly state"""

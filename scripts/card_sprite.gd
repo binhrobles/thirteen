@@ -7,6 +7,7 @@ var card: Card
 var is_selected: bool = false
 
 var texture_rect: TextureRect
+var selection_overlay: Control  # Draws on top of the card
 
 ## Card dimensions as percentage of viewport height (mobile-friendly)
 ## On a 844px tall phone (iPhone 14), 18% = ~152px height
@@ -51,6 +52,14 @@ func _setup_ui() -> void:
 	texture_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # Crisp pixels
 	texture_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(texture_rect)
+
+	# Create overlay control for selection highlight (drawn on top)
+	selection_overlay = Control.new()
+	selection_overlay.anchor_right = 1.0
+	selection_overlay.anchor_bottom = 1.0
+	selection_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	selection_overlay.draw.connect(_draw_selection_overlay)
+	add_child(selection_overlay)
 
 
 func setup(p_card: Card) -> void:
@@ -126,17 +135,18 @@ func _get_rank_name(rank: int) -> String:
 func set_selected(selected: bool) -> void:
 	"""Toggle selected state with visual feedback"""
 	is_selected = selected
-	queue_redraw()  # Trigger _draw() to redraw the selection border
+	if selection_overlay:
+		selection_overlay.queue_redraw()  # Trigger redraw on overlay
 
 
-func _draw() -> void:
-	"""Draw selection highlight if selected"""
-	if not is_selected:
+func _draw_selection_overlay() -> void:
+	"""Draw selection highlight on top of card"""
+	if not is_selected or not selection_overlay:
 		return
 
 	# Calculate actual card bounds (texture is aspect-fit within container)
 	var container_size := size
-	var texture_aspect := 96.0 / 128.0  # Card aspect ratio (width/height)
+	var texture_aspect := 96.0 / 128.0  # Card aspect ratio (width/height = 0.75)
 	var container_aspect := container_size.x / container_size.y
 
 	var card_rect: Rect2
@@ -151,20 +161,41 @@ func _draw() -> void:
 		var y_offset := (container_size.y - card_height) / 2.0
 		card_rect = Rect2(0, y_offset, container_size.x, card_height)
 
-	# Draw selection border
-	draw_rect(card_rect, SELECTED_BG_TINT, true, -1)  # Background tint
-
-	# Draw border as rectangles
+	# Draw on the overlay Control
 	var border_width := float(SELECTED_BORDER_WIDTH)
 
+	# Draw background tint
+	selection_overlay.draw_rect(card_rect, SELECTED_BG_TINT, true)
+
+	# Draw borders inset slightly to avoid overhang
+	var inset := 1.0  # Small inset to prevent overhang
+	var inset_rect := Rect2(
+		card_rect.position.x + inset,
+		card_rect.position.y + inset,
+		card_rect.size.x - inset * 2,
+		card_rect.size.y - inset * 2
+	)
+
 	# Top border
-	draw_rect(Rect2(card_rect.position.x, card_rect.position.y, card_rect.size.x, border_width), SELECTED_BORDER_COLOR)
+	selection_overlay.draw_rect(
+		Rect2(inset_rect.position.x, inset_rect.position.y, inset_rect.size.x, border_width),
+		SELECTED_BORDER_COLOR
+	)
 	# Bottom border
-	draw_rect(Rect2(card_rect.position.x, card_rect.position.y + card_rect.size.y - border_width, card_rect.size.x, border_width), SELECTED_BORDER_COLOR)
+	selection_overlay.draw_rect(
+		Rect2(inset_rect.position.x, inset_rect.position.y + inset_rect.size.y - border_width, inset_rect.size.x, border_width),
+		SELECTED_BORDER_COLOR
+	)
 	# Left border
-	draw_rect(Rect2(card_rect.position.x, card_rect.position.y, border_width, card_rect.size.y), SELECTED_BORDER_COLOR)
+	selection_overlay.draw_rect(
+		Rect2(inset_rect.position.x, inset_rect.position.y, border_width, inset_rect.size.y),
+		SELECTED_BORDER_COLOR
+	)
 	# Right border
-	draw_rect(Rect2(card_rect.position.x + card_rect.size.x - border_width, card_rect.position.y, border_width, card_rect.size.y), SELECTED_BORDER_COLOR)
+	selection_overlay.draw_rect(
+		Rect2(inset_rect.position.x + inset_rect.size.x - border_width, inset_rect.position.y, border_width, inset_rect.size.y),
+		SELECTED_BORDER_COLOR
+	)
 
 
 func _gui_input(event: InputEvent) -> void:

@@ -18,8 +18,9 @@ const ASPECT_RATIO := 0.667  # width/height ratio (2:3)
 ## Colors for suits
 const RED_COLOR := Color(0.8, 0.1, 0.1)  # Hearts and Diamonds
 const BLACK_COLOR := Color(0.1, 0.1, 0.1)  # Spades and Clubs
-const SELECTED_BORDER_COLOR := Color(0.3, 0.6, 1.0)  # Glowing blue
-const SELECTED_BORDER_WIDTH := 4
+const SELECTED_BORDER_COLOR := Color(0.2, 0.5, 1.0)  # Bright glowing blue
+const SELECTED_BORDER_WIDTH := 6  # Thicker border for visibility
+const SELECTED_BG_TINT := Color(0.85, 0.9, 1.0)  # Light blue tint
 
 
 func _ready() -> void:
@@ -115,6 +116,8 @@ func set_selected(selected: bool) -> void:
 		style_box.border_width_right = SELECTED_BORDER_WIDTH
 		style_box.border_width_top = SELECTED_BORDER_WIDTH
 		style_box.border_width_bottom = SELECTED_BORDER_WIDTH
+		# Tint the card background blue
+		style_box.bg_color = SELECTED_BG_TINT
 	else:
 		# Reset to default border
 		style_box.border_color = Color(0.3, 0.3, 0.3)
@@ -122,6 +125,8 @@ func set_selected(selected: bool) -> void:
 		style_box.border_width_right = 2
 		style_box.border_width_top = 2
 		style_box.border_width_bottom = 2
+		# Reset background to white
+		style_box.bg_color = Color.WHITE
 
 
 func _gui_input(event: InputEvent) -> void:

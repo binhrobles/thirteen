@@ -6,7 +6,14 @@
 
 ## Overview
 
-This document describes the architecture for online multiplayer in Tiến Lên (Thirteen), enabling 4-player real-time gameplay over the internet using AWS serverless infrastructure.
+This document describes the architecture for online multiplayer in Tiến Lên (Thirteen), enabling 4-player tournament-style gameplay over the internet using AWS serverless infrastructure.
+
+**Tournament Model:**
+- Players join a tournament (4 seats)
+- Play multiple games with the same group
+- Earn points based on finishing position (4/2/1/0 for 1st/2nd/3rd/4th)
+- Tournament continues until someone reaches target score (default: 21 points)
+- MVP: Single global tournament; Future: Multiple tournaments (lobby selection)
 
 ## Architecture Diagram
 
@@ -29,7 +36,7 @@ This document describes the architecture for online multiplayer in Tiến Lên (
                       ▼                                           ▼
               ┌──────────────┐                            ┌──────────────┐
               │  DynamoDB    │                            │  DynamoDB    │
-              │ Connections  │                            │     Room     │
+              │ Connections  │                            │   Tourney    │
               └──────────────┘                            │  (singleton) │
                                                           └──────────────┘
 ```
@@ -82,15 +89,16 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 
 **Responsibilities:**
 - Remove connection from Connections table
-- Free player's seat in the room
-- Notify other players in the room
+- Mark player as disconnected in tourney
+- Notify other players in the tourney
 - Start reconnection timeout (60 seconds)
+- If before first game: free seat; if during tournament: replace with bot
 
 #### Message Router (`$default`)
 ```javascript
 // Input: WebSocket message with action and payload
 {
-  action: "room/claim_seat" | "room/leave" | "game/play" | ...,
+  action: "tourney/claim_seat" | "tourney/leave" | "game/play" | ...,
   payload: { ... }
 }
 ```
@@ -101,8 +109,8 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 - Handle errors gracefully
 
 #### Action Handlers
-- `room/claim_seat` - Claim an available seat (0-3)
-- `room/leave` - Leave the room
+- `tourney/claim_seat` - Claim an available seat (0-3)
+- `tourney/leave` - Leave the tournament
 - `game/play` - Play cards
 - `game/pass` - Pass turn
 - `ping` - Heartbeat keepalive
@@ -120,41 +128,57 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 }
 ```
 
-#### Room Table (Singleton)
+#### Tourney Table (Singleton)
 ```javascript
 {
-  roomId: "string (PK, always 'global')",
-  status: "waiting | starting | in_progress | completed",
+  tourneyId: "string (PK, always 'global')",
+  status: "waiting | between_games | in_progress | completed",
+  targetScore: 21,  // Tournament ends when someone reaches this
   seats: [
-    { position: 0, playerId: "uuid | null", playerName: "...", connectionId: "..." },
-    { position: 1, playerId: null, playerName: null, connectionId: null },
-    { position: 2, playerId: null, playerName: null, connectionId: null },
-    { position: 3, playerId: null, playerName: null, connectionId: null }
+    {
+      position: 0,
+      playerId: "uuid | null",
+      playerName: "...",
+      connectionId: "...",
+      score: 0,  // Tournament total
+      gamesWon: 0,
+      lastGamePoints: 0  // Points from most recent game
+    },
+    { position: 1, playerId: null, playerName: null, connectionId: null, score: 0, gamesWon: 0, lastGamePoints: 0 },
+    { position: 2, playerId: null, playerName: null, connectionId: null, score: 0, gamesWon: 0, lastGamePoints: 0 },
+    { position: 3, playerId: null, playerName: null, connectionId: null, score: 0, gamesWon: 0, lastGamePoints: 0 }
   ],
-  gameState: {
+  currentGame: {
     // Only populated when status = "in_progress"
+    gameNumber: 1,
     currentPlayer: 0,
     hands: [[...cards], [...cards], [...cards], [...cards]],
     lastPlay: { playerId: 0, cards: [...], combo: "..." },
     passedPlayers: [false, false, false, false],
-    winOrder: [],
+    winOrder: [],  // Filled as players finish: [playerId, playerId, ...]
     // ... (same structure as current GameState class)
   },
-  moveHistory: [
-    { playerId: 0, action: "play", cards: [...], timestamp: "..." },
-    { playerId: 1, action: "pass", timestamp: "..." }
+  gameHistory: [
+    {
+      gameNumber: 1,
+      winOrder: [0, 2, 1, 3],  // Position indices in order of finishing
+      pointsAwarded: [4, 2, 1, 0],  // Points for 1st, 2nd, 3rd, 4th
+      timestamp: "..."
+    }
   ],
-  gameNumber: 0,  // Increments each time a game completes
   createdAt: "number",
   updatedAt: "number"
 }
 ```
 
 **Notes:**
-- Single global room (roomId = "global")
+- Single global tourney (tourneyId = "global")
 - No TTL - persists indefinitely
-- When game completes, status → "waiting", seats cleared, gameState reset
-- gameNumber tracks total games played
+- Seats **do not clear** between games - same 4 players continue
+- Scoring: 4 points (1st), 2 points (2nd), 1 point (3rd), 0 points (4th/last)
+- Tournament ends when any player reaches targetScore (default: 21)
+- Status "between_games" = showing leaderboard, waiting for next game
+- Future: multiple tourneys with unique IDs
 
 ## WebSocket Message Formats
 
@@ -163,7 +187,7 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 #### Claim Seat
 ```javascript
 {
-  action: "room/claim_seat",
+  action: "tourney/claim_seat",
   payload: {
     playerName: "Player 1",
     seatPosition: 0  // 0-3, or null for first available
@@ -171,10 +195,10 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 }
 ```
 
-#### Leave Room
+#### Leave Tournament
 ```javascript
 {
-  action: "room/leave",
+  action: "tourney/leave",
   payload: {}
 }
 ```
@@ -212,19 +236,21 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 
 ### Server → Client Messages
 
-#### Room Updated
+#### Tournament Updated
 ```javascript
 {
-  type: "room/updated",
+  type: "tourney/updated",
   payload: {
-    status: "waiting" | "starting" | "in_progress" | "completed",
+    status: "waiting" | "starting" | "in_progress" | "between_games" | "completed",
     seats: [
-      { position: 0, playerName: "Player 1" },
-      { position: 1, playerName: null },
-      { position: 2, playerName: "Player 3" },
-      { position: 3, playerName: null }
+      { position: 0, playerName: "Player 1", score: 10, gamesWon: 2 },
+      { position: 1, playerName: null, score: 0, gamesWon: 0 },
+      { position: 2, playerName: "Player 3", score: 8, gamesWon: 1 },
+      { position: 3, playerName: null, score: 0, gamesWon: 0 }
     ],
-    yourPosition: 0  // Your claimed seat, or null if not seated
+    yourPosition: 0,  // Your claimed seat, or null if not seated
+    targetScore: 21,
+    currentGameNumber: 3
   }
 }
 ```
@@ -273,12 +299,21 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 }
 ```
 
-#### Game Over
+#### Game Over (with Leaderboard)
 ```javascript
 {
   type: "game/over",
   payload: {
-    winOrder: [0, 2, 1, 3]
+    winOrder: [0, 2, 1, 3],  // Position indices in finishing order
+    pointsAwarded: [4, 2, 1, 0],  // Points awarded to each position
+    leaderboard: [
+      { position: 0, playerName: "Player 1", totalScore: 10, lastGamePoints: 4, gamesWon: 2 },
+      { position: 2, playerName: "Player 3", totalScore: 8, lastGamePoints: 2, gamesWon: 1 },
+      { position: 1, playerName: "Player 2", totalScore: 5, lastGamePoints: 1, gamesWon: 0 },
+      { position: 3, playerName: "Player 4", totalScore: 3, lastGamePoints: 0, gamesWon: 0 }
+    ],
+    tourneyComplete: false,  // true if someone reached targetScore
+    winner: null  // position index of tourney winner if tourneyComplete = true
   }
 }
 ```
@@ -288,7 +323,7 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 {
   type: "error",
   payload: {
-    code: "INVALID_MOVE" | "NOT_YOUR_TURN" | "SEAT_TAKEN" | "ROOM_FULL" | ...,
+    code: "INVALID_MOVE" | "NOT_YOUR_TURN" | "SEAT_TAKEN" | "TOURNEY_FULL" | "TOURNEY_IN_PROGRESS" | ...,
     message: "Human-readable error message"
   }
 }
@@ -341,22 +376,23 @@ Player 1 (Client)          Server                  Other Players
 - **Stale state:** Client includes sequence number with moves, server rejects if out of sync
 - **Recovery:** Client can request full state with `game/sync` action
 
-## Room Lifecycle
+## Tournament Lifecycle
 
 ### States
 1. **waiting** - Players claiming seats, not all seats filled
-2. **starting** - All 4 seats claimed, countdown before game starts (3 seconds)
+2. **starting** - All 4 seats claimed, countdown before first game starts (3 seconds)
 3. **in_progress** - Game is active
-4. **completed** - Game finished, resets to waiting
+4. **between_games** - Game finished, showing leaderboard, auto-start next game (5 seconds)
+5. **completed** - Tournament finished (someone reached target score)
 
 ### State Transitions
 
 ```
     ┌──────────┐
     │  waiting │◄───────────────┐
-    └────┬─────┘                │
+    └────┬─────┘                │ (player leaves before tourney starts)
          │                      │
-         │ (4 seats filled)     │ (player leaves)
+         │ (4 seats filled)     │
          ▼                      │
     ┌──────────┐                │
     │ starting │────────────────┘
@@ -365,13 +401,24 @@ Player 1 (Client)          Server                  Other Players
          │ (countdown ends)
          ▼
     ┌──────────────┐
-    │ in_progress  │
-    └────┬─────────┘
+    │ in_progress  │◄─────────────┐
+    └────┬─────────┘              │
+         │                        │
+         │ (game over)            │
+         ▼                        │
+    ┌────────────────┐            │
+    │ between_games  │            │
+    │ (show scores)  │            │
+    └────┬───────────┘            │
+         │                        │
+         │ (5s countdown)         │
+         │ if no winner           │
+         ├────────────────────────┘
          │
-         │ (game over)
+         │ (someone reached target)
          ▼
     ┌──────────┐
-    │ completed├──────► (auto-reset to waiting)
+    │ completed│ (tourney ends, seats cleared)
     └──────────┘
 ```
 
@@ -379,22 +426,28 @@ Player 1 (Client)          Server                  Other Players
 
 **waiting:**
 - ✅ Claim seat (if available)
-- ✅ Leave room (frees seat)
+- ✅ Leave tourney (frees seat, resets scores)
 - ⏳ Waiting for 4 players
 
 **starting:**
 - ❌ Claim seat (all full)
-- ✅ Leave room (cancels countdown, frees seat)
+- ✅ Leave tourney (cancels countdown, frees seat, resets scores)
 - ⏳ 3 second countdown
 
 **in_progress:**
-- ❌ Claim seat
-- ⚠️ Leave room (disconnect handling, replaced by bot after timeout)
+- ❌ Claim seat (tourney in progress)
+- ⚠️ Leave tourney (disconnect handling, replaced by bot after timeout)
 - 🎮 Play game
 
+**between_games:**
+- ❌ Claim seat (tourney in progress)
+- ⚠️ Leave tourney (forfeit tournament, replaced by bot)
+- 📊 Show leaderboard with points from last game
+- ⏳ 5 second countdown to next game
+
 **completed:**
-- 🔄 Auto-reset to waiting (clears seats, resets game state)
-- 📊 Increment gameNumber
+- 🏆 Show final leaderboard with tournament winner
+- 🔄 After timeout, reset to waiting (clears all state)
 
 ## Error Handling & Reconnection
 
@@ -448,20 +501,20 @@ Player 1 (Client)          Server                  Other Players
 5. Resume gameplay
 
 #### Server Behavior
-1. On disconnect, keep game state for 60 seconds
-2. Mark player as "disconnected" in room
+1. On disconnect, keep tournament state for 60 seconds
+2. Mark player as "disconnected" in tourney
 3. Notify other players: "Player X disconnected"
 4. If player reconnects within 60s:
    - Restore connection
-   - Send current room/game state
+   - Send current tourney/game state
    - Notify others: "Player X reconnected"
 5. If timeout expires:
-   - In waiting/starting: Free seat, cancel countdown if starting
-   - In game: Replace with bot
+   - In waiting/starting (before first game): Free seat, cancel countdown if starting
+   - In progress/between_games (tournament started): Replace with bot for remainder of tournament
 
 ### Reconnection Window
 - **Waiting/Starting:** 60 seconds → then free seat
-- **Game:** 60 seconds → then replace with bot
+- **In Progress/Between Games:** 60 seconds → then replace with bot (keeps accumulating 0 points)
 
 ## Player Authentication & Identity
 
@@ -562,13 +615,15 @@ Use **AWS CDK** (TypeScript) for infrastructure definition
 
 ### Integration Tests
 - WebSocket connection flow
-- Seat claiming/leaving in room
-- Game play flow (simulated 4 players)
+- Seat claiming/leaving in tournament
+- Multi-game tournament flow (simulated 4 players)
+- Scoring and leaderboard updates
 
 ### E2E Tests
 - Godot client → API Gateway → Lambda → DynamoDB
-- Full game from seat claiming to game over
-- Reconnection scenarios
+- Full tournament from seat claiming to tournament winner
+- Between-game transitions and leaderboard display
+- Reconnection scenarios (before/during/between games)
 
 ### Load Testing
 - Artillery.io or similar
@@ -577,24 +632,28 @@ Use **AWS CDK** (TypeScript) for infrastructure definition
 
 ## Migration Path
 
-### Phase 1: Local Multiplayer (Current)
+### Phase 1: Local Single Game (Current)
 - Single device, 1 human + 3 bots
-- No networking
+- No networking, no tournament scoring
 
-### Phase 2: Online Multiplayer (This Design)
+### Phase 2: Online Tournament (This Design)
 - AWS backend, 4 human players
-- Remove bot dependency for multiplayer mode
+- Single global tournament
+- Multi-game scoring (4/2/1/0 points)
+- Play to 21 points
+- Bot replacement on disconnect
 
-### Phase 3: Hybrid Mode
-- Support both local (bots) and online (humans) in same game
-- Bot fills empty seats automatically
+### Phase 3: Multiple Tournaments (Future)
+- Multiple concurrent tournaments (lobby selection)
+- Private tournaments (invite-only)
+- Public tournaments (open join)
+- Spectator mode
 
 ### Phase 4: Advanced Features (Future Epics)
-- Multiple rooms/lobbies (invite-only or public)
-- Tournament mode with scoring
+- Ranked matchmaking
 - RL-trained bots
-- Spectator mode
 - Replay system
+- Tournament history and statistics
 
 ## Open Questions & Decisions
 
@@ -603,10 +662,20 @@ Use **AWS CDK** (TypeScript) for infrastructure definition
 
 **Decision:** Replace with bot after 60s timeout → game continues smoothly
 
-### 2. Lobby System ✅
-**Question:** Single room vs multiple lobbies?
+### 2. Tournament System ✅
+**Question:** Single tournament vs multiple tournaments?
 
-**Decision (MVP):** Single global room with 4 seats. Future: multiple rooms/lobbies
+**Decision (MVP):** Single global tournament with 4 seats. Future: multiple tournaments (lobby selection)
+
+### 3. Scoring System ✅
+**Question:** What scoring system to use?
+
+**Decision:** 4/2/1/0 points for 1st/2nd/3rd/4th place, play to 21 points
+
+### 4. Between-Game Flow ✅
+**Question:** Auto-start next game or require manual ready?
+
+**Decision:** Auto-start after 5 seconds showing leaderboard. Keeps momentum.
 
 ### 3. Game State Storage
 **Question:** Store full game history or just current state?

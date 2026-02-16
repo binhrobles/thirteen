@@ -26,7 +26,8 @@ const CARDS_PATH := "res://assets/sprites/cards/"
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	# Use PASS so ScrollContainer can receive events, but we'll handle taps via _input
+	mouse_filter = Control.MOUSE_FILTER_PASS
 	_setup_ui()
 
 
@@ -142,30 +143,33 @@ func set_selected(selected: bool) -> void:
 		z_index = 0
 
 
-func _gui_input(event: InputEvent) -> void:
-	"""Handle touch interaction - distinguish taps from drags"""
+func _input(event: InputEvent) -> void:
+	"""Handle touch interaction - distinguish taps from drags, only if over this card"""
+	# Only handle if the event is over this card
+	if not _is_event_over_card(event):
+		return
+	
 	# Handle touch events
 	var screen_touch := event as InputEventScreenTouch
 	if screen_touch:
 		if screen_touch.pressed:
 			# Touch started - record position and reset drag state
-			# Don't accept - let ScrollContainer handle it for scrolling
 			touch_start_position = screen_touch.position
 			is_dragging = false
 		else:
 			# Touch ended - check if it was a tap (not a drag)
-			if touch_start_position != Vector2.ZERO:
+			if touch_start_position != Vector2.ZERO and not is_dragging:
 				var drag_distance: float = screen_touch.position.distance_to(touch_start_position)
-				if drag_distance <= DRAG_THRESHOLD and not is_dragging:
+				if drag_distance <= DRAG_THRESHOLD:
 					# It was a tap - toggle selection
 					toggle_selected()
-					accept_event()
-				# Reset touch tracking
-				touch_start_position = Vector2.ZERO
-				is_dragging = false
+					get_viewport().set_input_as_handled()
+			# Reset touch tracking
+			touch_start_position = Vector2.ZERO
+			is_dragging = false
 		return
 	
-	# Handle touch drag events
+	# Handle touch drag events - mark as dragging
 	var screen_drag := event as InputEventScreenDrag
 	if screen_drag:
 		# Check if touch has moved beyond threshold
@@ -173,7 +177,23 @@ func _gui_input(event: InputEvent) -> void:
 			var drag_distance: float = screen_drag.position.distance_to(touch_start_position)
 			if drag_distance > DRAG_THRESHOLD:
 				is_dragging = true
-				# Don't accept drag events - let ScrollContainer handle scrolling
+		# Don't handle drag events - let ScrollContainer handle scrolling
+		return
+
+
+func _is_event_over_card(event: InputEvent) -> bool:
+	"""Check if the event position is over this card"""
+	var event_position: Vector2
+	if event is InputEventScreenTouch:
+		event_position = (event as InputEventScreenTouch).position
+	elif event is InputEventScreenDrag:
+		event_position = (event as InputEventScreenDrag).position
+	else:
+		return false
+	
+	# Check if screen position is within card's global rect
+	var card_global_rect := Rect2(get_global_position(), size)
+	return card_global_rect.has_point(event_position)
 
 
 func toggle_selected() -> void:

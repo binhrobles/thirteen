@@ -99,15 +99,15 @@ func _initialize_game() -> void:
 	play_area_ui = PlayAreaScene.instantiate()
 	add_child(play_area_ui)
 
-	# Create play history drawer
+	# Create opponent hand displays for players 1, 2, 3
+	_create_opponent_hands()
+
+	# Create play history drawer (add last so it renders on top)
 	play_history_drawer = PlayHistoryDrawerScript.new()
 	add_child(play_history_drawer)
 
 	# Connect play area signal to show history drawer
 	play_area_ui.history_requested.connect(_on_history_requested)
-
-	# Create opponent hand displays for players 1, 2, 3
-	_create_opponent_hands()
 
 	# Create turn manager
 	var TurnManagerScript = load("res://scripts/turn_manager.gd")

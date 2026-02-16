@@ -36,6 +36,7 @@ func _setup_ui() -> void:
 	background.anchor_bottom = 1.0
 	background.color = Color(0, 0, 0, 0.7)
 	background.mouse_filter = Control.MOUSE_FILTER_STOP
+	background.gui_input.connect(_on_background_input)
 	add_child(background)
 
 	# Drawer panel (bottom 60% of screen)
@@ -225,14 +226,10 @@ func _on_close_pressed() -> void:
 	_dismiss()
 
 
-func _gui_input(event: InputEvent) -> void:
-	"""Handle tap outside to dismiss"""
+func _on_background_input(event: InputEvent) -> void:
+	"""Handle tap on background to dismiss"""
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		# Check if tap was on background (not on drawer)
-		var local_pos: Vector2 = event.position
-		if not drawer_panel.get_rect().has_point(local_pos):
-			_dismiss()
-			accept_event()
+		_dismiss()
 
 
 func _dismiss() -> void:

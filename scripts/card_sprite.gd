@@ -152,3 +152,11 @@ func toggle_selected() -> void:
 func scale_for_hand_size(scale_factor: float) -> void:
 	"""Scale down the card for large hands"""
 	scale = Vector2.ONE * scale_factor
+
+
+func set_greyed(greyed: bool) -> void:
+	"""Apply greyscale effect when player has passed"""
+	if greyed:
+		modulate = Color(0.5, 0.5, 0.5, 1.0)  # Grey out
+	else:
+		modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color

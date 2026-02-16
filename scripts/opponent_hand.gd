@@ -170,6 +170,15 @@ func _refresh_card_backs() -> void:
 		card_backs.append(card_back)
 
 
+func set_greyed(greyed: bool) -> void:
+	"""Grey out all card backs when player has passed"""
+	for card_back in card_backs:
+		if greyed:
+			card_back.modulate = Color(0.5, 0.5, 0.5, 1.0)  # Grey out
+		else:
+			card_back.modulate = Color(1.0, 1.0, 1.0, 1.0)  # Normal color
+
+
 func _create_card_back(width: float, height: float) -> Control:
 	"""Create a single card back visual"""
 	var container := Control.new()

@@ -96,3 +96,9 @@ func clear_selection() -> void:
 	for sprite in card_sprites:
 		if sprite.is_selected:
 			sprite.set_selected(false)
+
+
+func set_greyed(greyed: bool) -> void:
+	"""Grey out all cards when player has passed"""
+	for sprite in card_sprites:
+		sprite.set_greyed(greyed)

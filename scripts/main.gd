@@ -152,6 +152,10 @@ func _initialize_game() -> void:
 
 	# Connect game state signals for updating opponent hands
 	game_state.turn_changed.connect(_on_game_state_changed)
+	game_state.round_reset.connect(_on_round_reset)
+
+	# Update greyed status after moves (for passes)
+	turn_manager.move_completed.connect(_on_move_for_greyed_update)
 
 	# Start the game
 	turn_manager.initialize(game_state)
@@ -228,6 +232,28 @@ func _on_move_for_opponent_update(_player_id: int) -> void:
 func _on_history_requested() -> void:
 	"""Show play history drawer when play area is tapped"""
 	play_history_drawer.show_history(game_state.play_log)
+
+
+func _update_passed_status() -> void:
+	"""Update greyed status for all hands based on who has passed"""
+	# Update human player (player 0)
+	if player_hand_ui:
+		player_hand_ui.set_greyed(not game_state.players_in_round[0])
+
+	# Update opponent hands (players 1, 2, 3)
+	for i in range(opponent_hands.size()):
+		var player_id := i + 1  # Players 1, 2, 3
+		opponent_hands[i].set_greyed(not game_state.players_in_round[player_id])
+
+
+func _on_move_for_greyed_update(_player_id: int) -> void:
+	"""Update greyed status after any move (in case someone passed)"""
+	_update_passed_status()
+
+
+func _on_round_reset(_player_id: int) -> void:
+	"""Clear greyed status when round resets"""
+	_update_passed_status()
 
 
 func _on_new_game_requested() -> void:

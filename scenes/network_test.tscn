@@ -1,0 +1,117 @@
+[gd_scene load_steps=2 format=3 uid="uid://cnj4m7wt8bptj"]
+
+[ext_resource type="Script" path="res://scripts/network_test.gd" id="1_network_test"]
+
+[node name="NetworkTest" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_network_test")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "WebSocket Network Test"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="ServerURLInput" type="LineEdit" parent="VBoxContainer"]
+layout_mode = 2
+placeholder_text = "WebSocket URL (e.g., ws://localhost:3001)"
+
+[node name="PlayerIDInput" type="LineEdit" parent="VBoxContainer"]
+layout_mode = 2
+placeholder_text = "Player ID (UUID)"
+
+[node name="PlayerNameInput" type="LineEdit" parent="VBoxContainer"]
+layout_mode = 2
+placeholder_text = "Player Name"
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="ConnectButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Connect"
+
+[node name="DisconnectButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Disconnect"
+
+[node name="StatusLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Status: Disconnected"
+horizontal_alignment = 1
+
+[node name="HSeparator2" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="TournamentLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Tournament Controls"
+horizontal_alignment = 1
+
+[node name="TournamentControls" type="VBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/TournamentControls"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxContainer/TournamentControls/HBoxContainer"]
+layout_mode = 2
+text = "Seat Position:"
+
+[node name="SeatPositionInput" type="SpinBox" parent="VBoxContainer/TournamentControls"]
+layout_mode = 2
+min_value = -1.0
+max_value = 3.0
+value = -1.0
+allow_greater = false
+allow_lesser = false
+
+[node name="ClaimSeatButton" type="Button" parent="VBoxContainer/TournamentControls"]
+layout_mode = 2
+text = "Claim Seat"
+
+[node name="ReadyButton" type="Button" parent="VBoxContainer/TournamentControls"]
+layout_mode = 2
+text = "Ready Up"
+
+[node name="LeaveButton" type="Button" parent="VBoxContainer/TournamentControls"]
+layout_mode = 2
+text = "Leave Tournament"
+
+[node name="HSeparator3" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="MessageLogLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Message Log"
+horizontal_alignment = 1
+
+[node name="MessageLog" type="TextEdit" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 600)
+layout_mode = 2
+size_flags_vertical = 3
+editable = false
+wrap_mode = 1

@@ -41,8 +41,8 @@ func _setup_buttons() -> void:
 	title_label.visible = false
 	subtitle_label.visible = false
 
-	# Position buttons between play area (ends at 65%) and player hand (starts at 75%)
-	# Buttons go from 58% to 66% of screen height (shifted up for lifted cards)
+	# Position buttons between play area (ends at ~47%) and player hand (starts at 82%)
+	# Buttons go from 58% to 66% of screen height
 	var button_top := 0.58
 	var button_bottom := 0.66
 

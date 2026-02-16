@@ -12,8 +12,7 @@ var cards: Array[Card] = []
 var card_sprites: Array = []
 
 ## Card overlap amount (cards will overlap by this many pixels)
-const CARD_OVERLAP := 30
-const CARD_SPACING := 5
+const CARD_SPACING := 20
 
 
 func _ready() -> void:
@@ -22,15 +21,16 @@ func _ready() -> void:
 
 func _setup_ui() -> void:
 	"""Create the scroll container and card container"""
-	# Position at bottom of screen - use viewport-relative height (25% of screen)
-	anchor_top = 0.75
+	# Position at bottom of screen - moved down to give space for lifted cards (18% of screen)
+	anchor_top = 0.82
 	anchor_bottom = 1.0
 	anchor_left = 0.0
 	anchor_right = 1.0
 	offset_top = 0
 	offset_bottom = 0
 	grow_vertical = Control.GROW_DIRECTION_BEGIN
-	z_index = 5  # Render above play area and buttons
+	z_index = 100  # Render above everything
+	z_as_relative = false  # Use absolute z-index
 
 	# Add semi-transparent background
 	var background := ColorRect.new()
@@ -95,5 +95,3 @@ func clear_selection() -> void:
 	for sprite in card_sprites:
 		if sprite.is_selected:
 			sprite.set_selected(false)
-
-

@@ -13,9 +13,7 @@ var texture_rect: TextureRect
 const BASE_HEIGHT_PERCENT := 0.18  # 18% of viewport height
 const ASPECT_RATIO := 0.667  # width/height ratio (2:3)
 
-## Selection animation - lift card up
-const SELECTED_LIFT_AMOUNT := -40  # Pixels to lift up when selected
-const SELECTED_SCALE := 1.1  # Scale multiplier when selected
+## Selection animation - lift card up (no scaling)
 
 
 ## Card sprite path
@@ -128,14 +126,14 @@ func set_selected(selected: bool) -> void:
 	is_selected = selected
 
 	if selected:
-		# Lift card up and scale slightly larger
-		position.y = SELECTED_LIFT_AMOUNT
-		scale = Vector2.ONE * SELECTED_SCALE
+		# Lift card up by 20% of card height
+		var card_height := size.y
+		var lift_amount := card_height * 0.20
+		position.y = -lift_amount
 		z_index = 10  # Render on top of other cards
 	else:
-		# Return to normal position and scale
+		# Return to normal position
 		position.y = 0
-		scale = Vector2.ONE
 		z_index = 0
 
 

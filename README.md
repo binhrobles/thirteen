@@ -15,3 +15,30 @@ Early development. See `bd ready` for current work items.
 
 4-player Vietnamese climbing card game. Cards rank 3 (low) to 2 (high), suits Spades < Clubs < Diamonds < Hearts. Play singles, pairs, triples, runs, quads, and bombs to shed your hand first.
 
+## Development
+
+**Run the game:**
+```bash
+# Open project in Godot editor
+open -a Godot thirteen-vibes/project.godot
+
+# Or run from command line
+/Applications/Godot.app/Contents/MacOS/Godot --path /path/to/thirteen-vibes
+```
+
+**Issue tracking:**
+```bash
+bd ready        # See available work
+bd show <id>    # View issue details
+bd sync         # Sync with git
+```
+
+## Building
+
+See [BUILD.md](BUILD.md) for web export instructions.
+
+**Quick start:**
+1. Install Godot 4.6 export templates (via Editor → Manage Export Templates)
+2. Export: `/Applications/Godot.app/Contents/MacOS/Godot --headless --export-release "Web" ./build/web/index.html`
+3. Test: `cd build/web && python3 -m http.server 8000`
+

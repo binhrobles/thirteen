@@ -43,8 +43,8 @@ func _setup_buttons() -> void:
 
 	# Position buttons between play area (ends at ~47%) and player hand (starts at 82%)
 	# Buttons go from 58% to 66% of screen height
-	var button_top := 0.58
-	var button_bottom := 0.66
+	var button_top := 0.68
+	var button_bottom := 0.76
 
 	# Configure Pass button (left, red)
 	pass_button.anchor_left = 0.05

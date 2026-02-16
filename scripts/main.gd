@@ -89,17 +89,31 @@ func _initialize_game() -> void:
 	"""Initialize a new game"""
 	print("=== Starting New Game ===")
 
+	# Create play area first (for showing deal messages)
+	play_area_ui = PlayAreaScene.instantiate()
+	add_child(play_area_ui)
+
+	# Show dealing message
+	play_area_ui.show_game_message("Dealing cards...", 1.5)
+	await play_area_ui.get_tree().create_timer(1.5).timeout
+
 	# Deal cards and create game state
 	var hands := Deck.deal(4)
+	var starting_player := Deck.find_starting_player(hands)
 	game_state = GameStateScript.new(hands)
 
-	# Create UI nodes
+	# Show starting player message
+	var player_name := "You" if starting_player == 0 else "Player %d" % (starting_player + 1)
+	play_area_ui.show_game_message("%s has 3♠ — Starting!" % player_name, 1.5)
+	await play_area_ui.get_tree().create_timer(1.5).timeout
+
+	# Clear play area before game starts
+	play_area_ui.clear()
+
+	# Create player hand UI
 	player_hand_ui = PlayerHandScene.instantiate()
 	add_child(player_hand_ui)
 	player_hand_ui.set_cards(game_state.get_hand(0))
-
-	play_area_ui = PlayAreaScene.instantiate()
-	add_child(play_area_ui)
 
 	# Create opponent hand displays for players 1, 2, 3
 	_create_opponent_hands()

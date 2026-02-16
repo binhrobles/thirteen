@@ -154,6 +154,18 @@ func show_error(message: String) -> void:
 	status_label.add_theme_color_override("font_color", Color(0.7, 0.8, 0.9))  # Original color
 
 
+func show_game_message(message: String, duration: float = 1.5) -> void:
+	"""Show a game status message (e.g., dealing, starting player)"""
+	_clear_cards()
+	player_label.text = ""
+	status_label.text = message
+	status_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5))  # Yellow/gold
+	show()
+
+	# Wait for the specified duration
+	await get_tree().create_timer(duration).timeout
+
+
 func clear() -> void:
 	"""Clear the play area"""
 	_clear_cards()

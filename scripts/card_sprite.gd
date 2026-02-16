@@ -18,7 +18,8 @@ const ASPECT_RATIO := 0.667  # width/height ratio (2:3)
 ## Colors for suits
 const RED_COLOR := Color(0.8, 0.1, 0.1)  # Hearts and Diamonds
 const BLACK_COLOR := Color(0.1, 0.1, 0.1)  # Spades and Clubs
-const SELECTED_OFFSET := Vector2(0, -10)  # Raise when selected
+const SELECTED_BORDER_COLOR := Color(0.3, 0.6, 1.0)  # Glowing blue
+const SELECTED_BORDER_WIDTH := 4
 
 
 func _ready() -> void:
@@ -104,13 +105,23 @@ func set_selected(selected: bool) -> void:
 	"""Toggle selected state with visual feedback"""
 	is_selected = selected
 
+	# Get the current StyleBoxFlat
+	var style_box: StyleBoxFlat = background.get_theme_stylebox("panel")
+
 	if is_selected:
-		position += SELECTED_OFFSET
-		# Add highlight to background
-		background.modulate = Color(1.2, 1.2, 1.0)  # Slight yellow tint
+		# Add glowing blue border
+		style_box.border_color = SELECTED_BORDER_COLOR
+		style_box.border_width_left = SELECTED_BORDER_WIDTH
+		style_box.border_width_right = SELECTED_BORDER_WIDTH
+		style_box.border_width_top = SELECTED_BORDER_WIDTH
+		style_box.border_width_bottom = SELECTED_BORDER_WIDTH
 	else:
-		position -= SELECTED_OFFSET
-		background.modulate = Color.WHITE
+		# Reset to default border
+		style_box.border_color = Color(0.3, 0.3, 0.3)
+		style_box.border_width_left = 2
+		style_box.border_width_right = 2
+		style_box.border_width_top = 2
+		style_box.border_width_bottom = 2
 
 
 func _gui_input(event: InputEvent) -> void:

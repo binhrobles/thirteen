@@ -42,20 +42,9 @@ func _setup_buttons() -> void:
 	var button_top := 0.66
 	var button_bottom := 0.74
 
-	# Configure Play button (left)
-	play_button.anchor_left = 0.05
-	play_button.anchor_right = 0.475
-	play_button.anchor_top = button_top
-	play_button.anchor_bottom = button_bottom
-	play_button.offset_left = 0
-	play_button.offset_right = 0
-	play_button.offset_top = 0
-	play_button.offset_bottom = 0
-	play_button.add_theme_font_size_override("font_size", button_font_size)
-
-	# Configure Pass button (right)
-	pass_button.anchor_left = 0.525
-	pass_button.anchor_right = 0.95
+	# Configure Pass button (left, red)
+	pass_button.anchor_left = 0.05
+	pass_button.anchor_right = 0.475
 	pass_button.anchor_top = button_top
 	pass_button.anchor_bottom = button_bottom
 	pass_button.offset_left = 0
@@ -63,6 +52,33 @@ func _setup_buttons() -> void:
 	pass_button.offset_top = 0
 	pass_button.offset_bottom = 0
 	pass_button.add_theme_font_size_override("font_size", button_font_size)
+	# Red button style with opacity
+	var pass_style := StyleBoxFlat.new()
+	pass_style.bg_color = Color(0.8, 0.2, 0.2, 0.7)  # Red with 70% opacity
+	pass_style.corner_radius_top_left = 8
+	pass_style.corner_radius_top_right = 8
+	pass_style.corner_radius_bottom_left = 8
+	pass_style.corner_radius_bottom_right = 8
+	pass_button.add_theme_stylebox_override("normal", pass_style)
+
+	# Configure Play button (right, green)
+	play_button.anchor_left = 0.525
+	play_button.anchor_right = 0.95
+	play_button.anchor_top = button_top
+	play_button.anchor_bottom = button_bottom
+	play_button.offset_left = 0
+	play_button.offset_right = 0
+	play_button.offset_top = 0
+	play_button.offset_bottom = 0
+	play_button.add_theme_font_size_override("font_size", button_font_size)
+	# Green button style with opacity
+	var play_style := StyleBoxFlat.new()
+	play_style.bg_color = Color(0.2, 0.7, 0.3, 0.7)  # Green with 70% opacity
+	play_style.corner_radius_top_left = 8
+	play_style.corner_radius_top_right = 8
+	play_style.corner_radius_bottom_left = 8
+	play_style.corner_radius_bottom_right = 8
+	play_button.add_theme_stylebox_override("normal", play_style)
 
 
 func _initialize_game() -> void:

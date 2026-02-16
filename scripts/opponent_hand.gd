@@ -130,6 +130,15 @@ func _refresh_card_backs() -> void:
 		total_width = card_width
 		total_height = card_height + (card_count - 1) * overlap
 
+	# Calculate starting position for centering
+	var start_x: float = 0
+	var start_y: float = 0
+
+	if is_horizontal:
+		# Center horizontally
+		var total_width: float = card_width + (card_count - 1) * overlap
+		start_x = (size.x - total_width) / 2.0
+
 	# Create card backs
 	for i in card_count:
 		var card_back := _create_card_back(card_width, card_height)
@@ -137,8 +146,8 @@ func _refresh_card_backs() -> void:
 
 		# Position based on layout
 		if is_horizontal:
-			# Horizontal layout (top) - no rotation
-			card_back.position = Vector2(i * overlap, 0)
+			# Horizontal layout (top) - no rotation, centered
+			card_back.position = Vector2(start_x + i * overlap, start_y)
 		else:
 			# Vertical layout (left/right) - rotate 90 degrees
 			card_back.rotation_degrees = 90

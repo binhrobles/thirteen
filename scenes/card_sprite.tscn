@@ -1,0 +1,25 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/card_sprite.gd" id="1"]
+
+[node name="root" type="Control" unique_id=311279423]
+script = ExtResource("1")
+layout_mode = 3
+anchors_preset = 0
+
+[node name="Background" type="Panel" parent="." unique_id=370049111]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="RankLabel" type="Label" parent="." unique_id=505679497]
+layout_mode = 0
+text = "A"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SuitLabel" type="Label" parent="." unique_id=689913723]
+layout_mode = 0
+text = "♠"
+horizontal_alignment = 1
+vertical_alignment = 1

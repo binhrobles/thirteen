@@ -6,8 +6,7 @@ extends Control
 var card: Card
 var is_selected: bool = false
 
-@onready var texture_rect: TextureRect
-@onready var selection_panel: Panel
+var texture_rect: TextureRect
 
 ## Card dimensions as percentage of viewport height (mobile-friendly)
 ## On a 844px tall phone (iPhone 14), 18% = ~152px height
@@ -52,27 +51,6 @@ func _setup_ui() -> void:
 	texture_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # Crisp pixels
 	texture_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(texture_rect)
-
-	# Create selection panel (overlay for selection highlight)
-	selection_panel = Panel.new()
-	selection_panel.anchor_right = 1.0
-	selection_panel.anchor_bottom = 1.0
-	selection_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	var style_box := StyleBoxFlat.new()
-	style_box.bg_color = Color.TRANSPARENT
-	style_box.border_color = Color.TRANSPARENT
-	style_box.border_width_left = 0
-	style_box.border_width_right = 0
-	style_box.border_width_top = 0
-	style_box.border_width_bottom = 0
-	style_box.corner_radius_top_left = 8
-	style_box.corner_radius_top_right = 8
-	style_box.corner_radius_bottom_left = 8
-	style_box.corner_radius_bottom_right = 8
-
-	selection_panel.add_theme_stylebox_override("panel", style_box)
-	add_child(selection_panel)
 
 
 func setup(p_card: Card) -> void:
@@ -148,25 +126,45 @@ func _get_rank_name(rank: int) -> String:
 func set_selected(selected: bool) -> void:
 	"""Toggle selected state with visual feedback"""
 	is_selected = selected
+	queue_redraw()  # Trigger _draw() to redraw the selection border
 
-	var style_box: StyleBoxFlat = selection_panel.get_theme_stylebox("panel")
 
-	if is_selected:
-		# Add glowing blue border and tint
-		style_box.border_color = SELECTED_BORDER_COLOR
-		style_box.border_width_left = SELECTED_BORDER_WIDTH
-		style_box.border_width_right = SELECTED_BORDER_WIDTH
-		style_box.border_width_top = SELECTED_BORDER_WIDTH
-		style_box.border_width_bottom = SELECTED_BORDER_WIDTH
-		style_box.bg_color = SELECTED_BG_TINT
+func _draw() -> void:
+	"""Draw selection highlight if selected"""
+	if not is_selected:
+		return
+
+	# Calculate actual card bounds (texture is aspect-fit within container)
+	var container_size := size
+	var texture_aspect := 96.0 / 128.0  # Card aspect ratio (width/height)
+	var container_aspect := container_size.x / container_size.y
+
+	var card_rect: Rect2
+	if container_aspect > texture_aspect:
+		# Container is wider - card is limited by height
+		var card_width := container_size.y * texture_aspect
+		var x_offset := (container_size.x - card_width) / 2.0
+		card_rect = Rect2(x_offset, 0, card_width, container_size.y)
 	else:
-		# Reset to transparent
-		style_box.border_color = Color.TRANSPARENT
-		style_box.border_width_left = 0
-		style_box.border_width_right = 0
-		style_box.border_width_top = 0
-		style_box.border_width_bottom = 0
-		style_box.bg_color = Color.TRANSPARENT
+		# Container is taller - card is limited by width
+		var card_height := container_size.x / texture_aspect
+		var y_offset := (container_size.y - card_height) / 2.0
+		card_rect = Rect2(0, y_offset, container_size.x, card_height)
+
+	# Draw selection border
+	draw_rect(card_rect, SELECTED_BG_TINT, true, -1)  # Background tint
+
+	# Draw border as rectangles
+	var border_width := float(SELECTED_BORDER_WIDTH)
+
+	# Top border
+	draw_rect(Rect2(card_rect.position.x, card_rect.position.y, card_rect.size.x, border_width), SELECTED_BORDER_COLOR)
+	# Bottom border
+	draw_rect(Rect2(card_rect.position.x, card_rect.position.y + card_rect.size.y - border_width, card_rect.size.x, border_width), SELECTED_BORDER_COLOR)
+	# Left border
+	draw_rect(Rect2(card_rect.position.x, card_rect.position.y, border_width, card_rect.size.y), SELECTED_BORDER_COLOR)
+	# Right border
+	draw_rect(Rect2(card_rect.position.x + card_rect.size.x - border_width, card_rect.position.y, border_width, card_rect.size.y), SELECTED_BORDER_COLOR)
 
 
 func _gui_input(event: InputEvent) -> void:

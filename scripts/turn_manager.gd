@@ -3,6 +3,8 @@ extends Node
 
 ## Orchestrates turn flow between human and bots with UI updates
 
+const BotPlayerScript := preload("res://scripts/bot_player.gd")
+
 signal turn_started(player_id: int, is_human: bool)
 signal move_completed(player_id: int)
 signal game_finished()
@@ -13,7 +15,6 @@ var play_button: Button
 var pass_button: Button
 
 var game_state
-var bot_turn_delay := 1.5  # Seconds before bot plays
 
 const HUMAN_PLAYER := 0
 
@@ -89,20 +90,20 @@ func _start_bot_turn() -> void:
 		else:
 			play_area_ui.show_waiting(player_name)
 
-	# Delay before bot plays
-	await get_tree().create_timer(bot_turn_delay).timeout
+	# Random delay to simulate thinking (1.0 - 2.0 seconds)
+	var delay := randf_range(1.0, 2.0)
+	await get_tree().create_timer(delay).timeout
 	_execute_bot_turn(player_id)
 
 
 func _execute_bot_turn(player_id: int) -> void:
-	"""Execute bot's turn using hand evaluator"""
+	"""Execute bot's turn using greedy strategy"""
 	var hand: Array = game_state.get_hand(player_id)
 
-	# Evaluate all valid plays from bot's hand
-	var evaluation := BotHandEvaluator.evaluate(hand, game_state.last_play)
+	# Use greedy strategy to choose the lowest-value valid play
+	var cards_to_play: Array = BotPlayerScript.choose_play(hand, game_state.last_play)
 
-	# Check if bot has any valid plays
-	if not evaluation.has_any_plays():
+	if cards_to_play.is_empty():
 		# No valid plays - must pass
 		if game_state.last_play:
 			game_state.pass_turn(player_id)
@@ -112,30 +113,9 @@ func _execute_bot_turn(player_id: int) -> void:
 			print("ERROR: Bot has power but no valid plays!")
 		return
 
-	# Simple greedy strategy: play the lowest valid combo
-	# Priority: singles > pairs > triples > quads > runs > bombs
-	var cards_to_play: Array
-
-	if not evaluation.singles.is_empty():
-		cards_to_play = evaluation.singles[0]  # Play lowest single
-	elif not evaluation.pairs.is_empty():
-		cards_to_play = evaluation.pairs[0]
-	elif not evaluation.triples.is_empty():
-		cards_to_play = evaluation.triples[0]
-	elif not evaluation.quads.is_empty():
-		cards_to_play = evaluation.quads[0]
-	elif not evaluation.runs.is_empty():
-		cards_to_play = evaluation.runs[0]
-	elif not evaluation.bombs.is_empty():
-		cards_to_play = evaluation.bombs[0]
-
 	# Execute the play
-	if not cards_to_play.is_empty():
-		game_state.play_cards(player_id, cards_to_play)
-		_show_bot_play(player_id, cards_to_play)
-	else:
-		# Shouldn't reach here
-		print("ERROR: Bot evaluation found plays but none selected!")
+	game_state.play_cards(player_id, cards_to_play)
+	_show_bot_play(player_id, cards_to_play)
 
 
 func _show_bot_play(player_id: int, cards: Array[Card]) -> void:

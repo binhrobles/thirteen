@@ -151,7 +151,8 @@ func _reset_round() -> void:
 	# Add round reset marker to play log
 	play_log.append("round_reset")
 	round_reset.emit(current_player)
-	turn_changed.emit(current_player)
+	# Note: Don't emit turn_changed here - it's not a turn change, just a round reset
+	# TurnManager will restart the turn via the round_reset signal
 
 
 func _advance_turn() -> void:

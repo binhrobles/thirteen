@@ -188,7 +188,8 @@ func _on_turn_changed(player_id: int) -> void:
 func _on_round_reset(player_id: int) -> void:
 	"""Handle round reset (power granted)"""
 	print("Round reset! Player %d has power" % [player_id + 1])
-	# Turn will be started via turn_changed signal
+	# Restart the turn for the player who won the round
+	_start_turn()
 
 
 func _on_player_won(player_id: int, position: int) -> void:

@@ -103,10 +103,11 @@ func _execute_bot_turn(player_id: int) -> void:
 
 	# Try singles first
 	for card in hand:
-		var result = game_state.can_play(player_id, [card])
+		var cards_to_play: Array[Card] = [card]
+		var result = game_state.can_play(player_id, cards_to_play)
 		if result.valid:
-			game_state.play_cards(player_id, [card])
-			_show_bot_play(player_id, [card])
+			game_state.play_cards(player_id, cards_to_play)
+			_show_bot_play(player_id, cards_to_play)
 			play_made = true
 			break
 
@@ -118,8 +119,9 @@ func _execute_bot_turn(player_id: int) -> void:
 		else:
 			# Has power but no valid play? Just play first card
 			if not hand.is_empty():
-				game_state.play_cards(player_id, [hand[0]])
-				_show_bot_play(player_id, [hand[0]])
+				var fallback_play: Array[Card] = [hand[0]]
+				game_state.play_cards(player_id, fallback_play)
+				_show_bot_play(player_id, fallback_play)
 
 
 func _show_bot_play(player_id: int, cards: Array[Card]) -> void:

@@ -12,7 +12,9 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 - Players join a tournament (4 seats)
 - Play multiple games with the same group
 - Earn points based on finishing position (4/2/1/0 for 1st/2nd/3rd/4th)
-- Tournament continues until someone reaches target score (default: 21 points)
+- Between games: show leaderboard, all players must click "Ready" to continue
+- Tournament continues until someone reaches 21 points (fixed)
+- Tournament ends: show final leaderboard, manual reset only
 - MVP: Single global tournament; Future: Multiple tournaments (lobby selection)
 
 ## Architecture Diagram
@@ -111,6 +113,8 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 #### Action Handlers
 - `tourney/claim_seat` - Claim an available seat (0-3)
 - `tourney/leave` - Leave the tournament
+- `tourney/ready` - Mark player as ready for next game
+- `tourney/reset` - Reset tournament (admin/manual action)
 - `game/play` - Play cards
 - `game/pass` - Pass turn
 - `ping` - Heartbeat keepalive
@@ -142,11 +146,12 @@ This document describes the architecture for online multiplayer in Tiến Lên (
       connectionId: "...",
       score: 0,  // Tournament total
       gamesWon: 0,
-      lastGamePoints: 0  // Points from most recent game
+      lastGamePoints: 0,  // Points from most recent game
+      ready: false  // Ready for next game
     },
-    { position: 1, playerId: null, playerName: null, connectionId: null, score: 0, gamesWon: 0, lastGamePoints: 0 },
-    { position: 2, playerId: null, playerName: null, connectionId: null, score: 0, gamesWon: 0, lastGamePoints: 0 },
-    { position: 3, playerId: null, playerName: null, connectionId: null, score: 0, gamesWon: 0, lastGamePoints: 0 }
+    { position: 1, playerId: null, playerName: null, connectionId: null, score: 0, gamesWon: 0, lastGamePoints: 0, ready: false },
+    { position: 2, playerId: null, playerName: null, connectionId: null, score: 0, gamesWon: 0, lastGamePoints: 0, ready: false },
+    { position: 3, playerId: null, playerName: null, connectionId: null, score: 0, gamesWon: 0, lastGamePoints: 0, ready: false }
   ],
   currentGame: {
     // Only populated when status = "in_progress"
@@ -203,6 +208,14 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 }
 ```
 
+#### Ready Up
+```javascript
+{
+  action: "tourney/ready",
+  payload: {}
+}
+```
+
 #### Play Cards
 ```javascript
 {
@@ -243,14 +256,15 @@ This document describes the architecture for online multiplayer in Tiến Lên (
   payload: {
     status: "waiting" | "starting" | "in_progress" | "between_games" | "completed",
     seats: [
-      { position: 0, playerName: "Player 1", score: 10, gamesWon: 2 },
-      { position: 1, playerName: null, score: 0, gamesWon: 0 },
-      { position: 2, playerName: "Player 3", score: 8, gamesWon: 1 },
-      { position: 3, playerName: null, score: 0, gamesWon: 0 }
+      { position: 0, playerName: "Player 1", score: 10, gamesWon: 2, ready: false },
+      { position: 1, playerName: null, score: 0, gamesWon: 0, ready: false },
+      { position: 2, playerName: "Player 3", score: 8, gamesWon: 1, ready: true },
+      { position: 3, playerName: "Player 4", score: 5, gamesWon: 0, ready: false }
     ],
     yourPosition: 0,  // Your claimed seat, or null if not seated
     targetScore: 21,
-    currentGameNumber: 3
+    currentGameNumber: 3,
+    readyCount: 1  // How many players are ready (for between_games state)
   }
 }
 ```
@@ -380,10 +394,10 @@ Player 1 (Client)          Server                  Other Players
 
 ### States
 1. **waiting** - Players claiming seats, not all seats filled
-2. **starting** - All 4 seats claimed, countdown before first game starts (3 seconds)
+2. **starting** - All 4 seats claimed, waiting for all players to ready up for first game
 3. **in_progress** - Game is active
-4. **between_games** - Game finished, showing leaderboard, auto-start next game (5 seconds)
-5. **completed** - Tournament finished (someone reached target score)
+4. **between_games** - Game finished, showing leaderboard, waiting for all players to ready up
+5. **completed** - Tournament finished (someone reached 21 points), manual reset required
 
 ### State Transitions
 
@@ -398,7 +412,7 @@ Player 1 (Client)          Server                  Other Players
     │ starting │────────────────┘
     └────┬─────┘
          │
-         │ (countdown ends)
+         │ (all 4 ready)
          ▼
     ┌──────────────┐
     │ in_progress  │◄─────────────┐
@@ -411,14 +425,14 @@ Player 1 (Client)          Server                  Other Players
     │ (show scores)  │            │
     └────┬───────────┘            │
          │                        │
-         │ (5s countdown)         │
+         │ (all 4 ready)          │
          │ if no winner           │
          ├────────────────────────┘
          │
-         │ (someone reached target)
+         │ (someone reached 21)
          ▼
     ┌──────────┐
-    │ completed│ (tourney ends, seats cleared)
+    │ completed│ (manual reset required)
     └──────────┘
 ```
 
@@ -431,23 +445,28 @@ Player 1 (Client)          Server                  Other Players
 
 **starting:**
 - ❌ Claim seat (all full)
-- ✅ Leave tourney (cancels countdown, frees seat, resets scores)
-- ⏳ 3 second countdown
+- ✅ Leave tourney (frees seat, resets scores to 0, back to waiting if <4 players)
+- ✅ Ready up (mark ready for first game)
+- ⏳ Waiting for all 4 players to ready up
 
 **in_progress:**
 - ❌ Claim seat (tourney in progress)
+- ❌ Ready up (not applicable during game)
 - ⚠️ Leave tourney (disconnect handling, replaced by bot after timeout)
 - 🎮 Play game
 
 **between_games:**
 - ❌ Claim seat (tourney in progress)
+- ✅ Ready up (mark ready for next game)
 - ⚠️ Leave tourney (forfeit tournament, replaced by bot)
 - 📊 Show leaderboard with points from last game
-- ⏳ 5 second countdown to next game
+- ⏳ Waiting for all 4 players to ready up
 
 **completed:**
+- ❌ Claim seat (tourney ended)
+- ❌ Ready up (tourney ended)
 - 🏆 Show final leaderboard with tournament winner
-- 🔄 After timeout, reset to waiting (clears all state)
+- 🔄 Manual reset required (admin action or all players leave)
 
 ## Error Handling & Reconnection
 
@@ -675,7 +694,12 @@ Use **AWS CDK** (TypeScript) for infrastructure definition
 ### 4. Between-Game Flow ✅
 **Question:** Auto-start next game or require manual ready?
 
-**Decision:** Auto-start after 5 seconds showing leaderboard. Keeps momentum.
+**Decision:** All players must click "Ready" to start next game. Prevents rushed starts.
+
+### 5. Tournament Completion ✅
+**Question:** Auto-reset tournament or manual?
+
+**Decision:** Manual reset only. Final leaderboard stays visible until reset.
 
 ### 3. Game State Storage
 **Question:** Store full game history or just current state?

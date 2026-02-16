@@ -133,11 +133,16 @@ func _refresh_card_backs() -> void:
 		var card_back := _create_card_back(card_width, card_height)
 		card_container.add_child(card_back)
 
+		# Rotate cards for left/right positions
+		if not is_horizontal:
+			card_back.rotation_degrees = 90
+
 		# Position based on layout
 		if is_horizontal:
 			card_back.position = Vector2(i * overlap, 0)
 		else:
-			card_back.position = Vector2(0, i * overlap)
+			# Adjust position for rotated cards
+			card_back.position = Vector2(card_height / 2, i * overlap + card_width / 2)
 
 		card_backs.append(card_back)
 

@@ -128,9 +128,9 @@ func show_power_state(player_name: String, is_player: bool) -> void:
 	_clear_cards()
 	player_label.text = ""
 	if is_player:
-		status_label.text = "Your turn - play anything!"
+		status_label.text = "Your turn to open!"
 	else:
-		status_label.text = "Waiting for %s..." % player_name
+		status_label.text = "%s is opening..." % player_name
 	show()
 
 
@@ -138,7 +138,7 @@ func show_waiting(player_name: String) -> void:
 	"""Show waiting for another player"""
 	_clear_cards()
 	player_label.text = ""
-	status_label.text = "Waiting for %s..." % player_name
+	status_label.text = "It's on %s..." % player_name
 	show()
 
 

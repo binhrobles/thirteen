@@ -13,7 +13,7 @@ func _ready() -> void:
 	test_quads()
 	test_runs()
 	test_bombs()
-	test_opening_move()
+	# test_opening_move()  # TODO: implement this test
 	test_beating_plays()
 	test_chop_rules()
 
@@ -22,15 +22,11 @@ func _ready() -> void:
 
 # ── Test Helpers ──────────────────────────────────────────────
 
-func make_card(rank: Card.Rank, suit: Card.Suit) -> Card:
-	return Card.new(rank, suit)
-
-
 func make_hand(card_specs: Array) -> Array[Card]:
 	"""Create a hand from array of [rank, suit] pairs"""
 	var hand: Array[Card] = []
 	for spec in card_specs:
-		hand.append(make_card(spec[0], spec[1]))
+		hand.append(Card.new(spec[0], spec[1]))
 	return hand
 
 
@@ -61,15 +57,17 @@ func assert_count(result: BotHandEvaluator.EvaluationResult, combo_type: String,
 func test_singles() -> void:
 	print("Testing singles enumeration...")
 
-	# Opening move: all cards are valid singles
+	# Opening move: all cards are valid singles, one run
 	var hand := make_hand([
 		[Card.Rank.THREE, Card.Suit.SPADES],
+		[Card.Rank.FOUR, Card.Suit.HEARTS],
 		[Card.Rank.FIVE, Card.Suit.HEARTS],
 		[Card.Rank.SEVEN, Card.Suit.CLUBS]
 	])
 
 	var result := BotHandEvaluator.evaluate(hand, null)
-	assert_count(result, "singles", 3)
+	assert_count(result, "singles", 4)
+	assert_count(result, "runs", 1)
 
 	# Must beat a single 5♥
 	var last_play := Play.new(Play.Combo.SINGLE, make_hand([
@@ -179,9 +177,18 @@ func test_runs() -> void:
 
 	# 2s cannot be in runs
 	hand = make_hand([
+		[Card.Rank.KING, Card.Suit.SPADES],
 		[Card.Rank.ACE, Card.Suit.SPADES],
 		[Card.Rank.TWO, Card.Suit.HEARTS],
-		[Card.Rank.THREE, Card.Suit.CLUBS]
+	])
+
+	result = BotHandEvaluator.evaluate(hand, null)
+	assert_count(result, "runs", 0)
+
+	hand = make_hand([
+		[Card.Rank.TWO, Card.Suit.HEARTS],
+		[Card.Rank.THREE, Card.Suit.HEARTS],
+		[Card.Rank.FOUR, Card.Suit.HEARTS],
 	])
 
 	result = BotHandEvaluator.evaluate(hand, null)
@@ -195,19 +202,19 @@ func test_bombs() -> void:
 
 	# Minimal bomb: 3 consecutive pairs (6 cards)
 	var hand := make_hand([
-		[Card.Rank.THREE, Card.Suit.SPADES],
-		[Card.Rank.THREE, Card.Suit.HEARTS],
-		[Card.Rank.FOUR, Card.Suit.CLUBS],
-		[Card.Rank.FOUR, Card.Suit.DIAMONDS],
-		[Card.Rank.FIVE, Card.Suit.SPADES],
-		[Card.Rank.FIVE, Card.Suit.HEARTS]
+		[Card.Rank.EIGHT, Card.Suit.SPADES],
+		[Card.Rank.EIGHT, Card.Suit.HEARTS],
+		[Card.Rank.NINE, Card.Suit.CLUBS],
+		[Card.Rank.NINE, Card.Suit.DIAMONDS],
+		[Card.Rank.TEN, Card.Suit.SPADES],
+		[Card.Rank.TEN, Card.Suit.HEARTS]
 	])
 
-	# Can't open with bombs
+	# Can open with bombs
 	var result := BotHandEvaluator.evaluate(hand, null)
-	assert_count(result, "bombs", 0)
+	assert_count(result, "bombs", 1)
 
-	# But can play bomb to beat a run
+	# Cannot play bomb to beat a run
 	var last_play := Play.new(Play.Combo.RUN, make_hand([
 		[Card.Rank.SIX, Card.Suit.SPADES],
 		[Card.Rank.SEVEN, Card.Suit.HEARTS],
@@ -216,24 +223,12 @@ func test_bombs() -> void:
 	result = BotHandEvaluator.evaluate(hand, last_play)
 	assert_count(result, "bombs", 0)  # Bomb doesn't beat a 3-card run
 
-
-# ── Opening Move Tests ──────────────────────────────────────────────
-
-func test_opening_move() -> void:
-	print("\nTesting opening move (power state)...")
-
-	var hand := make_hand([
-		[Card.Rank.THREE, Card.Suit.SPADES],
-		[Card.Rank.FOUR, Card.Suit.HEARTS],
-		[Card.Rank.FIVE, Card.Suit.CLUBS],
-		[Card.Rank.FIVE, Card.Suit.DIAMONDS]
-	])
-
-	# With power (last_play = null), can't open with bomb
-	var result := BotHandEvaluator.evaluate(hand, null)
-
-	# Should find singles, pairs, runs, but no bombs when opening
-	print("  ✓ Opening move allows non-bomb combos")
+	# But can play bomb to beat a 2
+	last_play = Play.new(Play.Combo.SINGLE, make_hand([
+		[Card.Rank.TWO, Card.Suit.CLUBS]
+	]))
+	result = BotHandEvaluator.evaluate(hand, last_play)
+	assert_count(result, "bombs", 1)
 
 
 # ── Beating Plays Tests ──────────────────────────────────────────────
@@ -266,11 +261,13 @@ func test_beating_plays() -> void:
 		[Card.Rank.FIVE, Card.Suit.SPADES],
 		[Card.Rank.FIVE, Card.Suit.HEARTS],
 		[Card.Rank.SEVEN, Card.Suit.CLUBS],
-		[Card.Rank.SEVEN, Card.Suit.DIAMONDS]
+		[Card.Rank.SEVEN, Card.Suit.DIAMONDS],
+		[Card.Rank.SEVEN, Card.Suit.HEARTS]
 	])
 
 	result = BotHandEvaluator.evaluate(hand, last_play)
-	assert_count(result, "pairs", 2)  # Both pairs beat 3s
+	assert_count(result, "pairs", 4)  # All pairs beat 3s (7 has 3 permutations)
+	assert_count(result, "triples", 0)  # Triples don't beat pairs
 
 
 # ── Chop Rules Tests ──────────────────────────────────────────────
@@ -301,6 +298,65 @@ func test_chop_rules() -> void:
 		[Card.Rank.FOUR, Card.Suit.DIAMONDS],
 		[Card.Rank.FIVE, Card.Suit.SPADES],
 		[Card.Rank.FIVE, Card.Suit.HEARTS]
+	])
+
+	result = BotHandEvaluator.evaluate(hand, last_play)
+	assert_count(result, "bombs", 1)
+
+	# 4-pair bomb (8 cards) cannot chop pair of 2s
+	hand = make_hand([
+		[Card.Rank.THREE, Card.Suit.SPADES],
+		[Card.Rank.THREE, Card.Suit.HEARTS],
+		[Card.Rank.FOUR, Card.Suit.CLUBS],
+		[Card.Rank.FOUR, Card.Suit.DIAMONDS],
+		[Card.Rank.FIVE, Card.Suit.SPADES],
+		[Card.Rank.FIVE, Card.Suit.HEARTS],
+		[Card.Rank.SIX, Card.Suit.SPADES],
+		[Card.Rank.SIX, Card.Suit.HEARTS]
+	])
+
+	result = BotHandEvaluator.evaluate(hand, last_play)
+	assert_count(result, "bombs", 2) # 33-44-55 and 44-55-66, but not 33-44-55-66
+
+	# Quad cannot chop a pair of 2s
+	hand = make_hand([
+		[Card.Rank.THREE, Card.Suit.SPADES],
+		[Card.Rank.THREE, Card.Suit.CLUBS],
+		[Card.Rank.THREE, Card.Suit.DIAMONDS],
+		[Card.Rank.THREE, Card.Suit.HEARTS]
+	])
+
+	last_play = Play.new(Play.Combo.PAIR, make_hand([
+		[Card.Rank.TWO, Card.Suit.HEARTS],
+		[Card.Rank.TWO, Card.Suit.SPADES]
+	]))
+
+	result = BotHandEvaluator.evaluate(hand, last_play)
+	assert_count(result, "quads", 0)
+
+	# 3-pair bomb (6 cards) cannot chop pair of 2s
+	hand = make_hand([
+		[Card.Rank.THREE, Card.Suit.SPADES],
+		[Card.Rank.THREE, Card.Suit.HEARTS],
+		[Card.Rank.FOUR, Card.Suit.CLUBS],
+		[Card.Rank.FOUR, Card.Suit.DIAMONDS],
+		[Card.Rank.FIVE, Card.Suit.SPADES],
+		[Card.Rank.FIVE, Card.Suit.HEARTS]
+	])
+
+	result = BotHandEvaluator.evaluate(hand, last_play)
+	assert_count(result, "bombs", 0)
+
+	# 4-pair bomb (8 cards) can chop pair of 2s
+	hand = make_hand([
+		[Card.Rank.THREE, Card.Suit.SPADES],
+		[Card.Rank.THREE, Card.Suit.HEARTS],
+		[Card.Rank.FOUR, Card.Suit.CLUBS],
+		[Card.Rank.FOUR, Card.Suit.DIAMONDS],
+		[Card.Rank.FIVE, Card.Suit.SPADES],
+		[Card.Rank.FIVE, Card.Suit.HEARTS],
+		[Card.Rank.SIX, Card.Suit.SPADES],
+		[Card.Rank.SIX, Card.Suit.HEARTS]
 	])
 
 	result = BotHandEvaluator.evaluate(hand, last_play)

@@ -21,7 +21,6 @@ A multiplayer Vietnamese card game (Tiến Lên / Thirteen) playable on mobile b
 - **Beating:** Must play same combo type with higher value (compare highest card)
 - **Runs go indefinitely** -- no upper bound on length, but 2s cannot appear in runs
 - **Suited runs enforced** -- if a suited run is played, it must be beaten by a suited run
-- **No opening with bombs** -- can't lead a round with a bomb
 - **Chop rules:** Quad beats single 2. Bombs beat 2s by length (3-pair → single 2, 4-pair → pair of 2s, 5-pair → triple 2s)
 - **Passing:** locks you out of the round until it resets. When all others pass, last player gets "power" (can play anything)
 - **Winning:** first to shed all cards is 1st, game continues until 1 player remains

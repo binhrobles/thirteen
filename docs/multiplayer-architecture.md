@@ -25,12 +25,13 @@ This document describes the architecture for online multiplayer in Tiến Lên (
                                    │  - actions/*    │
                                    └────────┬────────┘
                                             │
-                      ┌─────────────────────┼─────────────────────┐
-                      ▼                     ▼                     ▼
-              ┌──────────────┐      ┌──────────────┐     ┌──────────────┐
-              │  DynamoDB    │      │  DynamoDB    │     │  DynamoDB    │
-              │ Connections  │      │   Lobbies    │     │    Games     │
-              └──────────────┘      └──────────────┘     └──────────────┘
+                      ┌─────────────────────┴─────────────────────┐
+                      ▼                                           ▼
+              ┌──────────────┐                            ┌──────────────┐
+              │  DynamoDB    │                            │  DynamoDB    │
+              │ Connections  │                            │     Room     │
+              └──────────────┘                            │  (singleton) │
+                                                          └──────────────┘
 ```
 
 ## Core Components
@@ -81,15 +82,15 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 
 **Responsibilities:**
 - Remove connection from Connections table
-- Update lobby/game state (mark player as disconnected)
-- Notify other players in same lobby/game
+- Free player's seat in the room
+- Notify other players in the room
 - Start reconnection timeout (60 seconds)
 
 #### Message Router (`$default`)
 ```javascript
 // Input: WebSocket message with action and payload
 {
-  action: "lobby/create" | "lobby/join" | "game/play" | ...,
+  action: "room/claim_seat" | "room/leave" | "game/play" | ...,
   payload: { ... }
 }
 ```
@@ -100,10 +101,8 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 - Handle errors gracefully
 
 #### Action Handlers
-- `lobby/create` - Create new lobby
-- `lobby/join` - Join existing lobby
-- `lobby/leave` - Leave lobby
-- `lobby/start` - Start game from lobby
+- `room/claim_seat` - Claim an available seat (0-3)
+- `room/leave` - Leave the room
 - `game/play` - Play cards
 - `game/pass` - Pass turn
 - `ping` - Heartbeat keepalive
@@ -121,33 +120,19 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 }
 ```
 
-#### Lobbies Table
+#### Room Table (Singleton)
 ```javascript
 {
-  lobbyId: "string (PK, uuid-v4)",
-  ownerId: "string",
+  roomId: "string (PK, always 'global')",
   status: "waiting | starting | in_progress | completed",
   seats: [
-    { position: 0, playerId: "uuid", playerName: "...", ready: false },
-    { position: 1, playerId: null, playerName: null, ready: false },
-    { position: 2, playerId: null, playerName: null, ready: false },
-    { position: 3, playerId: null, playerName: null, ready: false }
+    { position: 0, playerId: "uuid | null", playerName: "...", connectionId: "..." },
+    { position: 1, playerId: null, playerName: null, connectionId: null },
+    { position: 2, playerId: null, playerName: null, connectionId: null },
+    { position: 3, playerId: null, playerName: null, connectionId: null }
   ],
-  createdAt: "number",
-  updatedAt: "number",
-  ttl: "number (24 hours)"
-}
-```
-
-#### Games Table
-```javascript
-{
-  gameId: "string (PK, same as lobbyId)",
-  lobbyId: "string",
-  status: "in_progress | completed",
-  players: ["playerId1", "playerId2", "playerId3", "playerId4"],
   gameState: {
-    // Serialized game state (hands, current player, last play, etc.)
+    // Only populated when status = "in_progress"
     currentPlayer: 0,
     hands: [[...cards], [...cards], [...cards], [...cards]],
     lastPlay: { playerId: 0, cards: [...], combo: "..." },
@@ -159,55 +144,38 @@ This document describes the architecture for online multiplayer in Tiến Lên (
     { playerId: 0, action: "play", cards: [...], timestamp: "..." },
     { playerId: 1, action: "pass", timestamp: "..." }
   ],
+  gameNumber: 0,  // Increments each time a game completes
   createdAt: "number",
-  updatedAt: "number",
-  ttl: "number (7 days)"
+  updatedAt: "number"
 }
 ```
+
+**Notes:**
+- Single global room (roomId = "global")
+- No TTL - persists indefinitely
+- When game completes, status → "waiting", seats cleared, gameState reset
+- gameNumber tracks total games played
 
 ## WebSocket Message Formats
 
 ### Client → Server Messages
 
-#### Create Lobby
+#### Claim Seat
 ```javascript
 {
-  action: "lobby/create",
+  action: "room/claim_seat",
   payload: {
-    playerName: "Player 1"
+    playerName: "Player 1",
+    seatPosition: 0  // 0-3, or null for first available
   }
 }
 ```
 
-#### Join Lobby
+#### Leave Room
 ```javascript
 {
-  action: "lobby/join",
-  payload: {
-    lobbyId: "uuid-v4",
-    playerName: "Player 2",
-    seatPosition: 1  // optional, null = any available seat
-  }
-}
-```
-
-#### Leave Lobby
-```javascript
-{
-  action: "lobby/leave",
-  payload: {
-    lobbyId: "uuid-v4"
-  }
-}
-```
-
-#### Start Game
-```javascript
-{
-  action: "lobby/start",
-  payload: {
-    lobbyId: "uuid-v4"
-  }
+  action: "room/leave",
+  payload: {}
 }
 ```
 
@@ -216,7 +184,6 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 {
   action: "game/play",
   payload: {
-    gameId: "uuid-v4",
     cards: [
       { rank: 3, suit: 0, value: 0 },
       { rank: 3, suit: 1, value: 1 }
@@ -229,9 +196,7 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 ```javascript
 {
   action: "game/pass",
-  payload: {
-    gameId: "uuid-v4"
-  }
+  payload: {}
 }
 ```
 
@@ -247,24 +212,19 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 
 ### Server → Client Messages
 
-#### Lobby Created
+#### Room Updated
 ```javascript
 {
-  type: "lobby/created",
+  type: "room/updated",
   payload: {
-    lobbyId: "uuid-v4",
-    lobby: { /* lobby object */ }
-  }
-}
-```
-
-#### Lobby Updated
-```javascript
-{
-  type: "lobby/updated",
-  payload: {
-    lobbyId: "uuid-v4",
-    lobby: { /* lobby object */ }
+    status: "waiting" | "starting" | "in_progress" | "completed",
+    seats: [
+      { position: 0, playerName: "Player 1" },
+      { position: 1, playerName: null },
+      { position: 2, playerName: "Player 3" },
+      { position: 3, playerName: null }
+    ],
+    yourPosition: 0  // Your claimed seat, or null if not seated
   }
 }
 ```
@@ -274,7 +234,6 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 {
   type: "game/started",
   payload: {
-    gameId: "uuid-v4",
     yourPosition: 0,
     yourHand: [{ rank: 3, suit: 0, value: 0 }, ...],
     currentPlayer: 2,
@@ -288,7 +247,6 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 {
   type: "game/updated",
   payload: {
-    gameId: "uuid-v4",
     currentPlayer: 1,
     lastPlay: {
       playerId: 0,
@@ -307,7 +265,6 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 {
   type: "game/move",
   payload: {
-    gameId: "uuid-v4",
     playerId: 0,
     action: "play" | "pass",
     cards: [{ rank: 3, suit: 0, value: 0 }, ...], // only if action = play
@@ -321,7 +278,6 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 {
   type: "game/over",
   payload: {
-    gameId: "uuid-v4",
     winOrder: [0, 2, 1, 3]
   }
 }
@@ -332,7 +288,7 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 {
   type: "error",
   payload: {
-    code: "INVALID_MOVE" | "NOT_YOUR_TURN" | "LOBBY_FULL" | ...,
+    code: "INVALID_MOVE" | "NOT_YOUR_TURN" | "SEAT_TAKEN" | "ROOM_FULL" | ...,
     message: "Human-readable error message"
   }
 }
@@ -385,25 +341,25 @@ Player 1 (Client)          Server                  Other Players
 - **Stale state:** Client includes sequence number with moves, server rejects if out of sync
 - **Recovery:** Client can request full state with `game/sync` action
 
-## Lobby Lifecycle
+## Room Lifecycle
 
 ### States
-1. **waiting** - Players joining, not all seats filled
-2. **starting** - All seats filled, countdown before game starts (5 seconds)
+1. **waiting** - Players claiming seats, not all seats filled
+2. **starting** - All 4 seats claimed, countdown before game starts (3 seconds)
 3. **in_progress** - Game is active
-4. **completed** - Game finished
+4. **completed** - Game finished, resets to waiting
 
 ### State Transitions
 
 ```
     ┌──────────┐
-    │  waiting │◄───────────┐
-    └────┬─────┘            │
-         │                  │
-         │ (4 players)      │ (player leaves)
-         ▼                  │
-    ┌──────────┐            │
-    │ starting │────────────┘
+    │  waiting │◄───────────────┐
+    └────┬─────┘                │
+         │                      │
+         │ (4 seats filled)     │ (player leaves)
+         ▼                      │
+    ┌──────────┐                │
+    │ starting │────────────────┘
     └────┬─────┘
          │
          │ (countdown ends)
@@ -415,30 +371,30 @@ Player 1 (Client)          Server                  Other Players
          │ (game over)
          ▼
     ┌──────────┐
-    │ completed│
+    │ completed├──────► (auto-reset to waiting)
     └──────────┘
 ```
 
 ### Actions by State
 
 **waiting:**
-- ✅ Join lobby
-- ✅ Leave lobby
-- ❌ Start game (need 4 players)
+- ✅ Claim seat (if available)
+- ✅ Leave room (frees seat)
+- ⏳ Waiting for 4 players
 
 **starting:**
-- ❌ Join lobby (full)
-- ✅ Leave lobby (cancels countdown)
-- ⏳ Waiting for countdown
+- ❌ Claim seat (all full)
+- ✅ Leave room (cancels countdown, frees seat)
+- ⏳ 3 second countdown
 
 **in_progress:**
-- ❌ Join lobby
-- ⚠️ Leave lobby (disconnect handling)
+- ❌ Claim seat
+- ⚠️ Leave room (disconnect handling, replaced by bot after timeout)
 - 🎮 Play game
 
 **completed:**
-- ❌ All actions disabled
-- 🗑️ Cleanup after TTL
+- 🔄 Auto-reset to waiting (clears seats, resets game state)
+- 📊 Increment gameNumber
 
 ## Error Handling & Reconnection
 
@@ -493,19 +449,19 @@ Player 1 (Client)          Server                  Other Players
 
 #### Server Behavior
 1. On disconnect, keep game state for 60 seconds
-2. Mark player as "disconnected" in lobby/game
+2. Mark player as "disconnected" in room
 3. Notify other players: "Player X disconnected"
 4. If player reconnects within 60s:
    - Restore connection
-   - Send current game state
+   - Send current room/game state
    - Notify others: "Player X reconnected"
 5. If timeout expires:
-   - In lobby: Remove player, free seat
-   - In game: Replace with bot OR forfeit (TBD)
+   - In waiting/starting: Free seat, cancel countdown if starting
+   - In game: Replace with bot
 
 ### Reconnection Window
-- **Lobby:** 60 seconds → then remove from lobby
-- **Game:** 60 seconds → then replace with bot or forfeit
+- **Waiting/Starting:** 60 seconds → then free seat
+- **Game:** 60 seconds → then replace with bot
 
 ## Player Authentication & Identity
 
@@ -606,12 +562,12 @@ Use **AWS CDK** (TypeScript) for infrastructure definition
 
 ### Integration Tests
 - WebSocket connection flow
-- Lobby creation/join/leave
+- Seat claiming/leaving in room
 - Game play flow (simulated 4 players)
 
 ### E2E Tests
 - Godot client → API Gateway → Lambda → DynamoDB
-- Full game from lobby creation to game over
+- Full game from seat claiming to game over
 - Reconnection scenarios
 
 ### Load Testing
@@ -631,35 +587,26 @@ Use **AWS CDK** (TypeScript) for infrastructure definition
 
 ### Phase 3: Hybrid Mode
 - Support both local (bots) and online (humans) in same game
-- Bot fills empty seats in lobbies
+- Bot fills empty seats automatically
 
-### Phase 4: Advanced Features
-- Tournament mode (separate epic)
-- RL-trained bots (separate epic)
+### Phase 4: Advanced Features (Future Epics)
+- Multiple rooms/lobbies (invite-only or public)
+- Tournament mode with scoring
+- RL-trained bots
 - Spectator mode
 - Replay system
 
 ## Open Questions & Decisions
 
-### 1. Bot Replacement on Disconnect
+### 1. Bot Replacement on Disconnect ✅
 **Question:** When a player disconnects mid-game, replace with bot or forfeit?
 
-**Options:**
-- A) Replace with bot → game continues smoothly
-- B) Forfeit → simpler, but ruins game for others
-- C) Pause and wait → annoying for other players
+**Decision:** Replace with bot after 60s timeout → game continues smoothly
 
-**Recommendation:** Option A (replace with bot after 60s timeout)
+### 2. Lobby System ✅
+**Question:** Single room vs multiple lobbies?
 
-### 2. Lobby Visibility
-**Question:** Should lobbies be publicly discoverable or invite-only?
-
-**Options:**
-- A) Public lobby list → easier to find games
-- B) Invite-only → more private, need invite links
-- C) Both → public + private lobbies
-
-**Recommendation:** Option C for flexibility
+**Decision (MVP):** Single global room with 4 seats. Future: multiple rooms/lobbies
 
 ### 3. Game State Storage
 **Question:** Store full game history or just current state?

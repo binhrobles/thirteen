@@ -17,8 +17,6 @@ static func try_opening_move(cards: Array[Card]) -> MoveResult:
 	var combo := Play.determine_combo(cards)
 	if combo == Play.Combo.INVALID:
 		return MoveResult.new(false, null, "That's not a valid hand")
-	if combo == Play.Combo.BOMB:
-		return MoveResult.new(false, null, "Can't open with a bomb")
 	var suited := Play.is_run(cards) and Play.is_suited(cards)
 	return MoveResult.new(true, Play.new(combo, cards, suited))
 

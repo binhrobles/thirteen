@@ -24,6 +24,8 @@ func _setup_ui() -> void:
 	anchor_top = 0.0
 	anchor_bottom = 1.0
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	z_index = 200  # Render above everything else
+	z_as_relative = false  # Use absolute z-index
 
 	# Semi-transparent background
 	background = Panel.new()

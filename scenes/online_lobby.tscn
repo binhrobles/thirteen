@@ -46,27 +46,37 @@ theme_override_constants/separation = 30
 
 [node name="Title" type="Label" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 56
 text = "Online Multiplayer"
 horizontal_alignment = 1
 
-[node name="ServerURLInput" type="LineEdit" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 80)
+[node name="Spacer1" type="Control" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
-placeholder_text = "Server URL (e.g., ws://localhost:3001)"
 
-[node name="PlayerNameInput" type="LineEdit" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 80)
-layout_mode = 2
-theme_override_font_sizes/font_size = 24
-placeholder_text = "Your Name"
-
-[node name="ConnectButton" type="Button" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 100)
+[node name="NameLabel" type="Label" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 32
-text = "Connect to Server"
+text = "Enter Your Name:"
+horizontal_alignment = 1
+
+[node name="PlayerNameInput" type="LineEdit" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+alignment = 1
+placeholder_text = "Your Name"
+
+[node name="Spacer2" type="Control" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="ConnectButton" type="Button" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 40
+text = "🌐 Connect"
 
 [node name="StatusLabel" type="Label" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2

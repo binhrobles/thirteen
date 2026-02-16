@@ -5,7 +5,6 @@ extends Control
 
 @onready var connection_panel: Panel = $ConnectionPanel
 @onready var lobby_panel: Panel = $LobbyPanel
-@onready var server_url_input: LineEdit = $ConnectionPanel/MarginContainer/VBoxContainer/ServerURLInput
 @onready var player_name_input: LineEdit = $ConnectionPanel/MarginContainer/VBoxContainer/PlayerNameInput
 @onready var connect_button: Button = $ConnectionPanel/MarginContainer/VBoxContainer/ConnectButton
 @onready var status_label: Label = $ConnectionPanel/MarginContainer/VBoxContainer/StatusLabel
@@ -24,14 +23,16 @@ var player_id: String = ""
 var is_ready: bool = false
 
 
+const PROD_SERVER_URL = "wss://6u47cryn67.execute-api.us-east-1.amazonaws.com/prod"
+
+
 func _ready() -> void:
 	# Generate player ID
 	player_id = _generate_uuid()
 
-	# Set production server URL (hardcoded)
-	server_url_input.text = "wss://6u47cryn67.execute-api.us-east-1.amazonaws.com/prod"
-	server_url_input.editable = false  # Don't allow editing in production
+	# Set default player name
 	player_name_input.text = "Player_%d" % randi_range(1000, 9999)
+	player_name_input.select_all()  # Select all so user can just start typing
 
 	# Connect button signals
 	connect_button.pressed.connect(_on_connect_pressed)
@@ -70,14 +71,17 @@ func _create_seat_buttons() -> void:
 
 
 func _on_connect_pressed() -> void:
-	var url = server_url_input.text
-	var p_name = player_name_input.text
+	var p_name = player_name_input.text.strip_edges()
 
-	if url.is_empty() or p_name.is_empty():
-		status_label.text = "Error: URL and Name required"
+	if p_name.is_empty():
+		status_label.text = "Please enter your name"
+		player_name_input.grab_focus()
 		return
 
-	WebSocketClient.connect_to_server(url, player_id, p_name)
+	# Connect to production server
+	status_label.text = "Connecting..."
+	connect_button.disabled = true
+	WebSocketClient.connect_to_server(PROD_SERVER_URL, player_id, p_name)
 
 
 func _on_back_pressed() -> void:
@@ -125,10 +129,12 @@ func _on_ws_disconnected() -> void:
 	print("Disconnected from server")
 	lobby_panel.hide()
 	connection_panel.show()
+	connect_button.disabled = false
 
 
-func _on_ws_error(error: String) -> void:
-	status_label.text = "Error: %s" % error
+func _on_ws_error(_error: String) -> void:
+	status_label.text = "Connection failed. Try again."
+	connect_button.disabled = false
 
 
 func _on_tourney_updated(payload: Dictionary) -> void:

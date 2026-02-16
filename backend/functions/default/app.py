@@ -58,6 +58,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Route to appropriate handler
         if action == 'ping':
             return handle_ping(connection_id, payload)
+        elif action == 'tourney/info':
+            return handle_tourney_info(connection_id, player_id, payload)
         elif action == 'tourney/claim_seat':
             return handle_claim_seat(connection_id, player_id, player_name, payload)
         elif action == 'tourney/leave':
@@ -96,6 +98,27 @@ def handle_ping(connection_id: str, payload: Dict[str, Any]) -> Dict[str, int]:
         'type': 'pong',
         'payload': {'timestamp': timestamp}
     })
+
+
+def handle_tourney_info(connection_id: str, player_id: str, _payload: Dict[str, Any]) -> Dict[str, int]:
+    """Handle tourney/info action - send current tournament state to requesting player"""
+    try:
+        # Get tournament
+        tourney = get_or_create_tourney()
+
+        # Send tournament state to the requesting player
+        send_to_connection(connection_id, {
+            'type': 'tourney/updated',
+            'payload': tourney.to_client_state()
+        })
+
+        return {'statusCode': 200}
+
+    except Exception as e:
+        print(f'Error getting tourney info: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to get tournament info')
 
 
 def handle_claim_seat(connection_id: str, player_id: str, player_name: str, payload: Dict[str, Any]) -> Dict[str, int]:

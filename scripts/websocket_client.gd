@@ -192,6 +192,9 @@ func _on_connection_established() -> void:
 	# Start heartbeat
 	ping_timer.start()
 
+	# Request initial tournament info
+	send_message("tourney/info")
+
 
 ## Internal: Handle connection closed
 func _on_connection_closed() -> void:

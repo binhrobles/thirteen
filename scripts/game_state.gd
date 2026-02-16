@@ -148,6 +148,8 @@ func _reset_round() -> void:
 	last_play_by = -1  # Reset who made the last play
 	for i in NUM_PLAYERS:
 		players_in_round[i] = players_in_game[i]
+	# Add round reset marker to play log
+	play_log.append("round_reset")
 	round_reset.emit(current_player)
 	turn_changed.emit(current_player)
 

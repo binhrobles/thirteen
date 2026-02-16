@@ -4,6 +4,7 @@ const PlayerHandScene := preload("res://scenes/player_hand.tscn")
 const PlayAreaScene := preload("res://scenes/play_area.tscn")
 const GameStateScript := preload("res://scripts/game_state.gd")
 const OpponentHandScript := preload("res://scripts/opponent_hand.gd")
+const PlayHistoryDrawerScript := preload("res://scripts/play_history_drawer.gd")
 
 @onready var play_button: Button = $PlayButton
 @onready var pass_button: Button = $PassButton
@@ -14,6 +15,7 @@ var game_state
 var turn_manager
 var player_hand_ui
 var play_area_ui
+var play_history_drawer
 var opponent_hands: Array = []  # Array of OpponentHand for players 1, 2, 3
 
 
@@ -96,6 +98,13 @@ func _initialize_game() -> void:
 
 	play_area_ui = PlayAreaScene.instantiate()
 	add_child(play_area_ui)
+
+	# Create play history drawer
+	play_history_drawer = PlayHistoryDrawerScript.new()
+	add_child(play_history_drawer)
+
+	# Connect play area signal to show history drawer
+	play_area_ui.history_requested.connect(_on_history_requested)
 
 	# Create opponent hand displays for players 1, 2, 3
 	_create_opponent_hands()
@@ -183,3 +192,8 @@ func _update_opponent_hands() -> void:
 func _on_move_for_opponent_update(_player_id: int) -> void:
 	"""Update opponent hands after any move"""
 	_update_opponent_hands()
+
+
+func _on_history_requested() -> void:
+	"""Show play history drawer when play area is tapped"""
+	play_history_drawer.show_history(game_state.play_log)

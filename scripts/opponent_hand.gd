@@ -136,7 +136,6 @@ func _refresh_card_backs() -> void:
 
 	if is_horizontal:
 		# Center horizontally
-		var total_width: float = card_width + (card_count - 1) * overlap
 		start_x = (size.x - total_width) / 2.0
 
 	# Create card backs

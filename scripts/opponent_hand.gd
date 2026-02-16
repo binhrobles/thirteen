@@ -50,11 +50,11 @@ func _apply_position() -> void:
 	"""Apply anchoring based on position mode"""
 	match position_mode:
 		Position.TOP:
-			# Centered horizontally at top, flush with top edge
+			# Centered horizontally at top, half off-screen for more play area
 			anchor_left = 0.3
 			anchor_right = 0.7
-			anchor_top = 0.0
-			anchor_bottom = 0.13
+			anchor_top = -0.065
+			anchor_bottom = 0.065
 
 		Position.RIGHT:
 			# Right edge, rotated, half off-screen for more play area

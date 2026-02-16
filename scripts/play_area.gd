@@ -17,9 +17,9 @@ var card_sprites: Array = []
 const CARD_SPACING := 10  # Space between cards in played hand (when not overlapping)
 const MIN_CARD_SPACING := -60  # Minimum spacing (overlap) when cards need to fit
 
-## Boundaries to avoid (opponent hand areas)
-const LEFT_OPPONENT_WIDTH := 0.23  # Left opponent occupies 0.0 to 0.23
-const RIGHT_OPPONENT_START := 0.77  # Right opponent starts at 0.77
+## Boundaries to avoid (opponent hand areas) - now half off-screen
+const LEFT_OPPONENT_WIDTH := 0.115  # Left opponent visible from -0.115 to 0.115
+const RIGHT_OPPONENT_START := 0.885  # Right opponent starts at 0.885
 
 
 func _ready() -> void:

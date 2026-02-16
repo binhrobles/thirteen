@@ -57,18 +57,18 @@ func _apply_position() -> void:
 			anchor_bottom = 0.13
 
 		Position.RIGHT:
-			# Right edge, vertically centered, flush with right edge
+			# Right edge, vertically centered, half off-screen for more play area
 			# Need wider area to fit rotated cards (card height becomes visual width)
-			anchor_left = 0.77
-			anchor_right = 1.0
+			anchor_left = 0.885
+			anchor_right = 1.115
 			anchor_top = 0.3
 			anchor_bottom = 0.5
 
 		Position.LEFT:
-			# Left edge, vertically centered, flush with left edge
+			# Left edge, vertically centered, half off-screen for more play area
 			# Need wider area to fit rotated cards (card height becomes visual width)
-			anchor_left = 0.0
-			anchor_right = 0.23
+			anchor_left = -0.115
+			anchor_right = 0.115
 			anchor_top = 0.3
 			anchor_bottom = 0.5
 

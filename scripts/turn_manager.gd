@@ -171,9 +171,8 @@ func _on_play_button_pressed() -> void:
 	# Execute the play
 	game_state.play_cards(HUMAN_PLAYER, selected)
 
-	# Update UI
-	player_hand_ui.remove_cards(selected)
-	player_hand_ui.clear_selection()
+	# Update UI - refresh hand from game state to ensure sync
+	player_hand_ui.set_cards(game_state.get_hand(HUMAN_PLAYER))
 
 	if play_area_ui:
 		play_area_ui.show_played_hand(selected, "You")

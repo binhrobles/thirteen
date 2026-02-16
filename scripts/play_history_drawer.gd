@@ -129,8 +129,9 @@ func _populate_history() -> void:
 		history_list.add_child(empty_label)
 		return
 
-	# Add each play as an entry
-	for entry in current_round_plays:
+	# Add each play as an entry (newest first)
+	for i in range(current_round_plays.size() - 1, -1, -1):
+		var entry = current_round_plays[i]
 		var play_entry := _create_play_entry(entry)
 		history_list.add_child(play_entry)
 

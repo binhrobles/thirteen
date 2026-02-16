@@ -47,6 +47,6 @@ See [BUILD.md](BUILD.md) for web export instructions.
 ## Assets & Attribution
 
 **Card Sprites:**
-[Playing Cards Pack](https://kenney.nl/assets/playing-cards-pack) by [Kenney](https://kenney.nl/)
-Licensed under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) (Public Domain)
+Jorel's Card Pack by Jorel (96x128px pixel art)
+Licensed under [CC0](https://creativecommons.org/publicdomain/zero/1.0/) (Public Domain)
 

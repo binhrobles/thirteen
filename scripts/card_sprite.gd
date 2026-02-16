@@ -47,8 +47,9 @@ func _setup_ui() -> void:
 	texture_rect = TextureRect.new()
 	texture_rect.anchor_right = 1.0
 	texture_rect.anchor_bottom = 1.0
-	texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	texture_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	texture_rect.stretch_mode = TextureRect.STRETCH_SCALE  # Scale to fill
+	texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE  # Ignore texture size
+	texture_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # Crisp pixels
 	texture_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(texture_rect)
 

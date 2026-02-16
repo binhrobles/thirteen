@@ -30,6 +30,7 @@ func _setup_ui() -> void:
 	grow_vertical = Control.GROW_DIRECTION_BEGIN
 	z_index = 100  # Render above everything
 	z_as_relative = false  # Use absolute z-index
+	clip_contents = false  # Allow lifted cards to overflow
 
 	# Add semi-transparent background
 	var background := ColorRect.new()
@@ -49,6 +50,7 @@ func _setup_ui() -> void:
 	scroll_container.offset_bottom = -10
 	scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	scroll_container.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll_container.clip_contents = false  # Allow cards to overflow when lifted
 	add_child(scroll_container)
 
 	# Create card container with overlap

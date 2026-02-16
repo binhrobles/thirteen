@@ -8,7 +8,6 @@ signal history_requested()  # Emitted when user taps to see play history
 @onready var player_label: Label
 @onready var status_label: Label
 @onready var card_container: Control  # Changed from HBoxContainer for manual positioning
-@onready var background: Panel
 
 const CardSpriteScene := preload("res://scenes/card_sprite.tscn")
 
@@ -42,24 +41,6 @@ func _setup_ui() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 10  # Render above background but below player hand
 	z_as_relative = false  # Use absolute z-index
-
-	# Background panel
-	background = Panel.new()
-	background.anchor_right = 1.0
-	background.anchor_bottom = 1.0
-	var style_box := StyleBoxFlat.new()
-	style_box.bg_color = Color(0.15, 0.15, 0.2, 0.85)
-	style_box.corner_radius_top_left = 12
-	style_box.corner_radius_top_right = 12
-	style_box.corner_radius_bottom_left = 12
-	style_box.corner_radius_bottom_right = 12
-	style_box.border_width_left = 2
-	style_box.border_width_right = 2
-	style_box.border_width_top = 2
-	style_box.border_width_bottom = 2
-	style_box.border_color = Color(0.4, 0.4, 0.5)
-	background.add_theme_stylebox_override("panel", style_box)
-	add_child(background)
 
 	# Player label (who played this hand) - responsive font size
 	# Use viewport if available, otherwise default mobile size

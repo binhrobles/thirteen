@@ -171,6 +171,11 @@ func _on_move_completed(player_id: int) -> void:
 func _on_game_finished() -> void:
 	print("=== Game Finished ===")
 	print("Win order: ", game_state.win_order)
+
+	# Hide play area when game is over
+	if play_area_ui:
+		play_area_ui.hide()
+
 	if game_over_screen:
 		game_over_screen.show_results(game_state.win_order)
 

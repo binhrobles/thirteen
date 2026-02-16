@@ -93,6 +93,17 @@ Resources:
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
 
+  # Lambda Layer: Shared code
+  SharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub 'thirteen-shared-${Stage}'
+      Description: Shared tournament logic and utilities
+      ContentUri: layers/shared/
+      CompatibleRuntimes:
+        - python3.11
+      RetentionPolicy: Retain
+
   # Lambda Function: $connect
   ConnectFunction:
     Type: AWS::Serverless::Function
@@ -175,6 +186,8 @@ Resources:
       FunctionName: !Sub 'thirteen-default-${Stage}'
       CodeUri: functions/default/
       Handler: app.handler
+      Layers:
+        - !Ref SharedLayer
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionsTable

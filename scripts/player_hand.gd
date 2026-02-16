@@ -98,8 +98,15 @@ func clear_selection() -> void:
 
 func remove_cards(cards_to_remove: Array[Card]) -> void:
 	"""Remove specified cards from the hand (after playing)"""
+	# Remove in reverse order to avoid index shifting issues
 	for card in cards_to_remove:
-		var idx := cards.find(card)
+		# Find by card value, not object reference
+		var idx := -1
+		for i in range(cards.size()):
+			if cards[i].value == card.value:
+				idx = i
+				break
+
 		if idx >= 0:
 			cards.remove_at(idx)
 			card_sprites[idx].queue_free()

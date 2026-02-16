@@ -47,6 +47,5 @@ See [BUILD.md](BUILD.md) for web export instructions.
 ## Assets & Attribution
 
 **Card Sprites:**
-Jorel's Card Pack by Jorel (96x128px pixel art)
-Licensed under [CC0](https://creativecommons.org/publicdomain/zero/1.0/) (Public Domain)
+[Jorel's Card Pack by Jorel](https://games-by-jorel.itch.io/jorels-card-pack) (96x128px pixel art)
 

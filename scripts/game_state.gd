@@ -67,6 +67,9 @@ func play_cards(player_id: int, cards: Array[Card]) -> MoveValidator.MoveResult:
 		_player_wins(player_id)
 	else:
 		_advance_turn()
+		# Check if turn came back to the player who made this play (won the round)
+		if current_player == player_id:
+			_reset_round()
 
 	return result
 

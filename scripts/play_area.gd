@@ -46,10 +46,13 @@ func _setup_ui() -> void:
 	# Player label (who played this hand) - responsive font size
 	# Use viewport if available, otherwise default mobile size
 	var viewport_height: float
+	var viewport_width: float
 	if is_inside_tree():
 		viewport_height = get_viewport_rect().size.y
+		viewport_width = get_viewport_rect().size.x
 	else:
 		viewport_height = 844.0  # Default mobile portrait height
+		viewport_width = 390.0  # Default mobile portrait width
 
 	var player_font_size := int(viewport_height * 0.03)  # 3% of viewport height
 	var status_font_size := int(viewport_height * 0.025)  # 2.5% of viewport height
@@ -83,14 +86,17 @@ func _setup_ui() -> void:
 	add_child(card_container)
 
 	# Status label (for "Your turn", "Waiting", etc.)
+	# Sized to 75% of viewport width, positioned above buttons with room for 2 lines
 	status_label = Label.new()
-	status_label.anchor_left = 0.0
-	status_label.anchor_right = 1.0
+	status_label.anchor_left = 0.5
+	status_label.anchor_right = 0.5
 	status_label.anchor_top = 1.0
 	status_label.anchor_bottom = 1.0
-	status_label.offset_left = 0
-	status_label.offset_right = 0
-	status_label.offset_top = -40
+	# 75% of viewport width, centered (offset = viewport_width * 0.75 / 2)
+	var label_half_width := viewport_width * 0.75 / 2.0
+	status_label.offset_left = -label_half_width
+	status_label.offset_right = label_half_width
+	status_label.offset_top = -70  # Higher up with more space for 2 lines
 	status_label.offset_bottom = -10
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

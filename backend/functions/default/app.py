@@ -11,6 +11,7 @@ from decimal import Decimal
 # Add shared layer to path
 sys.path.append('/opt/python')
 from tourney import Tourney, TourneyStatus
+from game import Game, Card
 
 dynamodb = boto3.resource('dynamodb')
 connections_table = dynamodb.Table(os.environ['CONNECTIONS_TABLE'])
@@ -173,16 +174,14 @@ def handle_ready(connection_id, player_id, payload):
         # Broadcast update to all players
         broadcast_tourney_update(tourney)
 
-        # If all players ready and game started, broadcast game start
-        if tourney.status == TourneyStatus.IN_PROGRESS and all(not s.ready for s in tourney.seats if s.is_occupied()):
-            # Game just started, reset ready flags
-            for seat in tourney.seats:
-                if seat.is_occupied():
-                    seat.ready = False
+        # If all players ready, start the game
+        if tourney.status == TourneyStatus.IN_PROGRESS and tourney.current_game is None:
+            # Start new game
+            game = tourney.start_game()
             save_tourney(tourney)
 
-            # TODO: Broadcast game/started message with initial hands
-            # broadcast_game_started(tourney)
+            # Broadcast game start to all players
+            broadcast_game_started(tourney, game)
 
         return {'statusCode': 200}
 
@@ -195,14 +194,101 @@ def handle_ready(connection_id, player_id, payload):
 
 def handle_play_cards(connection_id, player_id, payload):
     """Handle game/play action"""
-    # TODO: Implement play cards logic
-    return send_error(connection_id, 'NOT_IMPLEMENTED', 'Play cards not yet implemented')
+    try:
+        # Get tournament
+        tourney = get_or_create_tourney()
+
+        if tourney.status != TourneyStatus.IN_PROGRESS or not tourney.current_game:
+            return send_error(connection_id, 'NO_ACTIVE_GAME', 'No active game')
+
+        # Get player position
+        seat = tourney.get_seat_by_player(player_id)
+        if not seat:
+            return send_error(connection_id, 'NOT_IN_TOURNEY', 'Not in tournament')
+
+        # Parse cards from payload
+        cards_data = payload.get('cards', [])
+        cards = [Card.from_dict(c) for c in cards_data]
+
+        # Load game state
+        game = Game.from_dict(tourney.current_game)
+
+        # Validate and execute play
+        valid, error = game.can_play(seat.position, cards)
+        if not valid:
+            return send_error(connection_id, error, f'Invalid play: {error}')
+
+        # Execute the play
+        game.play_cards(seat.position, cards)
+
+        # Update tourney with new game state
+        tourney.current_game = game.to_dict()
+
+        # Check if game is over
+        if game.is_game_over():
+            # Add last player to win order
+            for i in range(4):
+                if i not in game.win_order:
+                    game.win_order.append(i)
+                    break
+
+            # Complete game and award points
+            success, tourney_complete = tourney.complete_game(game.win_order)
+
+            save_tourney(tourney)
+
+            # Broadcast game over with leaderboard
+            broadcast_game_over(tourney, game.win_order, tourney_complete)
+        else:
+            save_tourney(tourney)
+
+            # Broadcast game state update
+            broadcast_game_update(tourney, game, seat.position)
+
+        return {'statusCode': 200}
+
+    except Exception as e:
+        print(f'Error handling play: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to play cards')
 
 
 def handle_pass(connection_id, player_id, payload):
     """Handle game/pass action"""
-    # TODO: Implement pass logic
-    return send_error(connection_id, 'NOT_IMPLEMENTED', 'Pass not yet implemented')
+    try:
+        # Get tournament
+        tourney = get_or_create_tourney()
+
+        if tourney.status != TourneyStatus.IN_PROGRESS or not tourney.current_game:
+            return send_error(connection_id, 'NO_ACTIVE_GAME', 'No active game')
+
+        # Get player position
+        seat = tourney.get_seat_by_player(player_id)
+        if not seat:
+            return send_error(connection_id, 'NOT_IN_TOURNEY', 'Not in tournament')
+
+        # Load game state
+        game = Game.from_dict(tourney.current_game)
+
+        # Execute pass
+        if not game.pass_turn(seat.position):
+            return send_error(connection_id, 'CANT_PASS', 'Cannot pass')
+
+        # Update tourney with new game state
+        tourney.current_game = game.to_dict()
+        save_tourney(tourney)
+
+        # Broadcast game state update
+        broadcast_game_update(tourney, game, seat.position)
+
+        return {'statusCode': 200}
+
+    except Exception as e:
+        print(f'Error handling pass: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to pass')
 
 
 def get_or_create_tourney() -> Tourney:
@@ -235,6 +321,70 @@ def broadcast_tourney_update(tourney: Tourney):
     }
 
     # Get all active connections
+    for seat in tourney.seats:
+        if seat.is_occupied() and seat.connection_id:
+            send_to_connection(seat.connection_id, message)
+
+
+def broadcast_game_started(tourney: Tourney, game: Game):
+    """Broadcast game start to all players"""
+    # Send each player their own hand
+    for i, seat in enumerate(tourney.seats):
+        if seat.is_occupied() and seat.connection_id:
+            message = {
+                'type': 'game/started',
+                'payload': {
+                    'yourPosition': i,
+                    'yourHand': [c.to_dict() for c in game.hands[i]],
+                    'currentPlayer': game.current_player,
+                    'players': [s.player_name for s in tourney.seats]
+                }
+            }
+            send_to_connection(seat.connection_id, message)
+
+
+def broadcast_game_update(tourney: Tourney, game: Game, player_who_moved: int):
+    """Broadcast game state update after a move"""
+    # Send update to all players
+    for i, seat in enumerate(tourney.seats):
+        if seat.is_occupied() and seat.connection_id:
+            message = {
+                'type': 'game/updated',
+                'payload': {
+                    'currentPlayer': game.current_player,
+                    'lastPlay': game.last_play.to_dict() if game.last_play else None,
+                    'passedPlayers': game.passed_players,
+                    'handCounts': [len(h) for h in game.hands],
+                    'yourHand': [c.to_dict() for c in game.hands[i]]  # Send updated hand
+                }
+            }
+            send_to_connection(seat.connection_id, message)
+
+
+def broadcast_game_over(tourney: Tourney, win_order: List[int], tourney_complete: bool):
+    """Broadcast game over with leaderboard"""
+    leaderboard = tourney.get_leaderboard()
+
+    # Determine points awarded
+    points_awarded = [4, 2, 1, 0]
+
+    winner_position = None
+    if tourney_complete:
+        # Find tournament winner (highest score)
+        winner_position = max(range(4), key=lambda i: tourney.seats[i].score)
+
+    message = {
+        'type': 'game/over',
+        'payload': {
+            'winOrder': win_order,
+            'pointsAwarded': points_awarded,
+            'leaderboard': leaderboard,
+            'tourneyComplete': tourney_complete,
+            'winner': winner_position
+        }
+    }
+
+    # Send to all players
     for seat in tourney.seats:
         if seat.is_occupied() and seat.connection_id:
             send_to_connection(seat.connection_id, message)

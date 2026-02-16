@@ -1,0 +1,7 @@
+# Godot 4 import cache
+.godot/
+
+# Builds
+builds/
+*.tmp
+*.log

@@ -182,8 +182,8 @@ func _create_card_sprites() -> void:
 	if current_cards.is_empty():
 		return
 
-	# Scale cards down slightly for the play area
-	var scale_factor := 0.8
+	# Scale for cards in play area
+	var scale_factor := 1.0
 
 	# Get viewport size for calculations
 	var viewport_size: Vector2

@@ -13,7 +13,7 @@ var card_backs: Array = []
 var player_id: int = -1
 
 ## Card dimensions as percentage of viewport height (smaller than player cards)
-const CARD_HEIGHT_PERCENT := 0.10  # 10% of viewport height
+const CARD_HEIGHT_PERCENT := 0.12  # 10% of viewport height
 const ASPECT_RATIO := 0.667  # width/height ratio (2:3)
 
 enum Position {
@@ -57,20 +57,20 @@ func _apply_position() -> void:
 			anchor_bottom = 0.13
 
 		Position.RIGHT:
-			# Right edge, vertically centered, half off-screen for more play area
-			# Need wider area to fit rotated cards (card height becomes visual width)
-			anchor_left = 0.885
-			anchor_right = 1.115
-			anchor_top = 0.3
-			anchor_bottom = 0.5
+			# Right edge, rotated, half off-screen for more play area
+      # Card height is visual width
+			anchor_left = 0.875
+			anchor_right = 1.105
+			anchor_top = 0.25
+			anchor_bottom = 0.45
 
 		Position.LEFT:
-			# Left edge, vertically centered, half off-screen for more play area
-			# Need wider area to fit rotated cards (card height becomes visual width)
-			anchor_left = -0.115
-			anchor_right = 0.115
-			anchor_top = 0.3
-			anchor_bottom = 0.5
+			# Left edge, rotated, half off-screen for more play area
+      # Card height is visual width
+			anchor_left = -0.125
+			anchor_right = 0.105
+			anchor_top = 0.25
+			anchor_bottom = 0.45
 
 	offset_left = 0
 	offset_right = 0

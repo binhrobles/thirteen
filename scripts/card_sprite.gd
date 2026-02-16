@@ -8,6 +8,11 @@ var is_selected: bool = false
 
 var texture_rect: TextureRect
 
+# Track touch position for drag detection
+var touch_start_position: Vector2
+var is_dragging: bool = false
+const DRAG_THRESHOLD := 10.0  # Pixels of movement before considering it a drag
+
 ## Card dimensions as percentage of viewport height (mobile-friendly)
 ## On a 844px tall phone (iPhone 14), 18% = ~152px height
 const BASE_HEIGHT_PERCENT := 0.18  # 18% of viewport height
@@ -138,10 +143,37 @@ func set_selected(selected: bool) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
-	"""Handle touch/click interaction"""
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		toggle_selected()
-		accept_event()
+	"""Handle touch interaction - distinguish taps from drags"""
+	# Handle touch events
+	var screen_touch := event as InputEventScreenTouch
+	if screen_touch:
+		if screen_touch.pressed:
+			# Touch started - record position and reset drag state
+			# Don't accept - let ScrollContainer handle it for scrolling
+			touch_start_position = screen_touch.position
+			is_dragging = false
+		else:
+			# Touch ended - check if it was a tap (not a drag)
+			if touch_start_position != Vector2.ZERO:
+				var drag_distance: float = screen_touch.position.distance_to(touch_start_position)
+				if drag_distance <= DRAG_THRESHOLD and not is_dragging:
+					# It was a tap - toggle selection
+					toggle_selected()
+					accept_event()
+				# Reset touch tracking
+				touch_start_position = Vector2.ZERO
+				is_dragging = false
+		return
+	
+	# Handle touch drag events
+	var screen_drag := event as InputEventScreenDrag
+	if screen_drag:
+		# Check if touch has moved beyond threshold
+		if touch_start_position != Vector2.ZERO:
+			var drag_distance: float = screen_drag.position.distance_to(touch_start_position)
+			if drag_distance > DRAG_THRESHOLD:
+				is_dragging = true
+				# Don't accept drag events - let ScrollContainer handle scrolling
 
 
 func toggle_selected() -> void:

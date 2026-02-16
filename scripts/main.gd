@@ -1,24 +1,15 @@
 extends Control
 
-const CardSpriteScene := preload("res://scenes/card_sprite.tscn")
+const PlayerHandScene := preload("res://scenes/player_hand.tscn")
 
 
 func _ready() -> void:
-	_test_card_sprites()
+	_test_player_hand()
 
 
-func _test_card_sprites() -> void:
-	"""Create a few test cards to verify the card sprite works"""
-	var test_cards := [
-		Card.new(Card.Rank.ACE, Card.Suit.HEARTS),
-		Card.new(Card.Rank.KING, Card.Suit.SPADES),
-		Card.new(Card.Rank.TWO, Card.Suit.DIAMONDS),
-		Card.new(Card.Rank.THREE, Card.Suit.CLUBS),
-	]
-
-	var x_offset := 100.0
-	for i in test_cards.size():
-		var card_sprite = CardSpriteScene.instantiate()
-		add_child(card_sprite)
-		card_sprite.setup(test_cards[i])
-		card_sprite.position = Vector2(x_offset + i * 100, 500)
+func _test_player_hand() -> void:
+	"""Create a player hand with dealt cards"""
+	var hands := Deck.deal(4)
+	var player_hand_node = PlayerHandScene.instantiate()
+	add_child(player_hand_node)
+	player_hand_node.set_cards(hands[0])  # Player 0's hand

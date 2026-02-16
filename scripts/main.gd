@@ -89,6 +89,10 @@ func _initialize_game() -> void:
 	"""Initialize a new game"""
 	print("=== Starting New Game ===")
 
+	# Hide buttons during deal sequence
+	play_button.hide()
+	pass_button.hide()
+
 	# Create play area first (for showing deal messages)
 	play_area_ui = PlayAreaScene.instantiate()
 	add_child(play_area_ui)
@@ -104,11 +108,15 @@ func _initialize_game() -> void:
 
 	# Show starting player message
 	var player_name := "You" if starting_player == 0 else "Player %d" % (starting_player + 1)
-	play_area_ui.show_game_message("%s has 3♠ — Starting!" % player_name, 1.5)
+	play_area_ui.show_game_message("%s opens" % player_name, 1.5)
 	await play_area_ui.get_tree().create_timer(1.5).timeout
 
 	# Clear play area before game starts
 	play_area_ui.clear()
+
+	# Show buttons (turn manager will enable/disable as needed)
+	play_button.show()
+	pass_button.show()
 
 	# Create player hand UI
 	player_hand_ui = PlayerHandScene.instantiate()

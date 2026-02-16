@@ -98,6 +98,10 @@ func _start_bot_turn() -> void:
 
 func _execute_bot_turn(player_id: int) -> void:
 	"""Execute bot's turn using greedy strategy"""
+	# Guard: Only execute if this player is still the current player
+	if game_state.current_player != player_id:
+		return
+
 	var hand: Array = game_state.get_hand(player_id)
 
 	# Use greedy strategy to choose the lowest-value valid play
@@ -106,8 +110,10 @@ func _execute_bot_turn(player_id: int) -> void:
 	if cards_to_play.is_empty():
 		# No valid plays - must pass
 		if game_state.last_play:
-			game_state.pass_turn(player_id)
-			_show_bot_pass(player_id)
+			if game_state.pass_turn(player_id):
+				_show_bot_pass(player_id)
+			else:
+				print("ERROR: Bot %d tried to pass but failed" % (player_id + 1))
 		else:
 			# This shouldn't happen - with power, should always have a valid play
 			print("ERROR: Bot has power but no valid plays!")

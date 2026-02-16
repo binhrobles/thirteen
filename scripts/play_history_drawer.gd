@@ -10,7 +10,6 @@ signal dismissed()  # Emitted when drawer is closed
 @onready var scroll_container: ScrollContainer
 @onready var history_list: VBoxContainer
 @onready var title_label: Label
-@onready var close_button: Button
 
 const CardSpriteScene := preload("res://scenes/card_sprite.tscn")
 const PLAYER_NAMES := ["You", "Player 2", "Player 3", "Player 4"]
@@ -63,26 +62,6 @@ func _setup_ui() -> void:
 	title_label.offset_top = 20
 	title_label.offset_bottom = 60
 	drawer_panel.add_child(title_label)
-
-	# Close button (X in top right)
-	close_button = Button.new()
-	close_button.text = "×"
-	close_button.add_theme_font_size_override("font_size", 36)
-	close_button.anchor_left = 1.0
-	close_button.anchor_right = 1.0
-	close_button.offset_left = -60
-	close_button.offset_right = -10
-	close_button.offset_top = 10
-	close_button.offset_bottom = 60
-	var close_style := StyleBoxFlat.new()
-	close_style.bg_color = Color(0.3, 0.3, 0.35)
-	close_style.corner_radius_top_left = 8
-	close_style.corner_radius_top_right = 8
-	close_style.corner_radius_bottom_left = 8
-	close_style.corner_radius_bottom_right = 8
-	close_button.add_theme_stylebox_override("normal", close_style)
-	close_button.pressed.connect(_on_close_pressed)
-	drawer_panel.add_child(close_button)
 
 	# Scroll container for history
 	scroll_container = ScrollContainer.new()
@@ -173,21 +152,13 @@ func _create_play_entry(entry: Dictionary) -> Control:
 	vbox.add_theme_constant_override("separation", 4)
 	container.add_child(vbox)
 
-	# Player name and combo type
-	var header := HBoxContainer.new()
-	vbox.add_child(header)
-
+	# Player name (prominent)
 	var player_label := Label.new()
 	var player_id: int = entry["player"]
 	player_label.text = PLAYER_NAMES[player_id]
-	player_label.add_theme_font_size_override("font_size", 20)
-	player_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-	header.add_child(player_label)
-
-	# Spacer
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(spacer)
+	player_label.add_theme_font_size_override("font_size", 24)  # Larger, more prominent
+	player_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))  # Brighter white
+	vbox.add_child(player_label)
 
 	# Handle pass vs play
 	var play = entry["play"]
@@ -196,15 +167,8 @@ func _create_play_entry(entry: Dictionary) -> Control:
 		pass_label.text = "PASS"
 		pass_label.add_theme_font_size_override("font_size", 18)
 		pass_label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
-		header.add_child(pass_label)
+		vbox.add_child(pass_label)
 	else:
-		# Show combo type
-		var combo_label := Label.new()
-		combo_label.text = Play.Combo.keys()[play.combo]
-		combo_label.add_theme_font_size_override("font_size", 16)
-		combo_label.add_theme_color_override("font_color", Color(0.7, 0.8, 0.9))
-		header.add_child(combo_label)
-
 		# Show cards
 		var cards_container := HBoxContainer.new()
 		cards_container.add_theme_constant_override("separation", 4)
@@ -219,11 +183,6 @@ func _create_play_entry(entry: Dictionary) -> Control:
 			card_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	return container
-
-
-func _on_close_pressed() -> void:
-	"""Close button pressed"""
-	_dismiss()
 
 
 func _on_background_input(event: InputEvent) -> void:

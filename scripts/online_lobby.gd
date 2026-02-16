@@ -28,8 +28,9 @@ func _ready() -> void:
 	# Generate player ID
 	player_id = _generate_uuid()
 
-	# Set default server URL
-	server_url_input.text = "ws://localhost:3001"
+	# Set production server URL (hardcoded)
+	server_url_input.text = "wss://6u47cryn67.execute-api.us-east-1.amazonaws.com/prod"
+	server_url_input.editable = false  # Don't allow editing in production
 	player_name_input.text = "Player_%d" % randi_range(1000, 9999)
 
 	# Connect button signals

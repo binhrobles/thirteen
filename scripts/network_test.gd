@@ -17,8 +17,8 @@ extends Control
 
 
 func _ready() -> void:
-	# Set default values
-	server_url_input.text = "ws://localhost:3001"
+	# Set default values (production server)
+	server_url_input.text = "wss://6u47cryn67.execute-api.us-east-1.amazonaws.com/prod"
 	player_id_input.text = _generate_uuid()
 	player_name_input.text = "Player_%d" % randi_range(1000, 9999)
 

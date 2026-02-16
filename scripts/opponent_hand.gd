@@ -59,15 +59,17 @@ func _apply_position() -> void:
 
 		Position.RIGHT:
 			# Right edge, vertically centered
-			anchor_left = 0.82
+			# Need wider area to fit rotated cards (card height becomes visual width)
+			anchor_left = 0.75
 			anchor_right = 0.98
 			anchor_top = 0.3
 			anchor_bottom = 0.5
 
 		Position.LEFT:
 			# Left edge, vertically centered
+			# Need wider area to fit rotated cards (card height becomes visual width)
 			anchor_left = 0.02
-			anchor_right = 0.18
+			anchor_right = 0.25
 			anchor_top = 0.3
 			anchor_bottom = 0.5
 
@@ -133,16 +135,28 @@ func _refresh_card_backs() -> void:
 		var card_back := _create_card_back(card_width, card_height)
 		card_container.add_child(card_back)
 
-		# Rotate cards for left/right positions
-		if not is_horizontal:
-			card_back.rotation_degrees = 90
-
 		# Position based on layout
 		if is_horizontal:
+			# Horizontal layout (top) - no rotation
 			card_back.position = Vector2(i * overlap, 0)
 		else:
-			# Adjust position for rotated cards
-			card_back.position = Vector2(card_height / 2, i * overlap + card_width / 2)
+			# Vertical layout (left/right) - rotate 90 degrees
+			card_back.rotation_degrees = 90
+			card_back.pivot_offset = Vector2(card_width / 2, card_height / 2)
+
+			# After rotation, visual width = card_height, visual height = card_width
+			# Position to align properly in container
+			var x_pos: float
+			var y_pos: float = i * overlap + card_height / 2
+
+			if position_mode == Position.RIGHT:
+				# Align to right edge of container
+				x_pos = size.x - card_height / 2
+			else:  # Position.LEFT
+				# Align to left edge of container
+				x_pos = card_height / 2
+
+			card_back.position = Vector2(x_pos, y_pos)
 
 		card_backs.append(card_back)
 

@@ -141,59 +141,56 @@ func set_selected(selected: bool) -> void:
 
 func _draw_selection_overlay() -> void:
 	"""Draw selection highlight on top of card"""
-	if not is_selected or not selection_overlay:
+	if not is_selected or not selection_overlay or not texture_rect or not texture_rect.texture:
 		return
 
-	# Calculate actual card bounds (texture is aspect-fit within container)
+	# Get the actual texture size
+	var texture_size := texture_rect.texture.get_size()
 	var container_size := size
-	var texture_aspect := 96.0 / 128.0  # Card aspect ratio (width/height = 0.75)
+
+	# Calculate how the texture is scaled and positioned with STRETCH_KEEP_ASPECT + EXPAND_FIT_HEIGHT
+	var texture_aspect := texture_size.x / texture_size.y
 	var container_aspect := container_size.x / container_size.y
 
 	var card_rect: Rect2
 	if container_aspect > texture_aspect:
-		# Container is wider - card is limited by height
-		var card_width := container_size.y * texture_aspect
-		var x_offset := (container_size.x - card_width) / 2.0
-		card_rect = Rect2(x_offset, 0, card_width, container_size.y)
+		# Container is wider - texture fills height, centered horizontally
+		var scaled_height := container_size.y
+		var scaled_width := scaled_height * texture_aspect
+		var x_offset := (container_size.x - scaled_width) / 2.0
+		card_rect = Rect2(x_offset, 0, scaled_width, scaled_height)
 	else:
-		# Container is taller - card is limited by width
-		var card_height := container_size.x / texture_aspect
-		var y_offset := (container_size.y - card_height) / 2.0
-		card_rect = Rect2(0, y_offset, container_size.x, card_height)
+		# Container is taller - texture fills width, centered vertically
+		var scaled_width := container_size.x
+		var scaled_height := scaled_width / texture_aspect
+		var y_offset := (container_size.y - scaled_height) / 2.0
+		card_rect = Rect2(0, y_offset, scaled_width, scaled_height)
 
 	# Draw on the overlay Control
 	var border_width := float(SELECTED_BORDER_WIDTH)
 
-	# Draw background tint
+	# Draw background tint (exactly matching card bounds)
 	selection_overlay.draw_rect(card_rect, SELECTED_BG_TINT, true)
 
-	# Draw borders inset slightly to avoid overhang
-	var inset := 1.0  # Small inset to prevent overhang
-	var inset_rect := Rect2(
-		card_rect.position.x + inset,
-		card_rect.position.y + inset,
-		card_rect.size.x - inset * 2,
-		card_rect.size.y - inset * 2
-	)
-
+	# Draw borders (flush with card edges)
 	# Top border
 	selection_overlay.draw_rect(
-		Rect2(inset_rect.position.x, inset_rect.position.y, inset_rect.size.x, border_width),
+		Rect2(card_rect.position.x, card_rect.position.y, card_rect.size.x, border_width),
 		SELECTED_BORDER_COLOR
 	)
 	# Bottom border
 	selection_overlay.draw_rect(
-		Rect2(inset_rect.position.x, inset_rect.position.y + inset_rect.size.y - border_width, inset_rect.size.x, border_width),
+		Rect2(card_rect.position.x, card_rect.position.y + card_rect.size.y - border_width, card_rect.size.x, border_width),
 		SELECTED_BORDER_COLOR
 	)
 	# Left border
 	selection_overlay.draw_rect(
-		Rect2(inset_rect.position.x, inset_rect.position.y, border_width, inset_rect.size.y),
+		Rect2(card_rect.position.x, card_rect.position.y, border_width, card_rect.size.y),
 		SELECTED_BORDER_COLOR
 	)
 	# Right border
 	selection_overlay.draw_rect(
-		Rect2(inset_rect.position.x + inset_rect.size.x - border_width, inset_rect.position.y, border_width, inset_rect.size.y),
+		Rect2(card_rect.position.x + card_rect.size.x - border_width, card_rect.position.y, border_width, card_rect.size.y),
 		SELECTED_BORDER_COLOR
 	)
 

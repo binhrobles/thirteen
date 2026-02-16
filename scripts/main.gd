@@ -5,6 +5,7 @@ const PlayAreaScene := preload("res://scenes/play_area.tscn")
 const GameStateScript := preload("res://scripts/game_state.gd")
 const OpponentHandScript := preload("res://scripts/opponent_hand.gd")
 const PlayHistoryDrawerScript := preload("res://scripts/play_history_drawer.gd")
+const GameOverScreenScript := preload("res://scripts/game_over_screen.gd")
 
 @onready var play_button: Button = $PlayButton
 @onready var pass_button: Button = $PassButton
@@ -16,6 +17,7 @@ var turn_manager
 var player_hand_ui
 var play_area_ui
 var play_history_drawer
+var game_over_screen
 var opponent_hands: Array = []  # Array of OpponentHand for players 1, 2, 3
 
 
@@ -102,12 +104,17 @@ func _initialize_game() -> void:
 	# Create opponent hand displays for players 1, 2, 3
 	_create_opponent_hands()
 
-	# Create play history drawer (add last so it renders on top)
+	# Create play history drawer
 	play_history_drawer = PlayHistoryDrawerScript.new()
 	add_child(play_history_drawer)
 
 	# Connect play area signal to show history drawer
 	play_area_ui.history_requested.connect(_on_history_requested)
+
+	# Create game over screen (add last so it renders on top)
+	game_over_screen = GameOverScreenScript.new()
+	add_child(game_over_screen)
+	game_over_screen.new_game_requested.connect(_on_new_game_requested)
 
 	# Create turn manager
 	var TurnManagerScript = load("res://scripts/turn_manager.gd")
@@ -147,6 +154,8 @@ func _on_move_completed(player_id: int) -> void:
 func _on_game_finished() -> void:
 	print("=== Game Finished ===")
 	print("Win order: ", game_state.win_order)
+	if game_over_screen:
+		game_over_screen.show_results(game_state.win_order)
 
 
 func _create_opponent_hands() -> void:
@@ -197,3 +206,31 @@ func _on_move_for_opponent_update(_player_id: int) -> void:
 func _on_history_requested() -> void:
 	"""Show play history drawer when play area is tapped"""
 	play_history_drawer.show_history(game_state.play_log)
+
+
+func _on_new_game_requested() -> void:
+	"""Handle new game request from game over screen"""
+	print("=== Starting New Game ===")
+
+	# Clean up current game
+	if player_hand_ui:
+		player_hand_ui.queue_free()
+		player_hand_ui = null
+
+	if play_area_ui:
+		play_area_ui.queue_free()
+		play_area_ui = null
+
+	if turn_manager:
+		turn_manager.queue_free()
+		turn_manager = null
+
+	for opponent in opponent_hands:
+		opponent.queue_free()
+	opponent_hands.clear()
+
+	# Keep play_history_drawer and game_over_screen for reuse
+
+	# Wait one frame for cleanup, then initialize new game
+	await get_tree().process_frame
+	_initialize_game()

@@ -93,6 +93,9 @@ func _setup_ui() -> void:
 	status_label.offset_top = -40
 	status_label.offset_bottom = -10
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label.clip_text = false
 	status_label.add_theme_font_size_override("font_size", status_font_size)
 	status_label.add_theme_color_override("font_color", Color(0.7, 0.8, 0.9))
 	add_child(status_label)
@@ -122,8 +125,8 @@ func show_power_state(player_name: String, is_player: bool) -> void:
 
 
 func show_waiting(player_name: String) -> void:
-	"""Show waiting for another player"""
-	_clear_cards()
+	"""Show waiting for another player (keeps last played hand visible)"""
+	# Don't clear cards - keep showing the last play
 	player_label.text = ""
 	status_label.text = "It's on %s..." % player_name
 	show()

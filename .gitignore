@@ -3,5 +3,6 @@
 
 # Builds
 builds/
+build/
 *.tmp
 *.log

@@ -4,6 +4,8 @@ A mobile-first [Tiến Lên (Thirteen)](https://en.wikipedia.org/wiki/Ti%E1%BA%B
 
 ## Status
 
+**Play now:** [GitHub Pages](https://binhrobles.github.io/thirteen-vibes/) (auto-deploys from main)
+
 Early development. See `bd ready` for current work items.
 
 ## Tech

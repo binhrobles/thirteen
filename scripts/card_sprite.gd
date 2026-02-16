@@ -21,12 +21,15 @@ const SELECTED_OFFSET := Vector2(0, -10)  # Raise when selected
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(BASE_WIDTH, BASE_HEIGHT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 	# Setup visual elements
 	_setup_background()
 	_setup_labels()
+
+
+func _get_minimum_size() -> Vector2:
+	return Vector2(BASE_WIDTH, BASE_HEIGHT)
 
 
 func _setup_background() -> void:
@@ -44,6 +47,7 @@ func _setup_background() -> void:
 	style_box.border_color = Color(0.3, 0.3, 0.3)
 
 	background.add_theme_stylebox_override("panel", style_box)
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Let clicks through to parent
 
 
 func _setup_labels() -> void:
@@ -53,6 +57,7 @@ func _setup_labels() -> void:
 	rank_label.anchor_right = 0.9
 	rank_label.anchor_bottom = 0.4
 	rank_label.add_theme_font_size_override("font_size", 36)
+	rank_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# Position suit label at bottom
 	suit_label.anchor_left = 0.1
@@ -60,6 +65,7 @@ func _setup_labels() -> void:
 	suit_label.anchor_right = 0.9
 	suit_label.anchor_bottom = 0.95
 	suit_label.add_theme_font_size_override("font_size", 48)
+	suit_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 func setup(p_card: Card) -> void:

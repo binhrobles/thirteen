@@ -36,6 +36,7 @@ func _setup_ui() -> void:
 	background.color = Color(0.1, 0.1, 0.1, 0.7)  # Dark semi-transparent
 	background.anchor_right = 1.0
 	background.anchor_bottom = 1.0
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Don't block clicks
 	add_child(background)
 
 	# Create scroll container with padding
@@ -82,9 +83,9 @@ func _create_card_sprites() -> void:
 func get_selected_cards() -> Array[Card]:
 	"""Return array of currently selected cards"""
 	var selected: Array[Card] = []
-	for i in card_sprites.size():
-		if card_sprites[i].is_selected:
-			selected.append(cards[i])
+	for sprite in card_sprites:
+		if sprite.is_selected:
+			selected.append(sprite.card)
 	return selected
 
 

@@ -214,6 +214,6 @@ func _on_game_over(win_order: Array[int]) -> void:
 
 func _update_ui() -> void:
 	"""Update UI for current game state"""
-	# Update player hand
-	if player_hand_ui and game_state:
-		player_hand_ui.set_cards(game_state.get_hand(HUMAN_PLAYER))
+	# Don't update player hand here - it's only updated when cards are actually played/removed
+	# Recreating cards would lose selection state
+	pass

@@ -58,10 +58,10 @@ func _apply_position() -> void:
 			anchor_bottom = 0.13
 
 		Position.RIGHT:
-			# Right edge, vertically centered
+			# Right edge, vertically centered, flush with right edge
 			# Need wider area to fit rotated cards (card height becomes visual width)
-			anchor_left = 0.75
-			anchor_right = 0.98
+			anchor_left = 0.77
+			anchor_right = 1.0
 			anchor_top = 0.3
 			anchor_bottom = 0.5
 
@@ -143,19 +143,20 @@ func _refresh_card_backs() -> void:
 			# Vertical layout (left/right) - rotate 90 degrees
 			card_back.rotation_degrees = 90
 
-			# Control nodes rotate around top-left (0,0) by default
-			# After 90° clockwise rotation: width becomes height visually
+			# When rotating 90° clockwise around top-left (0,0):
+			# After rotation, card occupies x: [position.x] to [position.x + card_height]
+			# So: left_edge = position.x, right_edge = position.x + card_height
+
 			var y_pos: float = i * overlap
 
 			if position_mode == Position.RIGHT:
-				# Align to right edge of container
-				# After rotation, card extends card_height to the right from position
+				# Right edge should be at size.x, so: position.x + card_height = size.x
 				var x_pos: float = size.x - card_height
 				card_back.position = Vector2(x_pos, y_pos)
 			else:  # Position.LEFT
-				# Align to left edge of container (flush with left)
-				# Position at (0, y) and card extends to the right
-				card_back.position = Vector2(0, y_pos)
+				# Left edge should be at 0, so: position.x = 0
+				var x_pos: float = 0
+				card_back.position = Vector2(x_pos, y_pos)
 
 		card_backs.append(card_back)
 

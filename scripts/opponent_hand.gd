@@ -51,11 +51,11 @@ func _apply_position() -> void:
 	"""Apply anchoring based on position mode"""
 	match position_mode:
 		Position.TOP:
-			# Centered horizontally at top
+			# Centered horizontally at top, flush with top edge
 			anchor_left = 0.3
 			anchor_right = 0.7
-			anchor_top = 0.05
-			anchor_bottom = 0.18
+			anchor_top = 0.0
+			anchor_bottom = 0.13
 
 		Position.RIGHT:
 			# Right edge, vertically centered
@@ -66,10 +66,10 @@ func _apply_position() -> void:
 			anchor_bottom = 0.5
 
 		Position.LEFT:
-			# Left edge, vertically centered
+			# Left edge, vertically centered, flush with left edge
 			# Need wider area to fit rotated cards (card height becomes visual width)
-			anchor_left = 0.02
-			anchor_right = 0.25
+			anchor_left = 0.0
+			anchor_right = 0.23
 			anchor_top = 0.3
 			anchor_bottom = 0.5
 

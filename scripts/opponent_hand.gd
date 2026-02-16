@@ -142,21 +142,20 @@ func _refresh_card_backs() -> void:
 		else:
 			# Vertical layout (left/right) - rotate 90 degrees
 			card_back.rotation_degrees = 90
-			card_back.pivot_offset = Vector2(card_width / 2, card_height / 2)
 
-			# After rotation, visual width = card_height, visual height = card_width
-			# Position to align properly in container
-			var x_pos: float
-			var y_pos: float = i * overlap + card_height / 2
+			# Control nodes rotate around top-left (0,0) by default
+			# After 90° clockwise rotation: width becomes height visually
+			var y_pos: float = i * overlap
 
 			if position_mode == Position.RIGHT:
 				# Align to right edge of container
-				x_pos = size.x - card_height / 2
+				# After rotation, card extends card_height to the right from position
+				var x_pos: float = size.x - card_height
+				card_back.position = Vector2(x_pos, y_pos)
 			else:  # Position.LEFT
-				# Align to left edge of container
-				x_pos = card_height / 2
-
-			card_back.position = Vector2(x_pos, y_pos)
+				# Align to left edge of container (flush with left)
+				# Position at (0, y) and card extends to the right
+				card_back.position = Vector2(0, y_pos)
 
 		card_backs.append(card_back)
 

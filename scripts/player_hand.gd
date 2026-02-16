@@ -13,7 +13,7 @@ var card_sprites: Array = []
 
 ## Card overlap amount (cards will overlap by this many pixels)
 const CARD_OVERLAP := 30
-const CARD_SPACING := -30  # Negative spacing creates overlap
+const CARD_SPACING := 5
 
 
 func _ready() -> void:

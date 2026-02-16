@@ -3,6 +3,7 @@ extends Control
 const PlayerHandScene := preload("res://scenes/player_hand.tscn")
 const PlayAreaScene := preload("res://scenes/play_area.tscn")
 const GameStateScript := preload("res://scripts/game_state.gd")
+const OpponentHandScript := preload("res://scripts/opponent_hand.gd")
 
 @onready var play_button: Button = $PlayButton
 @onready var pass_button: Button = $PassButton
@@ -13,6 +14,7 @@ var game_state
 var turn_manager
 var player_hand_ui
 var play_area_ui
+var opponent_hands: Array = []  # Array of OpponentHand for players 1, 2, 3
 
 
 func _ready() -> void:
@@ -79,6 +81,9 @@ func _initialize_game() -> void:
 	play_area_ui = PlayAreaScene.instantiate()
 	add_child(play_area_ui)
 
+	# Create opponent hand displays for players 1, 2, 3
+	_create_opponent_hands()
+
 	# Create turn manager
 	var TurnManagerScript = load("res://scripts/turn_manager.gd")
 	turn_manager = TurnManagerScript.new()
@@ -92,6 +97,12 @@ func _initialize_game() -> void:
 	turn_manager.turn_started.connect(_on_turn_started)
 	turn_manager.move_completed.connect(_on_move_completed)
 	turn_manager.game_finished.connect(_on_game_finished)
+
+	# Update opponent hands after each move
+	turn_manager.move_completed.connect(_on_move_for_opponent_update)
+
+	# Connect game state signals for updating opponent hands
+	game_state.turn_changed.connect(_on_game_state_changed)
 
 	# Start the game
 	turn_manager.initialize(game_state)
@@ -111,3 +122,48 @@ func _on_move_completed(player_id: int) -> void:
 func _on_game_finished() -> void:
 	print("=== Game Finished ===")
 	print("Win order: ", game_state.win_order)
+
+
+func _create_opponent_hands() -> void:
+	"""Create and position opponent hand displays for players 1, 2, 3"""
+	# Player 1 - Right (next in counter-clockwise order)
+	var opponent_1 := OpponentHandScript.new()
+	add_child(opponent_1)
+	opponent_1.set_player(1)
+	opponent_1.set_position_mode(OpponentHandScript.Position.RIGHT)
+	opponent_1.update_card_count(game_state.get_hand(1).size())
+	opponent_hands.append(opponent_1)
+
+	# Player 2 - Top (opposite)
+	var opponent_2 := OpponentHandScript.new()
+	add_child(opponent_2)
+	opponent_2.set_player(2)
+	opponent_2.set_position_mode(OpponentHandScript.Position.TOP)
+	opponent_2.update_card_count(game_state.get_hand(2).size())
+	opponent_hands.append(opponent_2)
+
+	# Player 3 - Left
+	var opponent_3 := OpponentHandScript.new()
+	add_child(opponent_3)
+	opponent_3.set_player(3)
+	opponent_3.set_position_mode(OpponentHandScript.Position.LEFT)
+	opponent_3.update_card_count(game_state.get_hand(3).size())
+	opponent_hands.append(opponent_3)
+
+
+func _on_game_state_changed(_player_id: int) -> void:
+	"""Update opponent hand displays when game state changes"""
+	_update_opponent_hands()
+
+
+func _update_opponent_hands() -> void:
+	"""Refresh all opponent hand card counts"""
+	for i in range(opponent_hands.size()):
+		var player_id := i + 1  # Players 1, 2, 3
+		var hand_size := game_state.get_hand(player_id).size()
+		opponent_hands[i].update_card_count(hand_size)
+
+
+func _on_move_for_opponent_update(_player_id: int) -> void:
+	"""Update opponent hands after any move"""
+	_update_opponent_hands()

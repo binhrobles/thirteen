@@ -42,9 +42,9 @@ func _setup_buttons() -> void:
 	subtitle_label.visible = false
 
 	# Position buttons between play area (ends at 65%) and player hand (starts at 75%)
-	# Buttons go from 66% to 74% of screen height
-	var button_top := 0.66
-	var button_bottom := 0.74
+	# Buttons go from 58% to 66% of screen height (shifted up for lifted cards)
+	var button_top := 0.58
+	var button_bottom := 0.66
 
 	# Configure Pass button (left, red)
 	pass_button.anchor_left = 0.05

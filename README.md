@@ -44,3 +44,9 @@ See [BUILD.md](BUILD.md) for web export instructions.
 2. Export: `/Applications/Godot.app/Contents/MacOS/Godot --headless --export-release "Web" ./build/web/index.html`
 3. Test: `cd build/web && python3 -m http.server 8000`
 
+## Assets & Attribution
+
+**Card Sprites:**
+[Playing Cards Pack](https://kenney.nl/assets/playing-cards-pack) by [Kenney](https://kenney.nl/)
+Licensed under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) (Public Domain)
+

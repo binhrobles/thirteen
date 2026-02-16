@@ -6,8 +6,7 @@ extends Control
 @onready var card_container: Control
 
 const CARD_BACK_OVERLAP := 15  # Pixels of overlap between cards
-const CARD_BACK_COLOR := Color(0.2, 0.3, 0.5)  # Blue-ish card back
-const CARD_BORDER_COLOR := Color(0.4, 0.5, 0.7)
+const CARD_BACK_PATH := "res://assets/sprites/cards/card_back.png"
 
 var card_count: int = 0
 var card_backs: Array = []
@@ -171,25 +170,27 @@ func _refresh_card_backs() -> void:
 		card_backs.append(card_back)
 
 
-func _create_card_back(width: float, height: float) -> Panel:
+func _create_card_back(width: float, height: float) -> Control:
 	"""Create a single card back visual"""
-	var panel := Panel.new()
-	panel.custom_minimum_size = Vector2(width, height)
+	var container := Control.new()
+	container.custom_minimum_size = Vector2(width, height)
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Create card back style
-	var style_box := StyleBoxFlat.new()
-	style_box.bg_color = CARD_BACK_COLOR
-	style_box.corner_radius_top_left = 6
-	style_box.corner_radius_top_right = 6
-	style_box.corner_radius_bottom_left = 6
-	style_box.corner_radius_bottom_right = 6
-	style_box.border_width_left = 2
-	style_box.border_width_right = 2
-	style_box.border_width_top = 2
-	style_box.border_width_bottom = 2
-	style_box.border_color = CARD_BORDER_COLOR
+	# Create texture rect for card back sprite
+	var texture_rect := TextureRect.new()
+	texture_rect.anchor_right = 1.0
+	texture_rect.anchor_bottom = 1.0
+	texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	texture_rect.expand_mode = TextureRect.EXPAND_FIT_HEIGHT
+	texture_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	texture_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	panel.add_theme_stylebox_override("panel", style_box)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Load card back texture
+	var texture := load(CARD_BACK_PATH) as Texture2D
+	if texture:
+		texture_rect.texture = texture
+	else:
+		push_error("Failed to load card back texture: " + CARD_BACK_PATH)
 
-	return panel
+	container.add_child(texture_rect)
+	return container

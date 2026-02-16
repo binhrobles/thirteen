@@ -7,17 +7,16 @@ var card: Card
 var is_selected: bool = false
 
 var texture_rect: TextureRect
-var selection_overlay: Control  # Draws on top of the card
 
 ## Card dimensions as percentage of viewport height (mobile-friendly)
 ## On a 844px tall phone (iPhone 14), 18% = ~152px height
 const BASE_HEIGHT_PERCENT := 0.18  # 18% of viewport height
 const ASPECT_RATIO := 0.667  # width/height ratio (2:3)
 
-## Selection highlight colors
-const SELECTED_BORDER_COLOR := Color(0.2, 0.5, 1.0)  # Bright glowing blue
-const SELECTED_BORDER_WIDTH := 6  # Thicker border for visibility
-const SELECTED_BG_TINT := Color(0.85, 0.9, 1.0, 0.3)  # Light blue tint
+## Selection animation - lift card up
+const SELECTED_LIFT_AMOUNT := -40  # Pixels to lift up when selected
+const SELECTED_SCALE := 1.1  # Scale multiplier when selected
+
 
 ## Card sprite path
 const CARDS_PATH := "res://assets/sprites/cards/"
@@ -52,14 +51,6 @@ func _setup_ui() -> void:
 	texture_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # Crisp pixels
 	texture_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(texture_rect)
-
-	# Create overlay control for selection highlight (drawn on top)
-	selection_overlay = Control.new()
-	selection_overlay.anchor_right = 1.0
-	selection_overlay.anchor_bottom = 1.0
-	selection_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	selection_overlay.draw.connect(_draw_selection_overlay)
-	add_child(selection_overlay)
 
 
 func setup(p_card: Card) -> void:
@@ -135,64 +126,17 @@ func _get_rank_name(rank: int) -> String:
 func set_selected(selected: bool) -> void:
 	"""Toggle selected state with visual feedback"""
 	is_selected = selected
-	if selection_overlay:
-		selection_overlay.queue_redraw()  # Trigger redraw on overlay
 
-
-func _draw_selection_overlay() -> void:
-	"""Draw selection highlight on top of card"""
-	if not is_selected or not selection_overlay or not texture_rect or not texture_rect.texture:
-		return
-
-	# Get the actual texture size
-	var texture_size := texture_rect.texture.get_size()
-	var container_size := size
-
-	# Calculate how the texture is scaled and positioned with STRETCH_KEEP_ASPECT + EXPAND_FIT_HEIGHT
-	var texture_aspect := texture_size.x / texture_size.y
-	var container_aspect := container_size.x / container_size.y
-
-	var card_rect: Rect2
-	if container_aspect > texture_aspect:
-		# Container is wider - texture fills height, centered horizontally
-		var scaled_height := container_size.y
-		var scaled_width := scaled_height * texture_aspect
-		var x_offset := (container_size.x - scaled_width) / 2.0
-		card_rect = Rect2(x_offset, 0, scaled_width, scaled_height)
+	if selected:
+		# Lift card up and scale slightly larger
+		position.y = SELECTED_LIFT_AMOUNT
+		scale = Vector2.ONE * SELECTED_SCALE
+		z_index = 10  # Render on top of other cards
 	else:
-		# Container is taller - texture fills width, centered vertically
-		var scaled_width := container_size.x
-		var scaled_height := scaled_width / texture_aspect
-		var y_offset := (container_size.y - scaled_height) / 2.0
-		card_rect = Rect2(0, y_offset, scaled_width, scaled_height)
-
-	# Draw on the overlay Control
-	var border_width := float(SELECTED_BORDER_WIDTH)
-
-	# Draw background tint (exactly matching card bounds)
-	selection_overlay.draw_rect(card_rect, SELECTED_BG_TINT, true)
-
-	# Draw borders (flush with card edges)
-	# Top border
-	selection_overlay.draw_rect(
-		Rect2(card_rect.position.x, card_rect.position.y, card_rect.size.x, border_width),
-		SELECTED_BORDER_COLOR
-	)
-	# Bottom border
-	selection_overlay.draw_rect(
-		Rect2(card_rect.position.x, card_rect.position.y + card_rect.size.y - border_width, card_rect.size.x, border_width),
-		SELECTED_BORDER_COLOR
-	)
-	# Left border
-	selection_overlay.draw_rect(
-		Rect2(card_rect.position.x, card_rect.position.y, border_width, card_rect.size.y),
-		SELECTED_BORDER_COLOR
-	)
-	# Right border
-	selection_overlay.draw_rect(
-		Rect2(card_rect.position.x + card_rect.size.x - border_width, card_rect.position.y, border_width, card_rect.size.y),
-		SELECTED_BORDER_COLOR
-	)
+		# Return to normal position and scale
+		position.y = 0
+		scale = Vector2.ONE
+		z_index = 0
 
 
 func _gui_input(event: InputEvent) -> void:

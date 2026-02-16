@@ -3,7 +3,7 @@ Game state and logic for Tiến Lên (Thirteen)
 Ported from GDScript game logic
 """
 import random
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from enum import Enum
 
 
@@ -17,22 +17,26 @@ class Suit(Enum):
 
 class Card:
     """Represents a playing card"""
-    def __init__(self, rank: int, suit: int):
+    rank: int
+    suit: int
+    value: int
+
+    def __init__(self, rank: int, suit: int) -> None:
         self.rank = rank  # 3-15 (3-10, J=11, Q=12, K=13, A=14, 2=15)
         self.suit = suit  # 0-3 (Spades, Clubs, Diamonds, Hearts)
         self.value = rank * 4 + suit  # Natural ordering
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, int]:
         return {'rank': self.rank, 'suit': self.suit, 'value': self.value}
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'Card':
+    def from_dict(cls, data: Dict[str, Any]) -> 'Card':
         return cls(data['rank'], data['suit'])
 
-    def __repr__(self):
-        rank_names = {11: 'J', 12: 'Q', 13: 'K', 14: 'A', 15: '2'}
-        suit_names = ['♠', '♣', '♦', '♥']
-        rank_str = rank_names.get(self.rank, str(self.rank))
+    def __repr__(self) -> str:
+        rank_names: Dict[int, str] = {11: 'J', 12: 'Q', 13: 'K', 14: 'A', 15: '2'}
+        suit_names: List[str] = ['♠', '♣', '♦', '♥']
+        rank_str: str = rank_names.get(self.rank, str(self.rank))
         return f"{rank_str}{suit_names[self.suit]}"
 
 
@@ -49,13 +53,18 @@ class Combo(Enum):
 
 class Play:
     """Represents a played hand"""
-    def __init__(self, combo: Combo, cards: List[Card], suited: bool = False):
+    combo: Combo
+    cards: List[Card]
+    suited: bool
+    high_card: Optional[Card]
+
+    def __init__(self, combo: Combo, cards: List[Card], suited: bool = False) -> None:
         self.combo = combo
         self.cards = sorted(cards, key=lambda c: c.value)
         self.suited = suited
         self.high_card = self.cards[-1] if cards else None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             'combo': self.combo.name,
             'cards': [c.to_dict() for c in self.cards],
@@ -63,7 +72,7 @@ class Play:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'Play':
+    def from_dict(cls, data: Dict[str, Any]) -> 'Play':
         combo = Combo[data['combo']]
         cards = [Card.from_dict(c) for c in data['cards']]
         return cls(combo, cards, data.get('suited', False))
@@ -71,15 +80,22 @@ class Play:
 
 class Game:
     """Game state for a single game of Tiến Lên"""
+    player_ids: List[str]
+    hands: List[List[Card]]
+    current_player: int
+    last_play: Optional[Play]
+    passed_players: List[bool]
+    win_order: List[int]
+    move_history: List[Dict[str, Any]]
 
-    def __init__(self, player_ids: List[str]):
+    def __init__(self, player_ids: List[str]) -> None:
         self.player_ids = player_ids  # 4 player IDs in seat order
-        self.hands: List[List[Card]] = [[] for _ in range(4)]
+        self.hands = [[] for _ in range(4)]
         self.current_player = 0
-        self.last_play: Optional[Play] = None
+        self.last_play = None
         self.passed_players = [False] * 4
-        self.win_order: List[int] = []
-        self.move_history: List[Dict] = []
+        self.win_order = []
+        self.move_history = []
 
     def deal(self) -> int:
         """
@@ -200,7 +216,7 @@ class Game:
 
         return True
 
-    def _advance_turn(self):
+    def _advance_turn(self) -> None:
         """Advance to next player"""
         # Skip players who finished
         for _ in range(4):
@@ -209,8 +225,8 @@ class Game:
                 break
 
         # Check if round reset (all others passed)
-        active_players = [i for i in range(4) if i not in self.win_order]
-        others_passed = all(self.passed_players[i] for i in active_players if i != self.current_player)
+        active_players: List[int] = [i for i in range(4) if i not in self.win_order]
+        others_passed: bool = all(self.passed_players[i] for i in active_players if i != self.current_player)
 
         if others_passed:
             # Grant power (clear last play and passed flags)
@@ -226,8 +242,8 @@ class Game:
         if not cards:
             return Play(Combo.INVALID, [])
 
-        sorted_cards = sorted(cards, key=lambda c: c.value)
-        n = len(sorted_cards)
+        sorted_cards: List[Card] = sorted(cards, key=lambda c: c.value)
+        n: int = len(sorted_cards)
 
         # Single
         if n == 1:
@@ -301,14 +317,15 @@ class Game:
     def _can_beat(self, play: Play, last_play: Play) -> bool:
         """Check if play can beat last play"""
         # Chops: Quad beats single 2
-        if play.combo == Combo.QUAD and last_play.combo == Combo.SINGLE and last_play.high_card.rank == 15:
+        if (play.combo == Combo.QUAD and last_play.combo == Combo.SINGLE and
+            last_play.high_card is not None and last_play.high_card.rank == 15):
             return True
 
         # Bombs beat 2s by length
         if play.combo == Combo.BOMB and last_play.combo in [Combo.SINGLE, Combo.PAIR, Combo.TRIPLE]:
-            if last_play.high_card.rank == 15:
+            if last_play.high_card is not None and last_play.high_card.rank == 15:
                 # 3-pair bomb beats single 2, 4-pair beats pair of 2s, etc.
-                bomb_pairs = len(play.cards) // 2
+                bomb_pairs: int = len(play.cards) // 2
                 if last_play.combo == Combo.SINGLE and bomb_pairs >= 3:
                     return True
                 if last_play.combo == Combo.PAIR and bomb_pairs >= 4:
@@ -329,9 +346,11 @@ class Game:
             return False
 
         # Compare high cards
+        if play.high_card is None or last_play.high_card is None:
+            return False
         return play.high_card.value > last_play.high_card.value
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to DynamoDB-compatible dict"""
         return {
             'playerIds': self.player_ids,
@@ -344,7 +363,7 @@ class Game:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'Game':
+    def from_dict(cls, data: Dict[str, Any]) -> 'Game':
         """Create from DynamoDB dict"""
         game = cls(data['playerIds'])
         game.hands = [[Card.from_dict(c) for c in hand] for hand in data['hands']]

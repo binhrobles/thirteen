@@ -1,9 +1,8 @@
 """
 Tournament state management and business logic
 """
-from typing import Dict, List, Optional, Tuple
-from decimal import Decimal
-from game import Game, Card
+from typing import Dict, List, Optional, Tuple, Any
+from game import Game
 
 
 class TourneyStatus:
@@ -17,9 +16,18 @@ class TourneyStatus:
 
 class Seat:
     """Represents a tournament seat"""
-    def __init__(self, position: int, player_id: str = None, player_name: str = None,
-                 connection_id: str = None, score: int = 0, games_won: int = 0,
-                 last_game_points: int = 0, ready: bool = False):
+    position: int
+    player_id: Optional[str]
+    player_name: Optional[str]
+    connection_id: Optional[str]
+    score: int
+    games_won: int
+    last_game_points: int
+    ready: bool
+
+    def __init__(self, position: int, player_id: Optional[str] = None, player_name: Optional[str] = None,
+                 connection_id: Optional[str] = None, score: int = 0, games_won: int = 0,
+                 last_game_points: int = 0, ready: bool = False) -> None:
         self.position = position
         self.player_id = player_id
         self.player_name = player_name
@@ -29,7 +37,7 @@ class Seat:
         self.last_game_points = last_game_points
         self.ready = ready
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to DynamoDB-compatible dict"""
         return {
             'position': self.position,
@@ -43,7 +51,7 @@ class Seat:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'Seat':
+    def from_dict(cls, data: Dict[str, Any]) -> 'Seat':
         """Create from DynamoDB dict"""
         return cls(
             position=data['position'],
@@ -67,27 +75,34 @@ class Seat:
 
 class Tourney:
     """Tournament state and business logic"""
-    GLOBAL_ID = "global"
-    TARGET_SCORE = 21
-    SEATS_COUNT = 4
+    GLOBAL_ID: str = "global"
+    TARGET_SCORE: int = 21
+    SEATS_COUNT: int = 4
 
-    def __init__(self, tourney_id: str = GLOBAL_ID):
+    tourney_id: str
+    status: str
+    target_score: int
+    seats: List[Seat]
+    current_game: Optional[Dict[str, Any]]
+    game_history: List[Dict[str, Any]]
+
+    def __init__(self, tourney_id: str = GLOBAL_ID) -> None:
         self.tourney_id = tourney_id
         self.status = TourneyStatus.WAITING
         self.target_score = self.TARGET_SCORE
-        self.seats: List[Seat] = [Seat(i) for i in range(self.SEATS_COUNT)]
+        self.seats = [Seat(i) for i in range(self.SEATS_COUNT)]
         self.current_game = None
         self.game_history = []
 
     @classmethod
-    def from_dynamo(cls, item: Dict) -> 'Tourney':
+    def from_dynamo(cls, item: Dict[str, Any]) -> 'Tourney':
         """Create tournament from DynamoDB item"""
         tourney = cls(item['tourneyId'])
         tourney.status = item.get('status', TourneyStatus.WAITING)
         tourney.target_score = int(item.get('targetScore', cls.TARGET_SCORE))
 
         # Parse seats
-        seats_data = item.get('seats', [])
+        seats_data: List[Any] = item.get('seats', [])
         tourney.seats = [Seat.from_dict(s) for s in seats_data]
 
         # Ensure we always have 4 seats
@@ -99,7 +114,7 @@ class Tourney:
 
         return tourney
 
-    def to_dynamo(self) -> Dict:
+    def to_dynamo(self) -> Dict[str, Any]:
         """Convert to DynamoDB item"""
         return {
             'tourneyId': self.tourney_id,
@@ -253,11 +268,14 @@ class Tourney:
         Returns: Game instance
         """
         # Create game with player IDs in seat order
-        player_ids = [s.player_id for s in self.seats]
+        player_ids: List[str] = [s.player_id for s in self.seats if s.player_id is not None]
+        if len(player_ids) != self.SEATS_COUNT:
+            raise ValueError(f"Cannot start game: expected {self.SEATS_COUNT} players, got {len(player_ids)}")
+
         game = Game(player_ids)
 
         # Deal cards
-        starting_player = game.deal()
+        _starting_player = game.deal()
 
         # Store as current game
         self.current_game = game.to_dict()
@@ -314,9 +332,9 @@ class Tourney:
 
         return True, tournament_complete
 
-    def get_leaderboard(self) -> List[Dict]:
+    def get_leaderboard(self) -> List[Dict[str, Any]]:
         """Get leaderboard sorted by score"""
-        leaderboard = []
+        leaderboard: List[Dict[str, Any]] = []
         for seat in self.seats:
             if seat.is_occupied():
                 leaderboard.append({
@@ -331,7 +349,7 @@ class Tourney:
         leaderboard.sort(key=lambda x: x['totalScore'], reverse=True)
         return leaderboard
 
-    def to_client_state(self) -> Dict:
+    def to_client_state(self) -> Dict[str, Any]:
         """Convert to client-friendly state"""
         return {
             'status': self.status,

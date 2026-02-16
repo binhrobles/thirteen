@@ -6,13 +6,13 @@ import json
 import os
 import time
 import boto3
-from decimal import Decimal
+from typing import Dict, Any, Optional
 
 dynamodb = boto3.resource('dynamodb')
 connections_table = dynamodb.Table(os.environ['CONNECTIONS_TABLE'])
 
 
-def handler(event, context):
+def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     """
     Handle WebSocket connection request
 
@@ -20,12 +20,12 @@ def handler(event, context):
     - playerId: UUID of the player
     - playerName: Display name (optional)
     """
-    connection_id = event['requestContext']['connectionId']
+    connection_id: str = event['requestContext']['connectionId']
 
     # Extract query parameters
-    query_params = event.get('queryStringParameters') or {}
-    player_id = query_params.get('playerId')
-    player_name = query_params.get('playerName', 'Player')
+    query_params: Dict[str, str] = event.get('queryStringParameters') or {}
+    player_id: Optional[str] = query_params.get('playerId')
+    player_name: str = query_params.get('playerName', 'Player')
 
     # Basic validation
     if not player_id:

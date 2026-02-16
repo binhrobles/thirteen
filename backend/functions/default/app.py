@@ -7,6 +7,7 @@ import os
 import sys
 import boto3
 from decimal import Decimal
+from typing import List, Dict, Any, Optional
 
 # Add shared layer to path
 sys.path.append('/opt/python')
@@ -17,10 +18,10 @@ dynamodb = boto3.resource('dynamodb')
 connections_table = dynamodb.Table(os.environ['CONNECTIONS_TABLE'])
 tourney_table = dynamodb.Table(os.environ['TOURNEY_TABLE'])
 
-apigw_management = None  # Initialized per request
+apigw_management: Optional[Any] = None  # Initialized per request
 
 
-def handler(event, context):
+def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Route WebSocket messages to appropriate action handlers
 
@@ -79,9 +80,9 @@ def handler(event, context):
         return send_error(connection_id, 'INTERNAL_ERROR', 'Internal server error')
 
 
-def handle_ping(connection_id, payload):
+def handle_ping(connection_id: str, payload: Dict[str, Any]) -> Dict[str, int]:
     """Handle heartbeat ping"""
-    timestamp = payload.get('timestamp', 0)
+    timestamp: int = payload.get('timestamp', 0)
 
     # Update last ping time
     connections_table.update_item(
@@ -97,17 +98,17 @@ def handle_ping(connection_id, payload):
     })
 
 
-def handle_claim_seat(connection_id, player_id, player_name, payload):
+def handle_claim_seat(connection_id: str, player_id: str, player_name: str, payload: Dict[str, Any]) -> Dict[str, int]:
     """Handle tourney/claim_seat action"""
     try:
         # Get or create tournament
         tourney = get_or_create_tourney()
 
         # Extract seat position from payload
-        seat_position = payload.get('seatPosition')
+        seat_position: Optional[int] = payload.get('seatPosition')
 
         # Attempt to claim seat
-        success, error_code, claimed_position = tourney.claim_seat(
+        success, error_code, _claimed_position = tourney.claim_seat(
             player_id, player_name, connection_id, seat_position
         )
 
@@ -129,7 +130,7 @@ def handle_claim_seat(connection_id, player_id, player_name, payload):
         return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to claim seat')
 
 
-def handle_leave_tourney(connection_id, player_id, payload):
+def handle_leave_tourney(connection_id: str, player_id: str, _payload: Dict[str, Any]) -> Dict[str, int]:
     """Handle tourney/leave action"""
     try:
         # Get tournament
@@ -156,7 +157,7 @@ def handle_leave_tourney(connection_id, player_id, payload):
         return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to leave tourney')
 
 
-def handle_ready(connection_id, player_id, payload):
+def handle_ready(connection_id: str, player_id: str, _payload: Dict[str, Any]) -> Dict[str, int]:
     """Handle tourney/ready action"""
     try:
         # Get tournament
@@ -192,7 +193,7 @@ def handle_ready(connection_id, player_id, payload):
         return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to ready up')
 
 
-def handle_play_cards(connection_id, player_id, payload):
+def handle_play_cards(connection_id: str, player_id: str, payload: Dict[str, Any]) -> Dict[str, int]:
     """Handle game/play action"""
     try:
         # Get tournament
@@ -207,7 +208,7 @@ def handle_play_cards(connection_id, player_id, payload):
             return send_error(connection_id, 'NOT_IN_TOURNEY', 'Not in tournament')
 
         # Parse cards from payload
-        cards_data = payload.get('cards', [])
+        cards_data: List[Dict[str, Any]] = payload.get('cards', [])
         cards = [Card.from_dict(c) for c in cards_data]
 
         # Load game state
@@ -233,7 +234,7 @@ def handle_play_cards(connection_id, player_id, payload):
                     break
 
             # Complete game and award points
-            success, tourney_complete = tourney.complete_game(game.win_order)
+            _success, tourney_complete = tourney.complete_game(game.win_order)
 
             save_tourney(tourney)
 
@@ -254,7 +255,7 @@ def handle_play_cards(connection_id, player_id, payload):
         return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to play cards')
 
 
-def handle_pass(connection_id, player_id, payload):
+def handle_pass(connection_id: str, player_id: str, _payload: Dict[str, Any]) -> Dict[str, int]:
     """Handle game/pass action"""
     try:
         # Get tournament
@@ -308,14 +309,14 @@ def get_or_create_tourney() -> Tourney:
         return Tourney()
 
 
-def save_tourney(tourney: Tourney):
+def save_tourney(tourney: Tourney) -> None:
     """Save tourney to DynamoDB"""
     tourney_table.put_item(Item=tourney.to_dynamo())
 
 
-def broadcast_tourney_update(tourney: Tourney):
+def broadcast_tourney_update(tourney: Tourney) -> None:
     """Broadcast tourney state update to all connected players"""
-    message = {
+    message: Dict[str, Any] = {
         'type': 'tourney/updated',
         'payload': tourney.to_client_state()
     }
@@ -326,12 +327,12 @@ def broadcast_tourney_update(tourney: Tourney):
             send_to_connection(seat.connection_id, message)
 
 
-def broadcast_game_started(tourney: Tourney, game: Game):
+def broadcast_game_started(tourney: Tourney, game: Game) -> None:
     """Broadcast game start to all players"""
     # Send each player their own hand
     for i, seat in enumerate(tourney.seats):
         if seat.is_occupied() and seat.connection_id:
-            message = {
+            message: Dict[str, Any] = {
                 'type': 'game/started',
                 'payload': {
                     'yourPosition': i,
@@ -343,12 +344,12 @@ def broadcast_game_started(tourney: Tourney, game: Game):
             send_to_connection(seat.connection_id, message)
 
 
-def broadcast_game_update(tourney: Tourney, game: Game, player_who_moved: int):
+def broadcast_game_update(tourney: Tourney, game: Game, _player_who_moved: int) -> None:
     """Broadcast game state update after a move"""
     # Send update to all players
     for i, seat in enumerate(tourney.seats):
         if seat.is_occupied() and seat.connection_id:
-            message = {
+            message: Dict[str, Any] = {
                 'type': 'game/updated',
                 'payload': {
                     'currentPlayer': game.current_player,
@@ -361,19 +362,19 @@ def broadcast_game_update(tourney: Tourney, game: Game, player_who_moved: int):
             send_to_connection(seat.connection_id, message)
 
 
-def broadcast_game_over(tourney: Tourney, win_order: List[int], tourney_complete: bool):
+def broadcast_game_over(tourney: Tourney, win_order: List[int], tourney_complete: bool) -> None:
     """Broadcast game over with leaderboard"""
-    leaderboard = tourney.get_leaderboard()
+    leaderboard: List[Dict[str, Any]] = tourney.get_leaderboard()
 
     # Determine points awarded
-    points_awarded = [4, 2, 1, 0]
+    points_awarded: List[int] = [4, 2, 1, 0]
 
-    winner_position = None
+    winner_position: Optional[int] = None
     if tourney_complete:
         # Find tournament winner (highest score)
         winner_position = max(range(4), key=lambda i: tourney.seats[i].score)
 
-    message = {
+    message: Dict[str, Any] = {
         'type': 'game/over',
         'payload': {
             'winOrder': win_order,
@@ -390,9 +391,11 @@ def broadcast_game_over(tourney: Tourney, win_order: List[int], tourney_complete
             send_to_connection(seat.connection_id, message)
 
 
-def send_to_connection(connection_id, data):
+def send_to_connection(connection_id: str, data: Dict[str, Any]) -> Dict[str, int]:
     """Send message to a specific connection"""
     try:
+        if apigw_management is None:
+            raise RuntimeError("apigw_management not initialized")
         apigw_management.post_to_connection(
             ConnectionId=connection_id,
             Data=json.dumps(data, default=decimal_default)
@@ -406,7 +409,7 @@ def send_to_connection(connection_id, data):
         return {'statusCode': 500}
 
 
-def send_error(connection_id, code, message):
+def send_error(connection_id: str, code: str, message: str) -> Dict[str, int]:
     """Send error message to connection"""
     return send_to_connection(connection_id, {
         'type': 'error',
@@ -417,7 +420,7 @@ def send_error(connection_id, code, message):
     })
 
 
-def decimal_default(obj):
+def decimal_default(obj: Any) -> Any:
     """JSON serializer for Decimal objects"""
     if isinstance(obj, Decimal):
         return int(obj) if obj % 1 == 0 else float(obj)

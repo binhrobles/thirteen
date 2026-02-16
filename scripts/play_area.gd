@@ -202,6 +202,7 @@ func _create_card_sprites() -> void:
 		card_sprite.setup(card)
 		card_sprite.scale_for_hand_size(scale_factor)
 		card_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_sprite.interactable = false  # Play area cards should not be selectable
 		card_sprites.append(card_sprite)
 
 	# Calculate card width (get from first card's minimum size)

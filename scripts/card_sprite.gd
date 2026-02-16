@@ -5,6 +5,7 @@ extends Control
 
 var card: Card
 var is_selected: bool = false
+var interactable: bool = true  # Can this card be selected/clicked?
 
 var texture_rect: TextureRect
 
@@ -145,8 +146,8 @@ func set_selected(selected: bool) -> void:
 
 func _input(event: InputEvent) -> void:
 	"""Handle touch and mouse interaction - distinguish taps from drags, only if over this card"""
-	# Only handle if the event is over this card
-	if not _is_event_over_card(event):
+	# Only handle if interactable and the event is over this card
+	if not interactable or not _is_event_over_card(event):
 		return
 
 	# Handle mouse button events

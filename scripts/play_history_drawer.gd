@@ -28,6 +28,8 @@ func _setup_ui() -> void:
 	anchor_right = 1.0
 	anchor_bottom = 1.0
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	z_index = 200  # Render above everything including player hand (z=100)
+	z_as_relative = false  # Use absolute z-index
 
 	# Semi-transparent background (tap to dismiss)
 	background = ColorRect.new()
@@ -181,6 +183,7 @@ func _create_play_entry(entry: Dictionary) -> Control:
 			card_sprite.call_deferred("setup", card)
 			card_sprite.call_deferred("scale_for_hand_size", 0.5)
 			card_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card_sprite.interactable = false  # History cards should not be selectable
 
 	return container
 

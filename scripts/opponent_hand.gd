@@ -53,8 +53,8 @@ func _apply_position() -> void:
 			# Centered horizontally at top, half off-screen for more play area
 			anchor_left = 0.3
 			anchor_right = 0.7
-			anchor_top = -0.065
-			anchor_bottom = 0.065
+			anchor_top = -0.045
+			anchor_bottom = 0.085
 
 		Position.RIGHT:
 			# Right edge, rotated, half off-screen for more play area

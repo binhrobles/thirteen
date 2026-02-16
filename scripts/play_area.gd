@@ -7,7 +7,7 @@ signal history_requested()  # Emitted when user taps to see play history
 
 @onready var player_label: Label
 @onready var status_label: Label
-@onready var card_container: HBoxContainer
+@onready var card_container: Control  # Changed from HBoxContainer for manual positioning
 @onready var background: Panel
 
 const CardSpriteScene := preload("res://scenes/card_sprite.tscn")
@@ -15,7 +15,12 @@ const CardSpriteScene := preload("res://scenes/card_sprite.tscn")
 var current_cards: Array[Card] = []
 var card_sprites: Array = []
 
-const CARD_SPACING := 10  # Space between cards in played hand
+const CARD_SPACING := 10  # Space between cards in played hand (when not overlapping)
+const MIN_CARD_SPACING := -40  # Minimum spacing (overlap) when cards need to fit
+
+## Boundaries to avoid (opponent hand areas)
+const LEFT_OPPONENT_WIDTH := 0.23  # Left opponent occupies 0.0 to 0.23
+const RIGHT_OPPONENT_START := 0.77  # Right opponent starts at 0.77
 
 
 func _ready() -> void:
@@ -24,18 +29,19 @@ func _ready() -> void:
 
 func _setup_ui() -> void:
 	"""Create the play area UI in center of screen"""
-	# Center anchoring - use 80% width, 40% height for mobile
-	anchor_left = 0.1
-	anchor_right = 0.9
-	anchor_top = 0.25
-	anchor_bottom = 0.65
+	# Center the play area - auto-size to content, positioned in upper-middle area
+	anchor_left = 0.5
+	anchor_right = 0.5
+	anchor_top = 0.35  # Positioned in upper-middle
 	grow_horizontal = Control.GROW_DIRECTION_BOTH
-	grow_vertical = Control.GROW_DIRECTION_BOTH
-	offset_left = 0
-	offset_right = 0
-	offset_top = 0
-	offset_bottom = 0
+	grow_vertical = Control.GROW_DIRECTION_BEGIN
+	offset_left = -180  # Half width (360px wide)
+	offset_right = 180
+	offset_top = -100  # Position upward from anchor
+	offset_bottom = 100  # 200px tall
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	z_index = 10  # Render above background but below player hand
+	z_as_relative = false  # Use absolute z-index
 
 	# Background panel
 	background = Panel.new()
@@ -79,8 +85,8 @@ func _setup_ui() -> void:
 	player_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	add_child(player_label)
 
-	# Card container (centered) - use full width for cards
-	card_container = HBoxContainer.new()
+	# Card container (centered) - use full width for cards, manual positioning
+	card_container = Control.new()
 	card_container.anchor_left = 0.0
 	card_container.anchor_top = 0.2
 	card_container.anchor_right = 1.0
@@ -91,8 +97,7 @@ func _setup_ui() -> void:
 	card_container.offset_right = -10
 	card_container.offset_top = 0
 	card_container.offset_bottom = 0
-	card_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	card_container.add_theme_constant_override("separation", CARD_SPACING)
+	card_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(card_container)
 
 	# Status label (for "Your turn", "Waiting", etc.)
@@ -182,17 +187,60 @@ func _clear_cards() -> void:
 
 
 func _create_card_sprites() -> void:
-	"""Create sprites for the current cards"""
+	"""Create sprites for the current cards with dynamic overlap"""
+	if current_cards.is_empty():
+		return
+
 	# Scale cards down slightly for the play area
 	var scale_factor := 0.8
+
+	# Get viewport size for calculations
+	var viewport_size: Vector2
+	if is_inside_tree():
+		viewport_size = get_viewport_rect().size
+	else:
+		viewport_size = Vector2(390, 844)
+
+	# Calculate available width (avoid opponent hand areas)
+	var available_width := viewport_size.x * (RIGHT_OPPONENT_START - LEFT_OPPONENT_WIDTH)
+
+	# Create card sprites first to get their sizes
 	for card in current_cards:
 		var card_sprite = CardSpriteScene.instantiate()
 		card_container.add_child(card_sprite)
 		card_sprite.setup(card)
 		card_sprite.scale_for_hand_size(scale_factor)
-		# Disable interaction on played cards
 		card_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card_sprites.append(card_sprite)
+
+	# Calculate card width (get from first card's minimum size)
+	var card_width: float = card_sprites[0].get_combined_minimum_size().x * scale_factor
+
+	# Calculate total width needed with normal spacing
+	var total_width_needed: float = card_width * current_cards.size() + CARD_SPACING * (current_cards.size() - 1)
+
+	# Calculate spacing (overlap if needed)
+	var card_spacing: float = CARD_SPACING
+	if total_width_needed > available_width:
+		# Need to overlap - calculate how much
+		# total_width = card_width + (card_width + spacing) * (n - 1)
+		# spacing = (total_width - card_width * n) / (n - 1)
+		card_spacing = (available_width - card_width * current_cards.size()) / (current_cards.size() - 1)
+		card_spacing = max(card_spacing, MIN_CARD_SPACING)
+
+	# Calculate total actual width with calculated spacing
+	var total_width: float = card_width + (card_width + card_spacing) * (current_cards.size() - 1)
+
+	# Calculate starting x position (center the cards)
+	var start_x: float = (card_container.size.x - total_width) / 2.0
+
+	# Position cards
+	for i in card_sprites.size():
+		var card_sprite = card_sprites[i]
+		var x_pos: float = start_x + i * (card_width + card_spacing)
+		card_sprite.position = Vector2(x_pos, 0)
+		# Set z_index so cards stack left-to-right
+		card_sprite.z_index = i
 
 
 func _gui_input(event: InputEvent) -> void:

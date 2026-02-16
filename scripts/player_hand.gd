@@ -30,6 +30,7 @@ func _setup_ui() -> void:
 	offset_top = 0
 	offset_bottom = 0
 	grow_vertical = Control.GROW_DIRECTION_BEGIN
+	z_index = 5  # Render above play area and buttons
 
 	# Add semi-transparent background
 	var background := ColorRect.new()

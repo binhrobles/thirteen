@@ -160,12 +160,14 @@ func _on_play_button_pressed() -> void:
 
 	var selected: Array = player_hand_ui.get_selected_cards()
 	if selected.is_empty():
-		print("No cards selected")
+		if play_area_ui:
+			play_area_ui.show_error("Select cards to play")
 		return
 
 	var result = game_state.can_play(HUMAN_PLAYER, selected)
 	if not result.valid:
-		print("Invalid play: ", result.error)
+		if play_area_ui:
+			play_area_ui.show_error(result.error)
 		return
 
 	# Execute the play

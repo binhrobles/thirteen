@@ -130,6 +130,18 @@ func show_waiting(player_name: String) -> void:
 	show()
 
 
+func show_error(message: String) -> void:
+	"""Show an error message briefly"""
+	player_label.text = ""
+	status_label.text = message
+	status_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))  # Red
+	show()
+
+	# Reset color after a delay
+	await get_tree().create_timer(2.0).timeout
+	status_label.add_theme_color_override("font_color", Color(0.7, 0.8, 0.9))  # Original color
+
+
 func clear() -> void:
 	"""Clear the play area"""
 	_clear_cards()

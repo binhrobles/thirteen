@@ -15,4 +15,3 @@ Early development. See `bd ready` for current work items.
 
 4-player Vietnamese climbing card game. Cards rank 3 (low) to 2 (high), suits Spades < Clubs < Diamonds < Hearts. Play singles, pairs, triples, runs, quads, and bombs to shed your hand first.
 
-See [idea.md](idea.md) for the full vision.

@@ -10,9 +10,10 @@ extends Control
 var card: Card
 var is_selected: bool = false
 
-## Card dimensions (can be scaled down for large hands)
-const BASE_WIDTH := 80.0
-const BASE_HEIGHT := 120.0
+## Card dimensions as percentage of viewport height (mobile-friendly)
+## On a 844px tall phone (iPhone 14), 18% = ~152px height
+const BASE_HEIGHT_PERCENT := 0.18  # 18% of viewport height
+const ASPECT_RATIO := 0.667  # width/height ratio (2:3)
 
 ## Colors for suits
 const RED_COLOR := Color(0.8, 0.1, 0.1)  # Hearts and Diamonds
@@ -29,7 +30,16 @@ func _ready() -> void:
 
 
 func _get_minimum_size() -> Vector2:
-	return Vector2(BASE_WIDTH, BASE_HEIGHT)
+	# Use viewport size if available, otherwise use a sensible mobile default (844x390 like iPhone 14)
+	var viewport_size: Vector2
+	if is_inside_tree():
+		viewport_size = get_viewport_rect().size
+	else:
+		viewport_size = Vector2(390, 844)  # Default mobile portrait size
+
+	var height := viewport_size.y * BASE_HEIGHT_PERCENT
+	var width := height * ASPECT_RATIO
+	return Vector2(width, height)
 
 
 func _setup_background() -> void:
@@ -51,12 +61,17 @@ func _setup_background() -> void:
 
 
 func _setup_labels() -> void:
+	# Calculate font sizes based on card size (mobile-friendly)
+	var card_height := _get_minimum_size().y
+	var rank_font_size := int(card_height * 0.25)  # 25% of card height
+	var suit_font_size := int(card_height * 0.32)  # 32% of card height
+
 	# Position rank label at top
 	rank_label.anchor_left = 0.1
 	rank_label.anchor_top = 0.05
 	rank_label.anchor_right = 0.9
 	rank_label.anchor_bottom = 0.4
-	rank_label.add_theme_font_size_override("font_size", 36)
+	rank_label.add_theme_font_size_override("font_size", rank_font_size)
 	rank_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# Position suit label at bottom
@@ -64,7 +79,7 @@ func _setup_labels() -> void:
 	suit_label.anchor_top = 0.6
 	suit_label.anchor_right = 0.9
 	suit_label.anchor_bottom = 0.95
-	suit_label.add_theme_font_size_override("font_size", 48)
+	suit_label.add_theme_font_size_override("font_size", suit_font_size)
 	suit_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 

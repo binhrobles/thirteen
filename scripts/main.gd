@@ -6,6 +6,8 @@ const GameStateScript := preload("res://scripts/game_state.gd")
 
 @onready var play_button: Button = $PlayButton
 @onready var pass_button: Button = $PassButton
+@onready var title_label: Label = $Title
+@onready var subtitle_label: Label = $Subtitle
 
 var game_state
 var turn_manager
@@ -14,7 +16,48 @@ var play_area_ui
 
 
 func _ready() -> void:
+	_setup_buttons()
 	_initialize_game()
+
+
+func _setup_buttons() -> void:
+	"""Configure buttons and labels for mobile with responsive sizing"""
+	var viewport_size := get_viewport_rect().size
+	var button_height := viewport_size.y * 0.08  # 8% of viewport height
+	var button_font_size := int(viewport_size.y * 0.03)  # 3% of viewport height
+	var bottom_margin := viewport_size.y * 0.02  # 2% from bottom
+
+	# Configure title labels to be larger and more visible
+	var title_font_size := int(viewport_size.y * 0.05)  # 5% of viewport height
+	var subtitle_font_size := int(viewport_size.y * 0.035)  # 3.5% of viewport height
+	title_label.add_theme_font_size_override("font_size", title_font_size)
+	subtitle_label.add_theme_font_size_override("font_size", subtitle_font_size)
+
+	# Hide title/subtitle when game starts (they'll be hidden by UI anyway)
+	title_label.visible = false
+	subtitle_label.visible = false
+
+	# Configure Play button (left)
+	play_button.anchor_left = 0.1
+	play_button.anchor_right = 0.45
+	play_button.anchor_top = 1.0
+	play_button.anchor_bottom = 1.0
+	play_button.offset_left = 0
+	play_button.offset_right = 0
+	play_button.offset_top = -button_height - bottom_margin
+	play_button.offset_bottom = -bottom_margin
+	play_button.add_theme_font_size_override("font_size", button_font_size)
+
+	# Configure Pass button (right)
+	pass_button.anchor_left = 0.55
+	pass_button.anchor_right = 0.9
+	pass_button.anchor_top = 1.0
+	pass_button.anchor_bottom = 1.0
+	pass_button.offset_left = 0
+	pass_button.offset_right = 0
+	pass_button.offset_top = -button_height - bottom_margin
+	pass_button.offset_bottom = -bottom_margin
+	pass_button.add_theme_font_size_override("font_size", button_font_size)
 
 
 func _initialize_game() -> void:

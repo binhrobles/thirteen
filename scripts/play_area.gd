@@ -24,17 +24,17 @@ func _ready() -> void:
 
 func _setup_ui() -> void:
 	"""Create the play area UI in center of screen"""
-	# Center anchoring
-	anchor_left = 0.5
-	anchor_right = 0.5
-	anchor_top = 0.5
-	anchor_bottom = 0.5
+	# Center anchoring - use 80% width, 40% height for mobile
+	anchor_left = 0.1
+	anchor_right = 0.9
+	anchor_top = 0.25
+	anchor_bottom = 0.65
 	grow_horizontal = Control.GROW_DIRECTION_BOTH
 	grow_vertical = Control.GROW_DIRECTION_BOTH
-	offset_left = -250
-	offset_right = 250
-	offset_top = -150
-	offset_bottom = 150
+	offset_left = 0
+	offset_right = 0
+	offset_top = 0
+	offset_bottom = 0
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 	# Background panel
@@ -55,46 +55,58 @@ func _setup_ui() -> void:
 	background.add_theme_stylebox_override("panel", style_box)
 	add_child(background)
 
-	# Player label (who played this hand)
+	# Player label (who played this hand) - responsive font size
+	# Use viewport if available, otherwise default mobile size
+	var viewport_height: float
+	if is_inside_tree():
+		viewport_height = get_viewport_rect().size.y
+	else:
+		viewport_height = 844.0  # Default mobile portrait height
+
+	var player_font_size := int(viewport_height * 0.03)  # 3% of viewport height
+	var status_font_size := int(viewport_height * 0.025)  # 2.5% of viewport height
+
 	player_label = Label.new()
-	player_label.anchor_left = 0.5
-	player_label.anchor_right = 0.5
-	player_label.offset_left = -200
-	player_label.offset_right = 200
+	player_label.anchor_left = 0.0
+	player_label.anchor_right = 1.0
+	player_label.anchor_top = 0.0
+	player_label.offset_left = 0
+	player_label.offset_right = 0
 	player_label.offset_top = 10
-	player_label.offset_bottom = 35
+	player_label.offset_bottom = 50
 	player_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	player_label.add_theme_font_size_override("font_size", 18)
+	player_label.add_theme_font_size_override("font_size", player_font_size)
 	player_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	add_child(player_label)
 
-	# Card container (centered)
+	# Card container (centered) - use full width for cards
 	card_container = HBoxContainer.new()
-	card_container.anchor_left = 0.5
-	card_container.anchor_top = 0.5
-	card_container.anchor_right = 0.5
-	card_container.anchor_bottom = 0.5
+	card_container.anchor_left = 0.0
+	card_container.anchor_top = 0.2
+	card_container.anchor_right = 1.0
+	card_container.anchor_bottom = 0.8
 	card_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	card_container.grow_vertical = Control.GROW_DIRECTION_BOTH
-	card_container.offset_left = -200
-	card_container.offset_right = 200
-	card_container.offset_top = -60
-	card_container.offset_bottom = 60
+	card_container.offset_left = 10
+	card_container.offset_right = -10
+	card_container.offset_top = 0
+	card_container.offset_bottom = 0
 	card_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	card_container.add_theme_constant_override("separation", CARD_SPACING)
 	add_child(card_container)
 
 	# Status label (for "Your turn", "Waiting", etc.)
 	status_label = Label.new()
-	status_label.anchor_left = 0.5
-	status_label.anchor_right = 0.5
+	status_label.anchor_left = 0.0
+	status_label.anchor_right = 1.0
+	status_label.anchor_top = 1.0
 	status_label.anchor_bottom = 1.0
-	status_label.offset_left = -200
-	status_label.offset_right = 200
-	status_label.offset_top = -35
+	status_label.offset_left = 0
+	status_label.offset_right = 0
+	status_label.offset_top = -50
 	status_label.offset_bottom = -10
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.add_theme_font_size_override("font_size", 16)
+	status_label.add_theme_font_size_override("font_size", status_font_size)
 	status_label.add_theme_color_override("font_color", Color(0.7, 0.8, 0.9))
 	add_child(status_label)
 

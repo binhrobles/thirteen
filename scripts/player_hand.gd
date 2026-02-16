@@ -22,12 +22,12 @@ func _ready() -> void:
 
 func _setup_ui() -> void:
 	"""Create the scroll container and card container"""
-	# Position at bottom of screen
-	anchor_top = 1.0
+	# Position at bottom of screen - use viewport-relative height (25% of screen)
+	anchor_top = 0.75
 	anchor_bottom = 1.0
 	anchor_left = 0.0
 	anchor_right = 1.0
-	offset_top = -150  # Card height + padding
+	offset_top = 0
 	offset_bottom = 0
 	grow_vertical = Control.GROW_DIRECTION_BEGIN
 

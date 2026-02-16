@@ -106,11 +106,6 @@ func _initialize_game() -> void:
 	var starting_player := Deck.find_starting_player(hands)
 	game_state = GameStateScript.new(hands)
 
-	# Show starting player message
-	var player_name := "You" if starting_player == 0 else "Player %d" % (starting_player + 1)
-	play_area_ui.show_game_message("%s opens" % player_name, 1.5)
-	await play_area_ui.get_tree().create_timer(1.5).timeout
-
 	# Clear play area before game starts
 	play_area_ui.clear()
 

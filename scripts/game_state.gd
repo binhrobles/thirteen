@@ -11,6 +11,7 @@ signal game_over(win_order: Array[int])
 ## Game state
 var hands: Array  # Array of Array[Card]
 var last_play: Play = null
+var last_play_by: int = -1  # Who made the last play (-1 if none)
 var current_player: int = 0
 var players_in_round: Array[bool] = [true, true, true, true]  # Who hasn't passed this round
 var players_in_game: Array[bool] = [true, true, true, true]  # Who hasn't won yet
@@ -60,6 +61,7 @@ func play_cards(player_id: int, cards: Array[Card]) -> MoveValidator.MoveResult:
 
 	# Update game state
 	last_play = result.play
+	last_play_by = player_id  # Track who made this play
 	play_log.append({"player": player_id, "play": result.play})
 
 	# Check if player won (emptied hand)
@@ -67,8 +69,8 @@ func play_cards(player_id: int, cards: Array[Card]) -> MoveValidator.MoveResult:
 		_player_wins(player_id)
 	else:
 		_advance_turn()
-		# Check if turn came back to the player who made this play (won the round)
-		if current_player == player_id:
+		# Check if turn came back to the player who made the last play (won the round)
+		if current_player == last_play_by:
 			_reset_round()
 
 	return result
@@ -95,6 +97,9 @@ func pass_turn(player_id: int) -> bool:
 		_reset_round()
 	else:
 		_advance_turn()
+		# Check if turn came back to the player who made the last play (won the round)
+		if current_player == last_play_by:
+			_reset_round()
 
 	return true
 
@@ -140,6 +145,7 @@ func _check_round_over() -> bool:
 func _reset_round() -> void:
 	"""Reset the round - give power to current player"""
 	last_play = null
+	last_play_by = -1  # Reset who made the last play
 	for i in NUM_PLAYERS:
 		players_in_round[i] = players_in_game[i]
 	round_reset.emit(current_player)

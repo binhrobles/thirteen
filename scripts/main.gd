@@ -160,7 +160,7 @@ func _update_opponent_hands() -> void:
 	"""Refresh all opponent hand card counts"""
 	for i in range(opponent_hands.size()):
 		var player_id := i + 1  # Players 1, 2, 3
-		var hand_size := game_state.get_hand(player_id).size()
+		var hand_size: int = game_state.get_hand(player_id).size()
 		opponent_hands[i].update_card_count(hand_size)
 
 

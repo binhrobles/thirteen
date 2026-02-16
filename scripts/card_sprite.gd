@@ -144,11 +144,42 @@ func set_selected(selected: bool) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	"""Handle touch interaction - distinguish taps from drags, only if over this card"""
+	"""Handle touch and mouse interaction - distinguish taps from drags, only if over this card"""
 	# Only handle if the event is over this card
 	if not _is_event_over_card(event):
 		return
-	
+
+	# Handle mouse button events
+	var mouse_button := event as InputEventMouseButton
+	if mouse_button and mouse_button.button_index == MOUSE_BUTTON_LEFT:
+		if mouse_button.pressed:
+			# Mouse down - record position and reset drag state
+			touch_start_position = mouse_button.position
+			is_dragging = false
+		else:
+			# Mouse up - check if it was a click (not a drag)
+			if touch_start_position != Vector2.ZERO and not is_dragging:
+				var drag_distance: float = mouse_button.position.distance_to(touch_start_position)
+				if drag_distance <= DRAG_THRESHOLD:
+					# It was a click - toggle selection
+					toggle_selected()
+					get_viewport().set_input_as_handled()
+			# Reset tracking
+			touch_start_position = Vector2.ZERO
+			is_dragging = false
+		return
+
+	# Handle mouse drag events - mark as dragging
+	var mouse_motion := event as InputEventMouseMotion
+	if mouse_motion and mouse_motion.button_mask & MOUSE_BUTTON_MASK_LEFT:
+		# Check if mouse has moved beyond threshold
+		if touch_start_position != Vector2.ZERO:
+			var drag_distance: float = mouse_motion.position.distance_to(touch_start_position)
+			if drag_distance > DRAG_THRESHOLD:
+				is_dragging = true
+		# Don't handle drag events - let ScrollContainer handle scrolling
+		return
+
 	# Handle touch events
 	var screen_touch := event as InputEventScreenTouch
 	if screen_touch:
@@ -168,7 +199,7 @@ func _input(event: InputEvent) -> void:
 			touch_start_position = Vector2.ZERO
 			is_dragging = false
 		return
-	
+
 	# Handle touch drag events - mark as dragging
 	var screen_drag := event as InputEventScreenDrag
 	if screen_drag:
@@ -184,13 +215,15 @@ func _input(event: InputEvent) -> void:
 func _is_event_over_card(event: InputEvent) -> bool:
 	"""Check if the event position is over this card"""
 	var event_position: Vector2
-	if event is InputEventScreenTouch:
+	if event is InputEventMouse:
+		event_position = (event as InputEventMouse).position
+	elif event is InputEventScreenTouch:
 		event_position = (event as InputEventScreenTouch).position
 	elif event is InputEventScreenDrag:
 		event_position = (event as InputEventScreenDrag).position
 	else:
 		return false
-	
+
 	# Check if screen position is within card's global rect
 	var card_global_rect := Rect2(get_global_position(), size)
 	return card_global_rect.has_point(event_position)

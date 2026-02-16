@@ -143,19 +143,21 @@ func _refresh_card_backs() -> void:
 			# Vertical layout (left/right) - rotate 90 degrees
 			card_back.rotation_degrees = 90
 
-			# When rotating 90° clockwise around top-left (0,0):
-			# After rotation, card occupies x: [position.x] to [position.x + card_height]
-			# So: left_edge = position.x, right_edge = position.x + card_height
+			# When rotating 90° CW around top-left (0,0):
+			# The card's BOTTOM edge becomes its LEFT edge (extends leftward from position)
+			# Original: TL(0,0) -> TR(w,0) -> BR(w,h) -> BL(0,h)
+			# After:    TL(0,0) -> TR(0,-w) -> BR(h,-w) -> BL(h,0)
+			# Visual: extends from x=[pos.x-h] to x=[pos.x], y=[pos.y-w] to y=[pos.y]
 
 			var y_pos: float = i * overlap
 
 			if position_mode == Position.RIGHT:
-				# Right edge should be at size.x, so: position.x + card_height = size.x
-				var x_pos: float = size.x - card_height
+				# Want: right edge at size.x, so: position.x = size.x
+				var x_pos: float = size.x
 				card_back.position = Vector2(x_pos, y_pos)
 			else:  # Position.LEFT
-				# Left edge should be at 0, so: position.x = 0
-				var x_pos: float = 0
+				# Want: left edge at 0, so: position.x - card_height = 0, position.x = card_height
+				var x_pos: float = card_height
 				card_back.position = Vector2(x_pos, y_pos)
 
 		card_backs.append(card_back)

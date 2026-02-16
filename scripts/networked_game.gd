@@ -1,0 +1,285 @@
+extends Control
+## Networked multiplayer game
+##
+## Handles online game with WebSocket synchronization
+
+const PlayerHandScene := preload("res://scenes/player_hand.tscn")
+const PlayAreaScene := preload("res://scenes/play_area.tscn")
+const OpponentHandScript := preload("res://scripts/opponent_hand.gd")
+const CardScript := preload("res://scripts/card.gd")
+
+@onready var play_button: Button = $PlayButton
+@onready var pass_button: Button = $PassButton
+@onready var status_label: Label = $StatusLabel
+
+var player_hand_ui
+var play_area_ui
+var opponent_hands: Array = []
+
+# Network game state
+var your_position: int = -1
+var current_player_position: int = -1
+var player_names: Array[String] = []
+var your_hand_cards: Array = []  # Array of card dictionaries
+var selected_cards: Array = []  # Cards selected for playing
+
+
+func _ready() -> void:
+	# Get game data from WebSocketClient meta
+	var game_data = WebSocketClient.get_meta("game_data", {})
+
+	if game_data.is_empty():
+		push_error("No game data found! Returning to lobby.")
+		get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")
+		return
+
+	# Extract game start data
+	your_position = game_data.get("your_position", -1)
+	your_hand_cards = game_data.get("your_hand", [])
+	current_player_position = game_data.get("current_player", -1)
+	player_names = game_data.get("players", [])
+
+	print("Starting networked game:")
+	print("  Your position: ", your_position)
+	print("  Your hand: ", your_hand_cards.size(), " cards")
+	print("  Current player: ", current_player_position)
+	print("  Players: ", player_names)
+
+	# Connect WebSocket signals
+	WebSocketClient.game_updated.connect(_on_game_updated)
+	WebSocketClient.game_over.connect(_on_game_over)
+	WebSocketClient.error_received.connect(_on_server_error)
+	WebSocketClient.disconnected.connect(_on_disconnected)
+
+	# Setup UI
+	_setup_buttons()
+	_setup_game_ui()
+
+	# Update turn indicator
+	_update_turn_display()
+
+
+func _setup_buttons() -> void:
+	var viewport_size := get_viewport_rect().size
+	var button_font_size := int(viewport_size.y * 0.03)
+
+	# Position buttons
+	var button_top := 0.68
+	var button_bottom := 0.76
+
+	# Pass button (left, red)
+	pass_button.anchor_left = 0.05
+	pass_button.anchor_right = 0.475
+	pass_button.anchor_top = button_top
+	pass_button.anchor_bottom = button_bottom
+	pass_button.add_theme_font_size_override("font_size", button_font_size)
+
+	var pass_style := StyleBoxFlat.new()
+	pass_style.bg_color = Color(0.8, 0.2, 0.2, 0.7)
+	pass_style.corner_radius_top_left = 8
+	pass_style.corner_radius_top_right = 8
+	pass_style.corner_radius_bottom_left = 8
+	pass_style.corner_radius_bottom_right = 8
+	pass_button.add_theme_stylebox_override("normal", pass_style)
+	pass_button.pressed.connect(_on_pass_pressed)
+
+	# Play button (right, green)
+	play_button.anchor_left = 0.525
+	play_button.anchor_right = 0.95
+	play_button.anchor_top = button_top
+	play_button.anchor_bottom = button_bottom
+	play_button.add_theme_font_size_override("font_size", button_font_size)
+
+	var play_style := StyleBoxFlat.new()
+	play_style.bg_color = Color(0.2, 0.7, 0.3, 0.7)
+	play_style.corner_radius_top_left = 8
+	play_style.corner_radius_top_right = 8
+	play_style.corner_radius_bottom_left = 8
+	play_style.corner_radius_bottom_right = 8
+	play_button.add_theme_stylebox_override("normal", play_style)
+	play_button.pressed.connect(_on_play_pressed)
+
+	# Status label
+	status_label.anchor_left = 0.05
+	status_label.anchor_right = 0.95
+	status_label.anchor_top = 0.62
+	status_label.anchor_bottom = 0.66
+	status_label.add_theme_font_size_override("font_size", int(viewport_size.y * 0.025))
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+
+func _setup_game_ui() -> void:
+	# Create play area
+	play_area_ui = PlayAreaScene.instantiate()
+	add_child(play_area_ui)
+
+	# Create opponent hands (positions relative to you)
+	for i in range(3):
+		var opponent = OpponentHandScript.new()
+		opponent.position_index = (your_position + i + 1) % 4
+		opponent.player_name = player_names[opponent.position_index] if opponent.position_index < player_names.size() else "Player %d" % (opponent.position_index + 1)
+		opponent.card_count = 13  # Start with 13 cards
+		add_child(opponent)
+		opponent_hands.append(opponent)
+
+	# Create player hand
+	player_hand_ui = PlayerHandScene.instantiate()
+	add_child(player_hand_ui)
+
+	# Convert card dictionaries to Card objects and add to hand
+	for card_data in your_hand_cards:
+		var card = CardScript.new()
+		card.rank = card_data.get("rank", 3)
+		card.suit = card_data.get("suit", 0)
+		card.value = card_data.get("value", 0)
+		player_hand_ui.add_card(card)
+
+	# Connect card selection signal
+	player_hand_ui.selection_changed.connect(_on_selection_changed)
+
+
+func _update_turn_display() -> void:
+	if current_player_position == your_position:
+		status_label.text = "YOUR TURN - Play or Pass"
+		play_button.disabled = false
+		pass_button.disabled = false
+	else:
+		var current_player_name = player_names[current_player_position] if current_player_position < player_names.size() else "Player %d" % (current_player_position + 1)
+		status_label.text = "Waiting for %s..." % current_player_name
+		play_button.disabled = true
+		pass_button.disabled = true
+
+
+func _on_selection_changed(selected_card_nodes: Array) -> void:
+	# Convert selected card nodes to card data for server
+	selected_cards.clear()
+	for card_node in selected_card_nodes:
+		selected_cards.append({
+			"rank": card_node.rank,
+			"suit": card_node.suit,
+			"value": card_node.value
+		})
+
+
+func _on_play_pressed() -> void:
+	if selected_cards.is_empty():
+		status_label.text = "Select cards to play!"
+		return
+
+	if current_player_position != your_position:
+		return
+
+	print("Playing cards: ", selected_cards)
+
+	# Send play action to server
+	WebSocketClient.play_cards(selected_cards)
+
+	# Disable buttons while waiting for server response
+	play_button.disabled = true
+	pass_button.disabled = true
+	status_label.text = "Sending move..."
+
+
+func _on_pass_pressed() -> void:
+	if current_player_position != your_position:
+		return
+
+	print("Passing turn")
+
+	# Send pass action to server
+	WebSocketClient.pass_turn()
+
+	# Disable buttons while waiting for server response
+	play_button.disabled = true
+	pass_button.disabled = true
+	status_label.text = "Sending pass..."
+
+
+func _on_game_updated(payload: Dictionary) -> void:
+	print("Game state updated: ", payload)
+
+	# Update current player
+	current_player_position = payload.get("currentPlayer", current_player_position)
+
+	# Update last play in play area
+	var last_play = payload.get("lastPlay")
+	if last_play and play_area_ui:
+		var combo = last_play.get("combo", "")
+		var cards_data = last_play.get("cards", [])
+		# Convert to Card objects for display
+		var cards = []
+		for card_data in cards_data:
+			var card = CardScript.new()
+			card.rank = card_data.get("rank", 3)
+			card.suit = card_data.get("suit", 0)
+			card.value = card_data.get("value", 0)
+			cards.append(card)
+		play_area_ui.display_play(cards, combo)
+
+	# Update your hand
+	var your_hand_data = payload.get("yourHand", [])
+	if not your_hand_data.is_empty() and player_hand_ui:
+		# Clear and rebuild hand
+		player_hand_ui.clear_hand()
+		for card_data in your_hand_data:
+			var card = CardScript.new()
+			card.rank = card_data.get("rank", 3)
+			card.suit = card_data.get("suit", 0)
+			card.value = card_data.get("value", 0)
+			player_hand_ui.add_card(card)
+
+	# Update opponent hand counts
+	var hand_counts = payload.get("handCounts", [])
+	for i in range(min(opponent_hands.size(), hand_counts.size())):
+		var opponent_pos = opponent_hands[i].position_index
+		if opponent_pos < hand_counts.size():
+			opponent_hands[i].set_card_count(hand_counts[opponent_pos])
+
+	# Update turn display
+	_update_turn_display()
+
+
+func _on_game_over(payload: Dictionary) -> void:
+	print("Game over! ", payload)
+
+	var win_order = payload.get("winOrder", [])
+	var points_awarded = payload.get("pointsAwarded", [])
+	var tourney_complete = payload.get("tourneyComplete", false)
+
+	# Show game over message
+	var message = "Game Over!\n\nFinish Order:\n"
+	for i in range(win_order.size()):
+		var pos = win_order[i]
+		var player_name = player_names[pos] if pos < player_names.size() else "Player %d" % (pos + 1)
+		var points = points_awarded[i] if i < points_awarded.size() else 0
+		message += "%d. %s (+%d pts)\n" % [i + 1, player_name, points]
+
+	if tourney_complete:
+		message += "\n🏆 Tournament Complete! 🏆"
+
+	status_label.text = message
+
+	# Disable buttons
+	play_button.disabled = true
+	pass_button.disabled = true
+
+	# TODO: Show proper game over screen with option to return to lobby
+
+
+func _on_server_error(code: String, message: String) -> void:
+	print_rich("[color=red]Server error [%s]: %s[/color]" % [code, message])
+	status_label.text = "Error: %s" % message
+
+	# Re-enable buttons if it was a move validation error
+	if code in ["NOT_YOUR_TURN", "INVALID_COMBO", "CANT_BEAT_LAST_PLAY", "CANT_PASS"]:
+		_update_turn_display()
+
+
+func _on_disconnected() -> void:
+	print("Disconnected from server!")
+	status_label.text = "Disconnected - Returning to lobby..."
+
+	# Wait a moment then return to lobby
+	await get_tree().create_timer(2.0).timeout
+	get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")

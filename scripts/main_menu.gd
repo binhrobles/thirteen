@@ -33,11 +33,8 @@ func _on_local_game_pressed() -> void:
 
 
 func _on_online_game_pressed() -> void:
-	# TODO: Load online multiplayer lobby
-	# For now, show a message
-	print("Online game not yet implemented - use Network Test to test WebSocket connection")
-	# Temporary: go to network test
-	_on_network_test_pressed()
+	# Load online multiplayer lobby
+	get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")
 
 
 func _on_network_test_pressed() -> void:

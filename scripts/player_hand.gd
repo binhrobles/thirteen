@@ -11,8 +11,7 @@ const CardSpriteScene := preload("res://scenes/card_sprite.tscn")
 var cards: Array[Card] = []
 var card_sprites: Array = []
 
-## Card overlap amount (cards will overlap by this many pixels)
-const CARD_SPACING := 20
+const CARD_SPACING := 10
 
 
 func _ready() -> void:

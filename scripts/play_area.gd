@@ -15,7 +15,7 @@ var current_cards: Array[Card] = []
 var card_sprites: Array = []
 
 const CARD_SPACING := 10  # Space between cards in played hand (when not overlapping)
-const MIN_CARD_SPACING := -40  # Minimum spacing (overlap) when cards need to fit
+const MIN_CARD_SPACING := -60  # Minimum spacing (overlap) when cards need to fit
 
 ## Boundaries to avoid (opponent hand areas)
 const LEFT_OPPONENT_WIDTH := 0.23  # Left opponent occupies 0.0 to 0.23
@@ -28,16 +28,17 @@ func _ready() -> void:
 
 func _setup_ui() -> void:
 	"""Create the play area UI in center of screen"""
-	# Center the play area - auto-size to content, positioned in upper-middle area
+	# Center the play area - fixed proportion of screen, player name at top, status above buttons
 	anchor_left = 0.5
 	anchor_right = 0.5
-	anchor_top = 0.35  # Positioned in upper-middle
+	anchor_top = 0.25  # Start higher to show player name
+	anchor_bottom = 0.66  # End just above buttons (which start at 0.68)
 	grow_horizontal = Control.GROW_DIRECTION_BOTH
-	grow_vertical = Control.GROW_DIRECTION_BEGIN
+	grow_vertical = Control.GROW_DIRECTION_BOTH
 	offset_left = -180  # Half width (360px wide)
 	offset_right = 180
-	offset_top = -100  # Position upward from anchor
-	offset_bottom = 100  # 200px tall
+	offset_top = 0
+	offset_bottom = 0
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 10  # Render above background but below player hand
 	z_as_relative = false  # Use absolute z-index
@@ -69,9 +70,9 @@ func _setup_ui() -> void:
 	# Card container (centered) - use full width for cards, manual positioning
 	card_container = Control.new()
 	card_container.anchor_left = 0.0
-	card_container.anchor_top = 0.2
+	card_container.anchor_top = 0.15
 	card_container.anchor_right = 1.0
-	card_container.anchor_bottom = 0.8
+	card_container.anchor_bottom = 0.75
 	card_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	card_container.grow_vertical = Control.GROW_DIRECTION_BOTH
 	card_container.offset_left = 10
@@ -89,7 +90,7 @@ func _setup_ui() -> void:
 	status_label.anchor_bottom = 1.0
 	status_label.offset_left = 0
 	status_label.offset_right = 0
-	status_label.offset_top = -50
+	status_label.offset_top = -40
 	status_label.offset_bottom = -10
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_font_size_override("font_size", status_font_size)

@@ -506,7 +506,8 @@ class Tourney:
                     'playerName': s.player_name,
                     'score': s.score,
                     'gamesWon': s.games_won,
-                    'ready': s.ready
+                    'ready': s.ready,
+                    'isBot': s.is_bot
                 }
                 for s in self.seats
             ],

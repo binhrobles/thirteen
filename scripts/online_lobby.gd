@@ -55,18 +55,18 @@ func _ready() -> void:
 	_create_seat_buttons()
 
 	# Override panel styles to use teal instead of theme purple
-	var teal_style := StyleBoxFlat.new()
-	teal_style.bg_color = Color(0.08, 0.15, 0.18, 1)  # Dark teal
-	teal_style.border_width_left = 2
-	teal_style.border_width_top = 2
-	teal_style.border_width_right = 2
-	teal_style.border_width_bottom = 2
-	teal_style.border_color = Color(1, 0.933333, 0.8, 1)  # Keep theme border color
-	teal_style.corner_radius_top_left = 10
-	teal_style.corner_radius_top_right = 10
-	connection_panel.add_theme_stylebox_override("panel", teal_style)
-	lobby_panel.add_theme_stylebox_override("panel", teal_style.duplicate())
-	loading_panel.add_theme_stylebox_override("panel", teal_style.duplicate())
+	# Create separate style for each panel
+	for panel in [connection_panel, lobby_panel, loading_panel]:
+		var teal_style := StyleBoxFlat.new()
+		teal_style.bg_color = Color(0.08, 0.15, 0.18, 1)  # Dark teal
+		teal_style.border_width_left = 2
+		teal_style.border_width_top = 2
+		teal_style.border_width_right = 2
+		teal_style.border_width_bottom = 2
+		teal_style.border_color = Color(1, 0.933333, 0.8, 1)  # Keep theme border color
+		teal_style.corner_radius_top_left = 10
+		teal_style.corner_radius_top_right = 10
+		panel.add_theme_stylebox_override("panel", teal_style)
 
 	# Show connection panel, hide lobby and loading
 	connection_panel.show()

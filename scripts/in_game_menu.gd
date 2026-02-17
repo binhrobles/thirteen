@@ -56,16 +56,26 @@ func _setup_ui() -> void:
 	style_box.corner_radius_bottom_left = corner_radius
 	style_box.corner_radius_bottom_right = corner_radius
 	menu_panel.add_theme_stylebox_override("panel", style_box)
+	menu_panel.mouse_filter = Control.MOUSE_FILTER_STOP  # Block clicks from passing through
 	add_child(menu_panel)
+
+	# Margin container for padding inside panel
+	var margin := MarginContainer.new()
+	margin.anchor_right = 1.0
+	margin.anchor_bottom = 1.0
+	var margin_size := int(viewport_height * 0.05)  # 5% margin
+	margin.add_theme_constant_override("margin_left", margin_size)
+	margin.add_theme_constant_override("margin_right", margin_size)
+	margin.add_theme_constant_override("margin_top", margin_size)
+	margin.add_theme_constant_override("margin_bottom", margin_size)
+	menu_panel.add_child(margin)
 
 	# Container for menu items
 	var vbox := VBoxContainer.new()
-	vbox.anchor_left = 0.1
-	vbox.anchor_right = 0.9
-	vbox.anchor_top = 0.2
-	vbox.anchor_bottom = 0.8
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_theme_constant_override("separation", int(viewport_height * 0.03))  # ~25px spacing
-	menu_panel.add_child(vbox)
+	margin.add_child(vbox)
 
 	# Title
 	var title_label := Label.new()
@@ -84,6 +94,8 @@ func _setup_ui() -> void:
 	exit_button = Button.new()
 	exit_button.text = "Exit Game"
 	exit_button.custom_minimum_size = Vector2(0, int(viewport_height * 0.08))  # ~70px on 844px screen
+	exit_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Fill width
+	exit_button.mouse_filter = Control.MOUSE_FILTER_STOP  # Ensure button captures all clicks
 	exit_button.add_theme_font_size_override("font_size", int(viewport_height * 0.035))  # ~30px on 844px screen
 
 	# Red button style

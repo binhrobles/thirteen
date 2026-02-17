@@ -133,6 +133,20 @@ func _setup_ui() -> void:
 	vbox.add_child(exit_button)
 
 
+func _input(event: InputEvent) -> void:
+	"""Capture ALL input events when menu is visible to prevent click-through"""
+	if visible:
+		# Consume ALL input events while menu is open
+		get_viewport().set_input_as_handled()
+
+		# Check if we should dismiss the menu (clicking outside the panel)
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			var mouse_pos = get_viewport().get_mouse_position()
+			# Check if click is outside the menu panel
+			if menu_panel and not menu_panel.get_global_rect().has_point(mouse_pos):
+				_dismiss()
+
+
 func show_menu() -> void:
 	"""Display the in-game menu"""
 	show()

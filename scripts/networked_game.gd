@@ -176,10 +176,10 @@ func _setup_game_ui() -> void:
 
 	# Convert card dictionaries to Card objects and add to hand
 	for card_data in your_hand_cards:
-		var card = CardScript.new()
-		card.rank = card_data.get("rank", 3)
-		card.suit = card_data.get("suit", 0)
-		card.value = card_data.get("value", 0)
+		var card = CardScript.new(
+			card_data.get("rank", 3),
+			card_data.get("suit", 0)
+		)
 		player_hand_ui.add_card(card)
 
 	# Connect card selection signal
@@ -257,10 +257,10 @@ func _on_game_updated(payload: Dictionary) -> void:
 		# Convert to Card objects for display
 		var cards = []
 		for card_data in cards_data:
-			var card = CardScript.new()
-			card.rank = card_data.get("rank", 3)
-			card.suit = card_data.get("suit", 0)
-			card.value = card_data.get("value", 0)
+			var card = CardScript.new(
+				card_data.get("rank", 3),
+				card_data.get("suit", 0)
+			)
 			cards.append(card)
 		play_area_ui.display_play(cards, combo)
 
@@ -270,10 +270,10 @@ func _on_game_updated(payload: Dictionary) -> void:
 		# Clear and rebuild hand
 		player_hand_ui.clear_hand()
 		for card_data in your_hand_data:
-			var card = CardScript.new()
-			card.rank = card_data.get("rank", 3)
-			card.suit = card_data.get("suit", 0)
-			card.value = card_data.get("value", 0)
+			var card = CardScript.new(
+				card_data.get("rank", 3),
+				card_data.get("suit", 0)
+			)
 			player_hand_ui.add_card(card)
 
 	# Update opponent hand counts

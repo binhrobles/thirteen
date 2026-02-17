@@ -427,10 +427,28 @@ def broadcast_tourney_update(tourney: Tourney) -> None:
         'payload': tourney.to_client_state()
     }
 
-    # Get all active connections
+    # Collect all unique connection IDs (from seats and from connections table)
+    connection_ids: set[str] = set()
+
+    # Add connections from occupied seats
     for seat in tourney.seats:
         if seat.is_occupied() and seat.connection_id:
-            send_to_connection(seat.connection_id, message)
+            connection_ids.add(seat.connection_id)
+
+    # Also get all active connections from the connections table
+    # This ensures spectators and players not yet seated also receive updates
+    try:
+        response = connections_table.scan()
+        for item in response.get('Items', []):
+            conn_id = item.get('connectionId')
+            if conn_id:
+                connection_ids.add(conn_id)
+    except Exception as e:
+        print(f'Error scanning connections table: {str(e)}')
+
+    # Broadcast to all connections
+    for connection_id in connection_ids:
+        send_to_connection(connection_id, message)
 
 
 def broadcast_game_started(tourney: Tourney, game: Game) -> None:

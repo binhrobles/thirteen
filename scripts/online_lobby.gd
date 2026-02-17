@@ -125,11 +125,27 @@ func _on_bot_button_pressed(seat_index: int) -> void:
 		return
 
 	var bot_button = bot_buttons[seat_index]
+	var seat_button = seat_buttons[seat_index]
 
 	# Check button text to determine action
 	if bot_button.text == "+ Add Bot":
+		# Optimistically update UI before network call
+		seat_button.text = "Seat %d: ✓ Bot_%d" % [seat_index, seat_index + 1]
+		seat_button.disabled = true
+		bot_button.text = "✕ Kick Bot"
+		bot_button.disabled = false
+
+		# Send request (server broadcast will be source of truth)
 		WebSocketClient.add_bot(seat_index)
+
 	elif bot_button.text == "✕ Kick Bot":
+		# Optimistically update UI before network call
+		seat_button.text = "Seat %d: Empty (Click to claim)" % seat_index
+		seat_button.disabled = false
+		bot_button.text = "+ Add Bot"
+		bot_button.disabled = false
+
+		# Send request (server broadcast will be source of truth)
 		WebSocketClient.kick_bot(seat_index)
 
 

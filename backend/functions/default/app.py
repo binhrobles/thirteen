@@ -66,6 +66,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_leave_tourney(connection_id, player_id, payload)
         elif action == 'tourney/ready':
             return handle_ready(connection_id, player_id, payload)
+        elif action == 'tourney/add_bot':
+            return handle_add_bot(connection_id, player_id, payload)
+        elif action == 'tourney/kick_bot':
+            return handle_kick_bot(connection_id, player_id, payload)
         elif action == 'game/play':
             return handle_play_cards(connection_id, player_id, payload)
         elif action == 'game/pass':
@@ -226,6 +230,73 @@ def handle_ready(connection_id: str, player_id: str, _payload: Dict[str, Any]) -
         import traceback
         traceback.print_exc()
         return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to ready up')
+
+
+def handle_add_bot(connection_id: str, _player_id: str, payload: Dict[str, Any]) -> Dict[str, int]:
+    """Handle tourney/add_bot action"""
+    try:
+        # Get tournament
+        tourney = get_or_create_tourney()
+
+        # Extract seat position from payload
+        seat_position: Optional[int] = payload.get('seatPosition')
+        if seat_position is None:
+            return send_error(connection_id, 'MISSING_SEAT_POSITION', 'seatPosition is required')
+
+        # Get optional bot profile (for future bot types)
+        bot_profile: Optional[str] = payload.get('botProfile')
+
+        # Attempt to add bot
+        success, error_code = tourney.add_bot(seat_position, bot_profile)
+
+        if not success:
+            return send_error(connection_id, error_code, f'Failed to add bot: {error_code}')
+
+        # Save updated tourney
+        save_tourney(tourney)
+
+        # Broadcast update to all players
+        broadcast_tourney_update(tourney)
+
+        return {'statusCode': 200}
+
+    except Exception as e:
+        print(f'Error adding bot: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to add bot')
+
+
+def handle_kick_bot(connection_id: str, _player_id: str, payload: Dict[str, Any]) -> Dict[str, int]:
+    """Handle tourney/kick_bot action"""
+    try:
+        # Get tournament
+        tourney = get_or_create_tourney()
+
+        # Extract seat position from payload
+        seat_position: Optional[int] = payload.get('seatPosition')
+        if seat_position is None:
+            return send_error(connection_id, 'MISSING_SEAT_POSITION', 'seatPosition is required')
+
+        # Attempt to kick bot
+        success, error_code = tourney.kick_bot(seat_position)
+
+        if not success:
+            return send_error(connection_id, error_code, f'Failed to kick bot: {error_code}')
+
+        # Save updated tourney
+        save_tourney(tourney)
+
+        # Broadcast update to all players
+        broadcast_tourney_update(tourney)
+
+        return {'statusCode': 200}
+
+    except Exception as e:
+        print(f'Error kicking bot: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to kick bot')
 
 
 def handle_play_cards(connection_id: str, player_id: str, payload: Dict[str, Any]) -> Dict[str, int]:

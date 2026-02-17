@@ -35,6 +35,9 @@ func _setup_ui() -> void:
 	z_index = 200  # Render above everything including player hand (z=100)
 	z_as_relative = false  # Use absolute z-index
 
+	# Get viewport for responsive sizing
+	var viewport_height: float = get_viewport_rect().size.y if is_inside_tree() else 844.0
+
 	# Semi-transparent background (tap to dismiss)
 	background = ColorRect.new()
 	background.anchor_right = 1.0
@@ -57,16 +60,16 @@ func _setup_ui() -> void:
 	drawer_panel.add_theme_stylebox_override("panel", style_box)
 	add_child(drawer_panel)
 
-	# Title
+	# Title - scale with viewport
 	title_label = Label.new()
 	title_label.text = "Round History"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 28)
+	title_label.add_theme_font_size_override("font_size", int(viewport_height * 0.035))  # 3.5% of viewport height
 	title_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	title_label.anchor_left = 0.0
 	title_label.anchor_right = 1.0
-	title_label.offset_top = 20
-	title_label.offset_bottom = 60
+	title_label.offset_top = int(viewport_height * 0.024)  # ~20px on 844px screen
+	title_label.offset_bottom = int(viewport_height * 0.071)  # ~60px on 844px screen
 	drawer_panel.add_child(title_label)
 
 	# Scroll container for history
@@ -75,17 +78,17 @@ func _setup_ui() -> void:
 	scroll_container.anchor_right = 1.0
 	scroll_container.anchor_top = 0.0
 	scroll_container.anchor_bottom = 1.0
-	scroll_container.offset_left = 10
-	scroll_container.offset_right = -10
-	scroll_container.offset_top = 70
-	scroll_container.offset_bottom = -10
+	scroll_container.offset_left = int(viewport_height * 0.012)  # ~10px on 844px screen
+	scroll_container.offset_right = -int(viewport_height * 0.012)
+	scroll_container.offset_top = int(viewport_height * 0.083)  # ~70px on 844px screen
+	scroll_container.offset_bottom = -int(viewport_height * 0.012)
 	scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	drawer_panel.add_child(scroll_container)
 
 	# VBox for history entries
 	history_list = VBoxContainer.new()
 	history_list.size_flags_horizontal = Control.SIZE_FILL
-	history_list.add_theme_constant_override("separation", 8)
+	history_list.add_theme_constant_override("separation", int(viewport_height * 0.009))  # ~8px on 844px screen
 	scroll_container.add_child(history_list)
 
 
@@ -124,11 +127,13 @@ func _populate_history() -> void:
 	for child in history_list.get_children():
 		child.queue_free()
 
+	var viewport_height: float = get_viewport_rect().size.y
+
 	if current_round_plays.is_empty():
 		var empty_label := Label.new()
 		empty_label.text = "No plays yet this round"
 		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		empty_label.add_theme_font_size_override("font_size", 18)
+		empty_label.add_theme_font_size_override("font_size", int(viewport_height * 0.021))  # ~18px on 844px screen
 		empty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 		history_list.add_child(empty_label)
 		return
@@ -142,28 +147,32 @@ func _populate_history() -> void:
 
 func _create_play_entry(entry: Dictionary) -> Control:
 	"""Create a single play entry display"""
+	var viewport_height: float = get_viewport_rect().size.y
+
 	var container := PanelContainer.new()
 	var style_box := StyleBoxFlat.new()
 	style_box.bg_color = Color(0.18, 0.18, 0.22)
-	style_box.corner_radius_top_left = 8
-	style_box.corner_radius_top_right = 8
-	style_box.corner_radius_bottom_left = 8
-	style_box.corner_radius_bottom_right = 8
-	style_box.content_margin_left = 10
-	style_box.content_margin_right = 10
-	style_box.content_margin_top = 8
-	style_box.content_margin_bottom = 8
+	var corner_radius := int(viewport_height * 0.009)  # ~8px on 844px screen
+	style_box.corner_radius_top_left = corner_radius
+	style_box.corner_radius_top_right = corner_radius
+	style_box.corner_radius_bottom_left = corner_radius
+	style_box.corner_radius_bottom_right = corner_radius
+	var margin := int(viewport_height * 0.012)  # ~10px on 844px screen
+	style_box.content_margin_left = margin
+	style_box.content_margin_right = margin
+	style_box.content_margin_top = int(viewport_height * 0.009)  # ~8px on 844px screen
+	style_box.content_margin_bottom = int(viewport_height * 0.009)
 	container.add_theme_stylebox_override("panel", style_box)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
+	vbox.add_theme_constant_override("separation", int(viewport_height * 0.005))  # ~4px on 844px screen
 	container.add_child(vbox)
 
 	# Player name (prominent)
 	var player_label := Label.new()
 	var player_id: int = entry["player"]
 	player_label.text = PLAYER_NAMES[player_id]
-	player_label.add_theme_font_size_override("font_size", 24)  # Larger, more prominent
+	player_label.add_theme_font_size_override("font_size", int(viewport_height * 0.028))  # ~24px on 844px screen
 	player_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))  # Brighter white
 	vbox.add_child(player_label)
 
@@ -172,13 +181,13 @@ func _create_play_entry(entry: Dictionary) -> Control:
 	if typeof(play) == TYPE_STRING and play == "pass":
 		var pass_label := Label.new()
 		pass_label.text = "PASS"
-		pass_label.add_theme_font_size_override("font_size", 18)
+		pass_label.add_theme_font_size_override("font_size", int(viewport_height * 0.021))  # ~18px on 844px screen
 		pass_label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
 		vbox.add_child(pass_label)
 	else:
 		# Show cards
 		var cards_container := HBoxContainer.new()
-		cards_container.add_theme_constant_override("separation", 4)
+		cards_container.add_theme_constant_override("separation", int(viewport_height * 0.005))  # ~4px on 844px screen
 		vbox.add_child(cards_container)
 
 		for card in play.cards:

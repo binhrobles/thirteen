@@ -81,6 +81,14 @@ func _setup_buttons() -> void:
 	pass_style.corner_radius_bottom_left = 8
 	pass_style.corner_radius_bottom_right = 8
 	pass_button.add_theme_stylebox_override("normal", pass_style)
+	# Grey disabled style
+	var pass_disabled_style := StyleBoxFlat.new()
+	pass_disabled_style.bg_color = Color(0.3, 0.3, 0.3, 0.5)
+	pass_disabled_style.corner_radius_top_left = 8
+	pass_disabled_style.corner_radius_top_right = 8
+	pass_disabled_style.corner_radius_bottom_left = 8
+	pass_disabled_style.corner_radius_bottom_right = 8
+	pass_button.add_theme_stylebox_override("disabled", pass_disabled_style)
 	pass_button.pressed.connect(_on_pass_pressed)
 
 	# Play button (right, green)
@@ -97,6 +105,14 @@ func _setup_buttons() -> void:
 	play_style.corner_radius_bottom_left = 8
 	play_style.corner_radius_bottom_right = 8
 	play_button.add_theme_stylebox_override("normal", play_style)
+	# Grey disabled style
+	var play_disabled_style := StyleBoxFlat.new()
+	play_disabled_style.bg_color = Color(0.3, 0.3, 0.3, 0.5)
+	play_disabled_style.corner_radius_top_left = 8
+	play_disabled_style.corner_radius_top_right = 8
+	play_disabled_style.corner_radius_bottom_left = 8
+	play_disabled_style.corner_radius_bottom_right = 8
+	play_button.add_theme_stylebox_override("disabled", play_disabled_style)
 	play_button.pressed.connect(_on_play_pressed)
 
 	# Status label

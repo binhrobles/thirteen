@@ -25,10 +25,13 @@ class Seat:
     last_game_points: int
     ready: bool
     disconnectedAt: Optional[int]  # Timestamp when player disconnected
+    is_bot: bool  # Whether this seat is occupied by a bot
+    bot_profile: Optional[str]  # Bot profile name (for future bot types)
 
     def __init__(self, position: int, player_id: Optional[str] = None, player_name: Optional[str] = None,
                  connection_id: Optional[str] = None, score: int = 0, games_won: int = 0,
-                 last_game_points: int = 0, ready: bool = False, disconnectedAt: Optional[int] = None) -> None:
+                 last_game_points: int = 0, ready: bool = False, disconnectedAt: Optional[int] = None,
+                 is_bot: bool = False, bot_profile: Optional[str] = None) -> None:
         self.position = position
         self.player_id = player_id
         self.player_name = player_name
@@ -38,6 +41,8 @@ class Seat:
         self.last_game_points = last_game_points
         self.ready = ready
         self.disconnectedAt = disconnectedAt
+        self.is_bot = is_bot
+        self.bot_profile = bot_profile
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to DynamoDB-compatible dict"""
@@ -49,10 +54,13 @@ class Seat:
             'score': self.score,
             'gamesWon': self.games_won,
             'lastGamePoints': self.last_game_points,
-            'ready': self.ready
+            'ready': self.ready,
+            'isBot': self.is_bot
         }
         if self.disconnectedAt is not None:
             result['disconnectedAt'] = self.disconnectedAt
+        if self.bot_profile is not None:
+            result['botProfile'] = self.bot_profile
         return result
 
     @classmethod
@@ -67,7 +75,9 @@ class Seat:
             games_won=int(data.get('gamesWon', 0)),
             last_game_points=int(data.get('lastGamePoints', 0)),
             ready=data.get('ready', False),
-            disconnectedAt=int(data['disconnectedAt']) if data.get('disconnectedAt') is not None else None
+            disconnectedAt=int(data['disconnectedAt']) if data.get('disconnectedAt') is not None else None,
+            is_bot=data.get('isBot', False),
+            bot_profile=data.get('botProfile')
         )
 
     def is_occupied(self) -> bool:
@@ -210,6 +220,97 @@ class Tourney:
         # If tournament in progress, mark as disconnected (TODO: bot replacement)
         # For now, just return error
         return False, "TOURNEY_IN_PROGRESS"
+
+    def add_bot(self, seat_position: int, bot_profile: Optional[str] = None) -> Tuple[bool, str]:
+        """
+        Add a bot to a specific seat
+
+        Args:
+            seat_position: Seat position (0-3)
+            bot_profile: Optional bot profile name (for future bot types)
+
+        Returns: (success: bool, error_message: str)
+        """
+        # Check if tourney is in valid state for adding bots
+        if self.status not in [TourneyStatus.WAITING, TourneyStatus.STARTING]:
+            return False, "TOURNEY_IN_PROGRESS"
+
+        # Validate seat position
+        if seat_position < 0 or seat_position >= self.SEATS_COUNT:
+            return False, "INVALID_SEAT"
+
+        seat = self.seats[seat_position]
+
+        # Check if seat is already occupied
+        if seat.is_occupied():
+            return False, "SEAT_TAKEN"
+
+        # Generate bot ID and name
+        import uuid
+        bot_id = f"bot_{uuid.uuid4().hex[:8]}"
+        bot_name = f"Bot_{seat_position + 1}"
+
+        # Occupy seat with bot
+        seat.player_id = bot_id
+        seat.player_name = bot_name
+        seat.connection_id = None  # Bots don't have connections
+        seat.score = 0
+        seat.games_won = 0
+        seat.last_game_points = 0
+        seat.ready = True  # Bots are always ready
+        seat.is_bot = True
+        seat.bot_profile = bot_profile
+
+        # Update status if all seats filled
+        if self.get_occupied_count() == self.SEATS_COUNT:
+            if self.status == TourneyStatus.WAITING:
+                self.status = TourneyStatus.STARTING
+
+        return True, ""
+
+    def kick_bot(self, seat_position: int) -> Tuple[bool, str]:
+        """
+        Kick a bot from a specific seat
+
+        Args:
+            seat_position: Seat position (0-3)
+
+        Returns: (success: bool, error_message: str)
+        """
+        # Check if tourney is in valid state for kicking bots
+        if self.status not in [TourneyStatus.WAITING, TourneyStatus.STARTING]:
+            return False, "TOURNEY_IN_PROGRESS"
+
+        # Validate seat position
+        if seat_position < 0 or seat_position >= self.SEATS_COUNT:
+            return False, "INVALID_SEAT"
+
+        seat = self.seats[seat_position]
+
+        # Check if seat is empty
+        if not seat.is_occupied():
+            return False, "SEAT_EMPTY"
+
+        # Check if seat has a bot
+        if not seat.is_bot:
+            return False, "NOT_A_BOT"
+
+        # Clear the seat
+        seat.player_id = None
+        seat.player_name = None
+        seat.connection_id = None
+        seat.score = 0
+        seat.games_won = 0
+        seat.last_game_points = 0
+        seat.ready = False
+        seat.is_bot = False
+        seat.bot_profile = None
+
+        # Update status if no longer full
+        if self.get_occupied_count() < self.SEATS_COUNT:
+            self.status = TourneyStatus.WAITING
+
+        return True, ""
 
     def set_ready(self, player_id: str, ready: bool = True) -> Tuple[bool, str]:
         """

@@ -26,6 +26,7 @@ theme_override_constants/separation = 10
 
 [node name="Title" type="Label" parent="VBoxContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 72
 text = "WebSocket Network Test"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -36,14 +37,20 @@ layout_mode = 2
 
 [node name="ServerURLInput" type="LineEdit" parent="VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+theme_override_font_sizes/font_size = 40
 placeholder_text = "WebSocket URL (e.g., ws://localhost:3001)"
 
 [node name="PlayerIDInput" type="LineEdit" parent="VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+theme_override_font_sizes/font_size = 40
 placeholder_text = "Player ID (UUID)"
 
 [node name="PlayerNameInput" type="LineEdit" parent="VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+theme_override_font_sizes/font_size = 40
 placeholder_text = "Player Name"
 
 [node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
@@ -51,14 +58,19 @@ layout_mode = 2
 
 [node name="ConnectButton" type="Button" parent="VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 120)
+theme_override_font_sizes/font_size = 52
 text = "Connect"
 
 [node name="DisconnectButton" type="Button" parent="VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 120)
+theme_override_font_sizes/font_size = 52
 text = "Disconnect"
 
 [node name="StatusLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 44
 text = "Status: Disconnected"
 horizontal_alignment = 1
 
@@ -67,6 +79,7 @@ layout_mode = 2
 
 [node name="TournamentLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 56
 text = "Tournament Controls"
 horizontal_alignment = 1
 
@@ -79,10 +92,12 @@ layout_mode = 2
 
 [node name="Label" type="Label" parent="VBoxContainer/TournamentControls/HBoxContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 40
 text = "Seat Position:"
 
 [node name="SeatPositionInput" type="SpinBox" parent="VBoxContainer/TournamentControls"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
 min_value = -1.0
 max_value = 3.0
 value = -1.0
@@ -91,14 +106,20 @@ allow_lesser = false
 
 [node name="ClaimSeatButton" type="Button" parent="VBoxContainer/TournamentControls"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+theme_override_font_sizes/font_size = 48
 text = "Claim Seat"
 
 [node name="ReadyButton" type="Button" parent="VBoxContainer/TournamentControls"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+theme_override_font_sizes/font_size = 48
 text = "Ready Up"
 
 [node name="LeaveButton" type="Button" parent="VBoxContainer/TournamentControls"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+theme_override_font_sizes/font_size = 48
 text = "Leave Tournament"
 
 [node name="HSeparator3" type="HSeparator" parent="VBoxContainer"]
@@ -106,6 +127,7 @@ layout_mode = 2
 
 [node name="MessageLogLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 56
 text = "Message Log"
 horizontal_alignment = 1
 
@@ -113,5 +135,6 @@ horizontal_alignment = 1
 custom_minimum_size = Vector2(0, 600)
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_font_sizes/font_size = 36
 editable = false
 wrap_mode = 1

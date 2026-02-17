@@ -68,22 +68,24 @@ func _create_seat_buttons() -> void:
 	for i in range(4):
 		# Create horizontal container for seat row
 		var row = HBoxContainer.new()
-		row.set("theme_override_constants/separation", 20)
+		row.set("theme_override_constants/separation", 30)
 		seats_container.add_child(row)
 
 		# Main seat button (claim or show player info)
 		var seat_button = Button.new()
-		seat_button.custom_minimum_size = Vector2(0, 80)
+		seat_button.custom_minimum_size = Vector2(0, 140)
 		seat_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		seat_button.text = "Seat %d: Empty" % i
+		seat_button.set("theme_override_font_sizes/font_size", 52)
 		seat_button.pressed.connect(_on_seat_button_pressed.bind(i))
 		row.add_child(seat_button)
 		seat_buttons.append(seat_button)
 
 		# Bot management button (Add Bot / Kick Bot)
 		var bot_button = Button.new()
-		bot_button.custom_minimum_size = Vector2(200, 80)
+		bot_button.custom_minimum_size = Vector2(350, 140)
 		bot_button.text = "+ Add Bot"
+		bot_button.set("theme_override_font_sizes/font_size", 48)
 		bot_button.pressed.connect(_on_bot_button_pressed.bind(i))
 		row.add_child(bot_button)
 		bot_buttons.append(bot_button)

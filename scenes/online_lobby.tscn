@@ -46,7 +46,7 @@ theme_override_constants/separation = 30
 
 [node name="Title" type="Label" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 56
+theme_override_font_sizes/font_size = 100
 text = "Online Multiplayer"
 horizontal_alignment = 1
 
@@ -56,14 +56,14 @@ layout_mode = 2
 
 [node name="NameLabel" type="Label" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 60
 text = "Enter Your Name:"
 horizontal_alignment = 1
 
 [node name="PlayerNameInput" type="LineEdit" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 100)
+custom_minimum_size = Vector2(0, 160)
 layout_mode = 2
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 64
 alignment = 1
 placeholder_text = "Your Name"
 
@@ -72,22 +72,22 @@ custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 
 [node name="ConnectButton" type="Button" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 120)
+custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 72
 text = "🌐 Connect"
 
 [node name="StatusLabel" type="Label" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 44
 text = "Status: Disconnected"
 horizontal_alignment = 1
 
 [node name="BackButton" type="Button" parent="ConnectionPanel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 140)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 48
 text = "← Back to Menu"
 
 [node name="LobbyPanel" type="Panel" parent="."]
@@ -117,13 +117,13 @@ theme_override_constants/separation = 30
 
 [node name="LobbyTitle" type="Label" parent="LobbyPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 88
 text = "Tournament Lobby"
 horizontal_alignment = 1
 
 [node name="LobbyStatusLabel" type="Label" parent="LobbyPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 52
 text = "Waiting for players..."
 horizontal_alignment = 1
 
@@ -132,7 +132,7 @@ layout_mode = 2
 
 [node name="SeatsLabel" type="Label" parent="LobbyPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 60
 text = "Select Your Seat:"
 horizontal_alignment = 1
 
@@ -144,16 +144,16 @@ theme_override_constants/separation = 20
 layout_mode = 2
 
 [node name="ReadyButton" type="Button" parent="LobbyPanel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 100)
+custom_minimum_size = Vector2(0, 160)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 64
 text = "✓ Ready to Play"
 
 [node name="LeaveButton" type="Button" parent="LobbyPanel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 140)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 48
 text = "Leave Tournament"
 
 [node name="LoadingPanel" type="Panel" parent="."]
@@ -179,12 +179,12 @@ theme_override_constants/separation = 40
 
 [node name="LoadingLabel" type="Label" parent="LoadingPanel/CenterContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 88
 text = "Loading tournament..."
 horizontal_alignment = 1
 
 [node name="Spinner" type="Label" parent="LoadingPanel/CenterContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 72
+theme_override_font_sizes/font_size = 128
 text = "⟳"
 horizontal_alignment = 1

@@ -39,14 +39,14 @@ theme_override_constants/separation = 10
 [node name="MainTitle" type="Label" parent="CenterContainer/VBoxContainer/TitleContainer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.85, 0.7, 1)
-theme_override_font_sizes/font_size = 64
+theme_override_font_sizes/font_size = 120
 text = "Tiến Lên"
 horizontal_alignment = 1
 
 [node name="Subtitle" type="Label" parent="CenterContainer/VBoxContainer/TitleContainer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 60
 text = "Thirteen"
 horizontal_alignment = 1
 
@@ -59,31 +59,31 @@ layout_mode = 2
 theme_override_constants/separation = 20
 
 [node name="LocalGameButton" type="Button" parent="CenterContainer/VBoxContainer/MenuButtons"]
-custom_minimum_size = Vector2(400, 80)
+custom_minimum_size = Vector2(600, 140)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 56
 text = "🎮 Local Game"
 
 [node name="OnlineGameButton" type="Button" parent="CenterContainer/VBoxContainer/MenuButtons"]
-custom_minimum_size = Vector2(400, 80)
+custom_minimum_size = Vector2(600, 140)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 56
 text = "🌐 Online Game"
 
 [node name="NetworkTestButton" type="Button" parent="CenterContainer/VBoxContainer/MenuButtons"]
-custom_minimum_size = Vector2(400, 80)
+custom_minimum_size = Vector2(600, 140)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 40
 text = "🔧 Network Test"
 
 [node name="AboutButton" type="Button" parent="CenterContainer/VBoxContainer/MenuButtons"]
-custom_minimum_size = Vector2(400, 80)
+custom_minimum_size = Vector2(600, 140)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 56
 text = "ℹ️ About"
 
 [node name="AboutPanel" type="Panel" parent="."]
@@ -119,14 +119,14 @@ theme_override_constants/separation = 30
 
 [node name="AboutTitle" type="Label" parent="AboutPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 72
 text = "About Tiến Lên"
 horizontal_alignment = 1
 
 [node name="Description" type="RichTextLabel" parent="AboutPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_font_sizes/normal_font_size = 20
+theme_override_font_sizes/normal_font_size = 40
 bbcode_enabled = true
 text = "[center]A Vietnamese shedding-type card game, also known as Thirteen or Vietnamese Poker.
 
@@ -144,13 +144,13 @@ fit_content = true
 scroll_active = false
 
 [node name="GitHubButton" type="Button" parent="AboutPanel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 60)
+custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 48
 text = "📂 View on GitHub"
 
 [node name="CloseButton" type="Button" parent="AboutPanel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 60)
+custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 48
 text = "Close"

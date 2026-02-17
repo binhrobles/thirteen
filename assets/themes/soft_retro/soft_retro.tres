@@ -1,11 +1,11 @@
 [gd_resource type="Theme" load_steps=52 format=3 uid="uid://b3klx57slj0l3"]
 
-[ext_resource type="FontFile" uid="uid://i1eetfry6s4h" path="res://themes/soft_retro/Righteous/Righteous-Regular.ttf" id="1_lopid"]
-[ext_resource type="Texture2D" uid="uid://udawlj7nryla" path="res://themes/soft_retro/art/checked.svg" id="2_k0c1y"]
-[ext_resource type="Texture2D" uid="uid://dl5qlemud0d4j" path="res://themes/soft_retro/art/toggle_on.svg" id="2_myavk"]
-[ext_resource type="Texture2D" uid="uid://gameaex7fm1g" path="res://themes/soft_retro/art/toggle_off.svg" id="3_208pi"]
-[ext_resource type="Texture2D" uid="uid://cbwip815aqfhq" path="res://themes/soft_retro/art/unchecked.svg" id="3_cwkfx"]
-[ext_resource type="Texture2D" uid="uid://bbl50qp6b1eq8" path="res://themes/soft_retro/art/slider_grabber.svg" id="6_cwkfx"]
+[ext_resource type="FontFile" uid="uid://i1eetfry6s4h" path="res://assets/themes/soft_retro/Righteous/Righteous-Regular.ttf" id="1_lopid"]
+[ext_resource type="Texture2D" uid="uid://udawlj7nryla" path="res://assets/themes/soft_retro/art/checked.svg" id="2_k0c1y"]
+[ext_resource type="Texture2D" uid="uid://dl5qlemud0d4j" path="res://assets/themes/soft_retro/art/toggle_on.svg" id="2_myavk"]
+[ext_resource type="Texture2D" uid="uid://gameaex7fm1g" path="res://assets/themes/soft_retro/art/toggle_off.svg" id="3_208pi"]
+[ext_resource type="Texture2D" uid="uid://cbwip815aqfhq" path="res://assets/themes/soft_retro/art/unchecked.svg" id="3_cwkfx"]
+[ext_resource type="Texture2D" uid="uid://bbl50qp6b1eq8" path="res://assets/themes/soft_retro/art/slider_grabber.svg" id="6_cwkfx"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k0c1y"]
 bg_color = Color(1, 0.690196, 0.639216, 1)

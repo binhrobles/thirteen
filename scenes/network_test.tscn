@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://cnj4m7wt8bptj"]
+[gd_scene load_steps=3 format=3 uid="uid://cnj4m7wt8bptj"]
 
 [ext_resource type="Script" path="res://scripts/network_test.gd" id="1_network_test"]
+[ext_resource type="Theme" uid="uid://b3klx57slj0l3" path="res://assets/themes/soft_retro/soft_retro.tres" id="2_theme"]
 
 [node name="NetworkTest" type="Control"]
 layout_mode = 3
@@ -9,6 +10,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("2_theme")
 script = ExtResource("1_network_test")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="."]

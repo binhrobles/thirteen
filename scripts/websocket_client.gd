@@ -167,6 +167,11 @@ func kick_bot(seat_position: int) -> void:
 	send_message("tourney/kick_bot", {"seatPosition": seat_position})
 
 
+## Start the game (when all human players are ready)
+func start_game() -> void:
+	send_message("tourney/start")
+
+
 ## Play cards
 func play_cards(cards: Array) -> void:
 	# Convert Card objects to dictionaries

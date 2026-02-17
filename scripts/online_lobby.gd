@@ -135,19 +135,31 @@ func _on_ready_pressed() -> void:
 	if not WebSocketClient.is_server_connected():
 		return
 
-	WebSocketClient.ready_up()
-	is_ready = true
-	ready_button.disabled = true
+	# Check if this is "Start Game" button
+	if ready_button.text.begins_with("🎮"):
+		WebSocketClient.start_game()
+	else:
+		WebSocketClient.ready_up()
+		is_ready = true
+		ready_button.disabled = true
 
 
 func _on_leave_pressed() -> void:
-	if not WebSocketClient.is_server_connected():
-		return
+	# Leave tournament, disconnect, and return to connection screen
+	if WebSocketClient.is_server_connected():
+		WebSocketClient.leave_tournament()
+		WebSocketClient.disconnect_from_server()
 
-	WebSocketClient.leave_tournament()
+	# Reset local state
 	claimed_seat_position = -1
 	is_ready = false
 	ready_button.disabled = false
+	ready_button.text = "✓ Ready to Play"
+
+	# Return to connection panel
+	lobby_panel.hide()
+	connection_panel.show()
+	connect_button.disabled = false
 
 
 func _on_ws_connected() -> void:
@@ -183,16 +195,34 @@ func _on_tourney_updated(payload: Dictionary) -> void:
 	# Update lobby status
 	lobby_status_label.text = "Tournament Status: %s | Ready: %d/4" % [status, ready_count]
 
+	# Track human players and ready state
+	var human_count = 0
+	var human_ready_count = 0
+	var current_player_ready = false
+
 	# Update seat buttons
 	for i in range(min(4, seats.size())):
 		var seat = seats[i]
 		var seat_button = seat_buttons[i]
 		var bot_button = bot_buttons[i]
 		var player_name = seat.get("playerName")
+		var player_id_in_seat = seat.get("playerId")
 		var seat_ready = seat.get("ready", false)
 		var is_bot = seat.get("isBot", false) or (player_name and player_name.begins_with("Bot_"))
 
+		# Bots are always ready
+		if is_bot:
+			seat_ready = true
+
 		if player_name:
+			# Track human players
+			if not is_bot:
+				human_count += 1
+				if seat_ready:
+					human_ready_count += 1
+				if player_id_in_seat == player_id:
+					current_player_ready = seat_ready
+
 			var ready_indicator = "✓" if seat_ready else "○"
 			seat_button.text = "Seat %d: %s %s" % [i, ready_indicator, player_name]
 			seat_button.disabled = true  # Can't claim occupied seats
@@ -212,6 +242,20 @@ func _on_tourney_updated(payload: Dictionary) -> void:
 			bot_button.text = "+ Add Bot"
 			bot_button.disabled = false
 			bot_button.visible = true
+
+	# Update ready button based on human player ready state
+	if human_count > 0 and human_ready_count == human_count:
+		# All human players are ready - show "Start Game"
+		ready_button.text = "🎮 Start Game"
+		ready_button.disabled = false
+	elif current_player_ready:
+		# Current player is ready but waiting for others
+		ready_button.text = "✓ Ready to Play"
+		ready_button.disabled = true
+	else:
+		# Current player not ready yet
+		ready_button.text = "✓ Ready to Play"
+		ready_button.disabled = false
 
 
 func _on_game_started(payload: Dictionary) -> void:

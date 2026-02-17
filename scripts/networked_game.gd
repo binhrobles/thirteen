@@ -137,6 +137,13 @@ func _setup_buttons() -> void:
 	menu_button.offset_right = -int(viewport_size.x * 0.024)  # 2.4% from right
 	menu_button.offset_bottom = int(viewport_size.y * 0.095)  # Height ~7% of viewport
 	menu_button.add_theme_font_size_override("font_size", int(viewport_size.y * 0.05))  # 5% of viewport height
+	# White cog symbol with no background panel
+	menu_button.add_theme_color_override("font_color", Color(1, 1, 1, 1))  # White
+	var transparent_style := StyleBoxEmpty.new()
+	menu_button.add_theme_stylebox_override("normal", transparent_style)
+	menu_button.add_theme_stylebox_override("hover", transparent_style)
+	menu_button.add_theme_stylebox_override("pressed", transparent_style)
+	menu_button.add_theme_stylebox_override("focus", transparent_style)
 	menu_button.pressed.connect(_on_menu_button_pressed)
 
 

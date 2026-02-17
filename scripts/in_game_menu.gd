@@ -26,17 +26,29 @@ func _setup_ui() -> void:
 	var viewport_size := get_viewport_rect().size
 	var viewport_height := viewport_size.y
 
-	# Full screen overlay
+	# Full screen overlay - fill entire screen to block all clicks
+	anchor_left = 0.0
+	anchor_top = 0.0
 	anchor_right = 1.0
 	anchor_bottom = 1.0
+	offset_left = 0
+	offset_top = 0
+	offset_right = 0
+	offset_bottom = 0
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 250  # Render above everything else (including history drawer at 200)
 	z_as_relative = false  # Use absolute z-index
 
-	# Semi-transparent background (tap to dismiss)
+	# Semi-transparent background (tap to dismiss) - fills entire screen
 	background = ColorRect.new()
+	background.anchor_left = 0.0
+	background.anchor_top = 0.0
 	background.anchor_right = 1.0
 	background.anchor_bottom = 1.0
+	background.offset_left = 0
+	background.offset_top = 0
+	background.offset_right = 0
+	background.offset_bottom = 0
 	background.color = Color(0, 0, 0, 0.7)
 	background.mouse_filter = Control.MOUSE_FILTER_STOP
 	background.gui_input.connect(_on_background_input)
@@ -127,9 +139,12 @@ func show_menu() -> void:
 
 
 func _on_background_input(event: InputEvent) -> void:
-	"""Handle tap on background to dismiss"""
+	"""Handle tap on background to dismiss and block all input"""
+	# ALWAYS consume events to prevent click-through
+	accept_event()
+
+	# Dismiss menu on left click
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		accept_event()  # Consume the event to prevent click-through
 		_dismiss()
 
 

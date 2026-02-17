@@ -155,7 +155,7 @@ func show_game_message(message: String, duration: float = 1.5) -> void:
 	_clear_cards()
 	player_label.text = ""
 	status_label.text = message
-	status_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.5))  # Yellow/gold
+	status_label.add_theme_color_override("font_color", Color(1, 1, 1))  # White
 	show()
 
 	# Wait for the specified duration

@@ -49,7 +49,7 @@ func _setup_ui() -> void:
 	menu_panel.anchor_top = 0.35
 	menu_panel.anchor_bottom = 0.65
 	var style_box := StyleBoxFlat.new()
-	style_box.bg_color = Color(0.12, 0.12, 0.15)
+	style_box.bg_color = Color(0.08, 0.15, 0.18)  # Dark teal to complement green poker table
 	var corner_radius := int(viewport_height * 0.024)  # ~20px on 844px screen
 	style_box.corner_radius_top_left = corner_radius
 	style_box.corner_radius_top_right = corner_radius

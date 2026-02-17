@@ -24,7 +24,6 @@ var your_position: int = -1
 var current_player_position: int = -1
 var player_names: Array[String] = []
 var your_hand_cards: Array = []  # Array of card dictionaries
-var selected_cards: Array = []  # Cards selected for playing
 
 
 func _ready() -> void:
@@ -188,16 +187,17 @@ func _setup_game_ui() -> void:
 	player_hand_ui = PlayerHandScene.instantiate()
 	add_child(player_hand_ui)
 
-	# Convert card dictionaries to Card objects and add to hand
+	# Convert card dictionaries to Card objects
+	var initial_cards: Array[Card] = []
 	for card_data in your_hand_cards:
 		var card = CardScript.new(
 			card_data.get("rank", 3),
 			card_data.get("suit", 0)
 		)
-		player_hand_ui.add_card(card)
+		initial_cards.append(card)
 
-	# Connect card selection signal
-	player_hand_ui.selection_changed.connect(_on_selection_changed)
+	# Set initial hand
+	player_hand_ui.set_cards(initial_cards)
 
 
 func _update_turn_display() -> void:
@@ -212,29 +212,34 @@ func _update_turn_display() -> void:
 		pass_button.disabled = true
 
 
-func _on_selection_changed(selected_card_nodes: Array) -> void:
-	# Convert selected card nodes to card data for server
-	selected_cards.clear()
-	for card_node in selected_card_nodes:
-		selected_cards.append({
-			"rank": card_node.rank,
-			"suit": card_node.suit,
-			"value": card_node.value
-		})
+func _get_selected_cards_data() -> Array:
+	"""Get currently selected cards from hand as data for server"""
+	var cards_data = []
+	if player_hand_ui:
+		var selected = player_hand_ui.get_selected_cards()
+		for card in selected:
+			cards_data.append({
+				"rank": card.rank,
+				"suit": card.suit,
+				"value": card.value
+			})
+	return cards_data
 
 
 func _on_play_pressed() -> void:
-	if selected_cards.is_empty():
-		status_label.text = "Select cards to play!"
-		return
-
 	if current_player_position != your_position:
 		return
 
-	print("Playing cards: ", selected_cards)
+	# Get currently selected cards
+	var cards_to_play = _get_selected_cards_data()
+	if cards_to_play.is_empty():
+		status_label.text = "Select cards to play!"
+		return
+
+	print("Playing cards: ", cards_to_play)
 
 	# Send play action to server
-	WebSocketClient.play_cards(selected_cards)
+	WebSocketClient.play_cards(cards_to_play)
 
 	# Disable buttons while waiting for server response
 	play_button.disabled = true
@@ -281,14 +286,17 @@ func _on_game_updated(payload: Dictionary) -> void:
 	# Update your hand
 	var your_hand_data = payload.get("yourHand", [])
 	if not your_hand_data.is_empty() and player_hand_ui:
-		# Clear and rebuild hand
-		player_hand_ui.clear_hand()
+		# Convert card data to Card objects
+		var updated_cards: Array[Card] = []
 		for card_data in your_hand_data:
 			var card = CardScript.new(
 				card_data.get("rank", 3),
 				card_data.get("suit", 0)
 			)
-			player_hand_ui.add_card(card)
+			updated_cards.append(card)
+
+		# Update hand with new cards
+		player_hand_ui.set_cards(updated_cards)
 
 	# Update opponent hand counts
 	var hand_counts = payload.get("handCounts", [])

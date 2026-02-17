@@ -20,6 +20,7 @@ extends Control
 
 # Seat buttons (dynamically created)
 var seat_buttons: Array[Button] = []
+var bot_buttons: Array[Button] = []  # Add/Kick bot buttons
 var claimed_seat_position: int = -1
 var player_id: String = ""
 var is_ready: bool = false
@@ -65,12 +66,27 @@ func _process(_delta: float) -> void:
 
 func _create_seat_buttons() -> void:
 	for i in range(4):
-		var button = Button.new()
-		button.custom_minimum_size = Vector2(0, 80)
-		button.text = "Seat %d: Empty" % i
-		button.pressed.connect(_on_seat_button_pressed.bind(i))
-		seats_container.add_child(button)
-		seat_buttons.append(button)
+		# Create horizontal container for seat row
+		var row = HBoxContainer.new()
+		row.set("theme_override_constants/separation", 20)
+		seats_container.add_child(row)
+
+		# Main seat button (claim or show player info)
+		var seat_button = Button.new()
+		seat_button.custom_minimum_size = Vector2(0, 80)
+		seat_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		seat_button.text = "Seat %d: Empty" % i
+		seat_button.pressed.connect(_on_seat_button_pressed.bind(i))
+		row.add_child(seat_button)
+		seat_buttons.append(seat_button)
+
+		# Bot management button (Add Bot / Kick Bot)
+		var bot_button = Button.new()
+		bot_button.custom_minimum_size = Vector2(200, 80)
+		bot_button.text = "+ Add Bot"
+		bot_button.pressed.connect(_on_bot_button_pressed.bind(i))
+		row.add_child(bot_button)
+		bot_buttons.append(bot_button)
 
 
 func _on_connect_pressed() -> void:
@@ -100,6 +116,19 @@ func _on_seat_button_pressed(seat_index: int) -> void:
 
 	# Claim the selected seat
 	WebSocketClient.claim_seat(seat_index)
+
+
+func _on_bot_button_pressed(seat_index: int) -> void:
+	if not WebSocketClient.is_server_connected():
+		return
+
+	var bot_button = bot_buttons[seat_index]
+
+	# Check button text to determine action
+	if bot_button.text == "+ Add Bot":
+		WebSocketClient.add_bot(seat_index)
+	elif bot_button.text == "✕ Kick Bot":
+		WebSocketClient.kick_bot(seat_index)
 
 
 func _on_ready_pressed() -> void:
@@ -158,16 +187,31 @@ func _on_tourney_updated(payload: Dictionary) -> void:
 	for i in range(min(4, seats.size())):
 		var seat = seats[i]
 		var seat_button = seat_buttons[i]
+		var bot_button = bot_buttons[i]
 		var player_name = seat.get("playerName")
 		var seat_ready = seat.get("ready", false)
+		var is_bot = seat.get("isBot", false) or (player_name and player_name.begins_with("Bot_"))
 
 		if player_name:
 			var ready_indicator = "✓" if seat_ready else "○"
 			seat_button.text = "Seat %d: %s %s" % [i, ready_indicator, player_name]
 			seat_button.disabled = true  # Can't claim occupied seats
+
+			# Show kick button for bots, hide for human players
+			if is_bot:
+				bot_button.text = "✕ Kick Bot"
+				bot_button.disabled = false
+				bot_button.visible = true
+			else:
+				bot_button.visible = false
 		else:
 			seat_button.text = "Seat %d: Empty (Click to claim)" % i
 			seat_button.disabled = false
+
+			# Show add bot button for empty seats
+			bot_button.text = "+ Add Bot"
+			bot_button.disabled = false
+			bot_button.visible = true
 
 
 func _on_game_started(payload: Dictionary) -> void:

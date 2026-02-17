@@ -157,6 +157,16 @@ func ready_up() -> void:
 	send_message("tourney/ready")
 
 
+## Add bot to a seat
+func add_bot(seat_position: int) -> void:
+	send_message("tourney/add_bot", {"seatPosition": seat_position})
+
+
+## Kick bot from a seat
+func kick_bot(seat_position: int) -> void:
+	send_message("tourney/kick_bot", {"seatPosition": seat_position})
+
+
 ## Play cards
 func play_cards(cards: Array) -> void:
 	# Convert Card objects to dictionaries

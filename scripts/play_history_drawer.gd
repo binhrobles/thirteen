@@ -12,6 +12,7 @@ signal dismissed()  # Emitted when drawer is closed
 @onready var title_label: Label
 
 const CardSpriteScene := preload("res://scenes/card_sprite.tscn")
+const SoftRetroTheme := preload("res://assets/themes/soft_retro/soft_retro.tres")
 const PLAYER_NAMES := ["You", "Player 2", "Player 3", "Player 4"]
 
 var current_round_plays: Array = []  # Array of {player: int, play: Play or "pass"}
@@ -24,6 +25,9 @@ func _ready() -> void:
 
 func _setup_ui() -> void:
 	"""Create the overlay UI"""
+	# Apply retro theme for consistent font
+	theme = SoftRetroTheme
+
 	# Full screen overlay
 	anchor_right = 1.0
 	anchor_bottom = 1.0

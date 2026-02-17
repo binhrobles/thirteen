@@ -164,10 +164,24 @@ func _setup_game_ui() -> void:
 	# Create opponent hands (positions relative to you)
 	for i in range(3):
 		var opponent = OpponentHandScript.new()
-		opponent.position_index = (your_position + i + 1) % 4
-		opponent.player_name = player_names[opponent.position_index] if opponent.position_index < player_names.size() else "Player %d" % (opponent.position_index + 1)
-		opponent.card_count = 13  # Start with 13 cards
 		add_child(opponent)
+
+		# Calculate absolute position of this opponent (0-3)
+		var abs_position = (your_position + i + 1) % 4
+
+		# Map relative position to screen position enum
+		var pos_mode: OpponentHandScript.Position
+		if i == 0:
+			pos_mode = OpponentHandScript.Position.RIGHT  # Next player (clockwise)
+		elif i == 1:
+			pos_mode = OpponentHandScript.Position.TOP    # Across from you
+		else:  # i == 2
+			pos_mode = OpponentHandScript.Position.LEFT   # Previous player
+
+		opponent.set_player(abs_position)
+		opponent.set_position_mode(pos_mode)
+		opponent.update_card_count(13)
+
 		opponent_hands.append(opponent)
 
 	# Create player hand
@@ -278,10 +292,10 @@ func _on_game_updated(payload: Dictionary) -> void:
 
 	# Update opponent hand counts
 	var hand_counts = payload.get("handCounts", [])
-	for i in range(min(opponent_hands.size(), hand_counts.size())):
-		var opponent_pos = opponent_hands[i].position_index
+	for i in range(opponent_hands.size()):
+		var opponent_pos = opponent_hands[i].player_id
 		if opponent_pos < hand_counts.size():
-			opponent_hands[i].set_card_count(hand_counts[opponent_pos])
+			opponent_hands[i].update_card_count(hand_counts[opponent_pos])
 
 	# Update turn display
 	_update_turn_display()

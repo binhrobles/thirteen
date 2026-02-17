@@ -40,7 +40,7 @@ func _ready() -> void:
 	your_position = game_data.get("your_position", -1)
 	your_hand_cards = game_data.get("your_hand", [])
 	current_player_position = game_data.get("current_player", -1)
-	player_names = game_data.get("players", [])
+	player_names.assign(game_data.get("players", []))
 
 	print("Starting networked game:")
 	print("  Your position: ", your_position)

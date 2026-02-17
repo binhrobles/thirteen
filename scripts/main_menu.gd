@@ -23,6 +23,18 @@ func _ready() -> void:
 	about_close_button.pressed.connect(_on_about_close_pressed)
 	github_button.pressed.connect(_on_github_pressed)
 
+	# Override panel style to use teal instead of theme purple
+	var teal_style := StyleBoxFlat.new()
+	teal_style.bg_color = Color(0.08, 0.15, 0.18, 1)  # Dark teal
+	teal_style.border_width_left = 2
+	teal_style.border_width_top = 2
+	teal_style.border_width_right = 2
+	teal_style.border_width_bottom = 2
+	teal_style.border_color = Color(1, 0.933333, 0.8, 1)  # Keep theme border color
+	teal_style.corner_radius_top_left = 10
+	teal_style.corner_radius_top_right = 10
+	about_panel.add_theme_stylebox_override("panel", teal_style)
+
 	# Hide about panel initially
 	about_panel.hide()
 

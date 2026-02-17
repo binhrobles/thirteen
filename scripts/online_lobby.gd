@@ -5,6 +5,8 @@ extends Control
 
 @onready var connection_panel: Panel = $ConnectionPanel
 @onready var lobby_panel: Panel = $LobbyPanel
+@onready var loading_panel: Panel = $LoadingPanel
+@onready var loading_label: Label = $LoadingPanel/CenterContainer/VBoxContainer/LoadingLabel
 @onready var player_name_input: LineEdit = $ConnectionPanel/MarginContainer/VBoxContainer/PlayerNameInput
 @onready var connect_button: Button = $ConnectionPanel/MarginContainer/VBoxContainer/ConnectButton
 @onready var status_label: Label = $ConnectionPanel/MarginContainer/VBoxContainer/StatusLabel
@@ -51,9 +53,10 @@ func _ready() -> void:
 	# Create seat buttons
 	_create_seat_buttons()
 
-	# Show connection panel, hide lobby
+	# Show connection panel, hide lobby and loading
 	connection_panel.show()
 	lobby_panel.hide()
+	loading_panel.hide()
 
 
 func _process(_delta: float) -> void:
@@ -119,10 +122,11 @@ func _on_leave_pressed() -> void:
 
 
 func _on_ws_connected() -> void:
-	print("Connected to server - showing lobby")
+	print("Connected to server - waiting for tourney info...")
 	connection_panel.hide()
-	lobby_panel.show()
-	lobby_status_label.text = "Waiting for players..."
+	lobby_panel.hide()
+	loading_panel.show()
+	loading_label.text = "Loading tournament..."
 
 
 func _on_ws_disconnected() -> void:
@@ -141,6 +145,11 @@ func _on_tourney_updated(payload: Dictionary) -> void:
 	var status = payload.get("status", "unknown")
 	var ready_count = payload.get("readyCount", 0)
 	var seats = payload.get("seats", [])
+
+	# Hide loading screen and show lobby (if not already shown)
+	if loading_panel.visible:
+		loading_panel.hide()
+		lobby_panel.show()
 
 	# Update lobby status
 	lobby_status_label.text = "Tournament Status: %s | Ready: %d/4" % [status, ready_count]

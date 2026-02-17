@@ -24,10 +24,11 @@ class Seat:
     games_won: int
     last_game_points: int
     ready: bool
+    disconnectedAt: Optional[int]  # Timestamp when player disconnected
 
     def __init__(self, position: int, player_id: Optional[str] = None, player_name: Optional[str] = None,
                  connection_id: Optional[str] = None, score: int = 0, games_won: int = 0,
-                 last_game_points: int = 0, ready: bool = False) -> None:
+                 last_game_points: int = 0, ready: bool = False, disconnectedAt: Optional[int] = None) -> None:
         self.position = position
         self.player_id = player_id
         self.player_name = player_name
@@ -36,10 +37,11 @@ class Seat:
         self.games_won = games_won
         self.last_game_points = last_game_points
         self.ready = ready
+        self.disconnectedAt = disconnectedAt
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to DynamoDB-compatible dict"""
-        return {
+        result = {
             'position': self.position,
             'playerId': self.player_id,
             'playerName': self.player_name,
@@ -49,6 +51,9 @@ class Seat:
             'lastGamePoints': self.last_game_points,
             'ready': self.ready
         }
+        if self.disconnectedAt is not None:
+            result['disconnectedAt'] = self.disconnectedAt
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Seat':
@@ -61,7 +66,8 @@ class Seat:
             score=int(data.get('score', 0)),
             games_won=int(data.get('gamesWon', 0)),
             last_game_points=int(data.get('lastGamePoints', 0)),
-            ready=data.get('ready', False)
+            ready=data.get('ready', False),
+            disconnectedAt=int(data['disconnectedAt']) if data.get('disconnectedAt') is not None else None
         )
 
     def is_occupied(self) -> bool:
@@ -348,6 +354,46 @@ class Tourney:
         # Sort by score descending
         leaderboard.sort(key=lambda x: x['totalScore'], reverse=True)
         return leaderboard
+
+    def cleanup_disconnected_players(self, grace_period_seconds: int = 5) -> bool:
+        """
+        Remove players who have been disconnected longer than grace period
+        Only applies to WAITING/STARTING tournaments
+
+        Returns: True if any players were removed
+        """
+        if self.status not in [TourneyStatus.WAITING, TourneyStatus.STARTING]:
+            return False
+
+        import time
+        current_time = int(time.time())
+        removed_any = False
+
+        for seat in self.seats:
+            if seat.is_occupied():
+                # Check if seat has disconnectedAt timestamp
+                disconnect_time = getattr(seat, 'disconnectedAt', None)
+                if disconnect_time is not None:
+                    time_disconnected = current_time - int(disconnect_time)
+                    if time_disconnected >= grace_period_seconds:
+                        # Grace period expired - kick player
+                        print(f'Kicking player {seat.player_name} (disconnected for {time_disconnected}s)')
+                        seat.player_id = None
+                        seat.player_name = None
+                        seat.connection_id = None
+                        seat.score = 0
+                        seat.games_won = 0
+                        seat.ready = False
+                        # Remove disconnect timestamp
+                        if hasattr(seat, 'disconnectedAt'):
+                            delattr(seat, 'disconnectedAt')
+                        removed_any = True
+
+                        # Update status if no longer full
+                        if self.get_occupied_count() < self.SEATS_COUNT:
+                            self.status = TourneyStatus.WAITING
+
+        return removed_any
 
     def to_client_state(self) -> Dict[str, Any]:
         """Convert to client-friendly state"""

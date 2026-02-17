@@ -100,11 +100,15 @@ def handle_ping(connection_id: str, payload: Dict[str, Any]) -> Dict[str, int]:
     })
 
 
-def handle_tourney_info(connection_id: str, player_id: str, _payload: Dict[str, Any]) -> Dict[str, int]:
+def handle_tourney_info(connection_id: str, _player_id: str, _payload: Dict[str, Any]) -> Dict[str, int]:
     """Handle tourney/info action - send current tournament state to requesting player"""
     try:
         # Get tournament
         tourney = get_or_create_tourney()
+
+        # Clean up disconnected players (5 second grace period)
+        if tourney.cleanup_disconnected_players(grace_period_seconds=5):
+            save_tourney(tourney)
 
         # Send tournament state to the requesting player
         send_to_connection(connection_id, {
@@ -127,6 +131,9 @@ def handle_claim_seat(connection_id: str, player_id: str, player_name: str, payl
         # Get or create tournament
         tourney = get_or_create_tourney()
 
+        # Clean up disconnected players first
+        tourney.cleanup_disconnected_players(grace_period_seconds=5)
+
         # Extract seat position from payload
         seat_position: Optional[int] = payload.get('seatPosition')
 
@@ -137,6 +144,11 @@ def handle_claim_seat(connection_id: str, player_id: str, player_name: str, payl
 
         if not success:
             return send_error(connection_id, error_code, f'Failed to claim seat: {error_code}')
+
+        # Clear disconnect timestamp if player is reconnecting
+        seat = tourney.get_seat_by_player(player_id)
+        if seat and hasattr(seat, 'disconnectedAt'):
+            seat.disconnectedAt = None
 
         # Save updated tourney
         save_tourney(tourney)

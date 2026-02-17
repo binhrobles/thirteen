@@ -57,6 +57,8 @@ func _ready() -> void:
 	# Override panel styles to use teal instead of theme purple
 	# Create separate style for each panel
 	for panel in [connection_panel, lobby_panel, loading_panel]:
+		# Clear inherited theme first to ensure override works
+		panel.theme = null
 		var teal_style := StyleBoxFlat.new()
 		teal_style.bg_color = Color(0.08, 0.15, 0.18, 1)  # Dark teal
 		teal_style.border_width_left = 2

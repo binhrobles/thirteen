@@ -24,6 +24,8 @@ func _ready() -> void:
 	github_button.pressed.connect(_on_github_pressed)
 
 	# Override panel style to use teal instead of theme purple
+	# Clear inherited theme first to ensure override works
+	about_panel.theme = null
 	var teal_style := StyleBoxFlat.new()
 	teal_style.bg_color = Color(0.08, 0.15, 0.18, 1)  # Dark teal
 	teal_style.border_width_left = 2

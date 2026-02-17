@@ -26,6 +26,7 @@ var opponent_hands: Array = []  # Array of OpponentHand for players 1, 2, 3
 
 func _ready() -> void:
 	_setup_buttons()
+	_create_persistent_ui()
 	_initialize_game()
 
 
@@ -123,6 +124,23 @@ func _setup_buttons() -> void:
 	menu_button.pressed.connect(_on_menu_button_pressed)
 
 
+func _create_persistent_ui() -> void:
+	"""Create UI elements that persist across games"""
+	# Create in-game menu
+	in_game_menu = InGameMenuScript.new()
+	add_child(in_game_menu)
+	in_game_menu.exit_game_requested.connect(_on_exit_game_requested)
+
+	# Create play history drawer
+	play_history_drawer = PlayHistoryDrawerScript.new()
+	add_child(play_history_drawer)
+
+	# Create game over screen
+	game_over_screen = GameOverScreenScript.new()
+	add_child(game_over_screen)
+	game_over_screen.new_game_requested.connect(_on_new_game_requested)
+
+
 func _initialize_game() -> void:
 	"""Initialize a new game"""
 	print("=== Starting New Game ===")
@@ -159,22 +177,8 @@ func _initialize_game() -> void:
 	# Create opponent hand displays for players 1, 2, 3
 	_create_opponent_hands()
 
-	# Create play history drawer
-	play_history_drawer = PlayHistoryDrawerScript.new()
-	add_child(play_history_drawer)
-
-	# Create in-game menu
-	in_game_menu = InGameMenuScript.new()
-	add_child(in_game_menu)
-	in_game_menu.exit_game_requested.connect(_on_exit_game_requested)
-
 	# Connect play area signal to show history drawer
 	play_area_ui.history_requested.connect(_on_history_requested)
-
-	# Create game over screen (add last so it renders on top)
-	game_over_screen = GameOverScreenScript.new()
-	add_child(game_over_screen)
-	game_over_screen.new_game_requested.connect(_on_new_game_requested)
 
 	# Create turn manager
 	var TurnManagerScript = load("res://scripts/turn_manager.gd")

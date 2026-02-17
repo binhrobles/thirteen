@@ -56,6 +56,7 @@ func _ready() -> void:
 
 	# Setup UI
 	_setup_buttons()
+	_create_persistent_ui()
 	_setup_game_ui()
 
 	# Update turn indicator
@@ -147,6 +148,14 @@ func _setup_buttons() -> void:
 	menu_button.pressed.connect(_on_menu_button_pressed)
 
 
+func _create_persistent_ui() -> void:
+	"""Create UI elements that persist across the session"""
+	# Create in-game menu
+	in_game_menu = InGameMenuScript.new()
+	add_child(in_game_menu)
+	in_game_menu.exit_game_requested.connect(_on_exit_game_requested)
+
+
 func _setup_game_ui() -> void:
 	# Create play area
 	play_area_ui = PlayAreaScene.instantiate()
@@ -175,11 +184,6 @@ func _setup_game_ui() -> void:
 
 	# Connect card selection signal
 	player_hand_ui.selection_changed.connect(_on_selection_changed)
-
-	# Create in-game menu
-	in_game_menu = InGameMenuScript.new()
-	add_child(in_game_menu)
-	in_game_menu.exit_game_requested.connect(_on_exit_game_requested)
 
 
 func _update_turn_display() -> void:

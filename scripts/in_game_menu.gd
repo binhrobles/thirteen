@@ -30,7 +30,7 @@ func _setup_ui() -> void:
 	anchor_right = 1.0
 	anchor_bottom = 1.0
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	z_index = 200  # Render above everything else
+	z_index = 250  # Render above everything else (including history drawer at 200)
 	z_as_relative = false  # Use absolute z-index
 
 	# Semi-transparent background (tap to dismiss)
@@ -117,6 +117,7 @@ func show_menu() -> void:
 func _on_background_input(event: InputEvent) -> void:
 	"""Handle tap on background to dismiss"""
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		accept_event()  # Consume the event to prevent click-through
 		_dismiss()
 
 
@@ -127,5 +128,6 @@ func _dismiss() -> void:
 
 func _on_exit_button_pressed() -> void:
 	"""Handle exit button press"""
-	exit_game_requested.emit()
+	# Hide first to prevent click-through, then emit signal
 	hide()
+	exit_game_requested.emit()

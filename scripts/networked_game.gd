@@ -7,13 +7,16 @@ const PlayerHandScene := preload("res://scenes/player_hand.tscn")
 const PlayAreaScene := preload("res://scenes/play_area.tscn")
 const OpponentHandScript := preload("res://scripts/opponent_hand.gd")
 const CardScript := preload("res://scripts/card.gd")
+const InGameMenuScript := preload("res://scripts/in_game_menu.gd")
 
 @onready var play_button: Button = $PlayButton
 @onready var pass_button: Button = $PassButton
+@onready var menu_button: Button = $MenuButton
 @onready var status_label: Label = $StatusLabel
 
 var player_hand_ui
 var play_area_ui
+var in_game_menu
 var opponent_hands: Array = []
 
 # Network game state
@@ -124,6 +127,18 @@ func _setup_buttons() -> void:
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
+	# Configure Menu button (top right, cog icon)
+	menu_button.anchor_left = 1.0
+	menu_button.anchor_right = 1.0
+	menu_button.anchor_top = 0.0
+	menu_button.anchor_bottom = 0.0
+	menu_button.offset_left = -int(viewport_size.x * 0.12)  # 12% from right
+	menu_button.offset_top = int(viewport_size.y * 0.024)  # 2.4% from top
+	menu_button.offset_right = -int(viewport_size.x * 0.024)  # 2.4% from right
+	menu_button.offset_bottom = int(viewport_size.y * 0.095)  # Height ~7% of viewport
+	menu_button.add_theme_font_size_override("font_size", int(viewport_size.y * 0.05))  # 5% of viewport height
+	menu_button.pressed.connect(_on_menu_button_pressed)
+
 
 func _setup_game_ui() -> void:
 	# Create play area
@@ -153,6 +168,11 @@ func _setup_game_ui() -> void:
 
 	# Connect card selection signal
 	player_hand_ui.selection_changed.connect(_on_selection_changed)
+
+	# Create in-game menu
+	in_game_menu = InGameMenuScript.new()
+	add_child(in_game_menu)
+	in_game_menu.exit_game_requested.connect(_on_exit_game_requested)
 
 
 func _update_turn_display() -> void:
@@ -299,3 +319,17 @@ func _on_disconnected() -> void:
 	# Wait a moment then return to lobby
 	await get_tree().create_timer(2.0).timeout
 	get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")
+
+
+func _on_menu_button_pressed() -> void:
+	"""Show in-game menu when cog button is pressed"""
+	in_game_menu.show_menu()
+
+
+func _on_exit_game_requested() -> void:
+	"""Handle exit game request from in-game menu"""
+	print("Exiting game, returning to main menu")
+	# Disconnect from WebSocket if connected
+	if WebSocketClient:
+		WebSocketClient.disconnect_from_server()
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")

@@ -6,9 +6,11 @@ const GameStateScript := preload("res://scripts/game_state.gd")
 const OpponentHandScript := preload("res://scripts/opponent_hand.gd")
 const PlayHistoryDrawerScript := preload("res://scripts/play_history_drawer.gd")
 const GameOverScreenScript := preload("res://scripts/game_over_screen.gd")
+const InGameMenuScript := preload("res://scripts/in_game_menu.gd")
 
 @onready var play_button: Button = $PlayButton
 @onready var pass_button: Button = $PassButton
+@onready var menu_button: Button = $MenuButton
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
 
@@ -18,6 +20,7 @@ var player_hand_ui
 var play_area_ui
 var play_history_drawer
 var game_over_screen
+var in_game_menu
 var opponent_hands: Array = []  # Array of OpponentHand for players 1, 2, 3
 
 
@@ -100,6 +103,18 @@ func _setup_buttons() -> void:
 	play_disabled_style.corner_radius_bottom_right = 8
 	play_button.add_theme_stylebox_override("disabled", play_disabled_style)
 
+	# Configure Menu button (top right, cog icon)
+	menu_button.anchor_left = 1.0
+	menu_button.anchor_right = 1.0
+	menu_button.anchor_top = 0.0
+	menu_button.anchor_bottom = 0.0
+	menu_button.offset_left = -int(viewport_size.x * 0.12)  # 12% from right
+	menu_button.offset_top = int(viewport_size.y * 0.024)  # 2.4% from top
+	menu_button.offset_right = -int(viewport_size.x * 0.024)  # 2.4% from right
+	menu_button.offset_bottom = int(viewport_size.y * 0.095)  # Height ~7% of viewport
+	menu_button.add_theme_font_size_override("font_size", int(viewport_size.y * 0.05))  # 5% of viewport height
+	menu_button.pressed.connect(_on_menu_button_pressed)
+
 
 func _initialize_game() -> void:
 	"""Initialize a new game"""
@@ -140,6 +155,11 @@ func _initialize_game() -> void:
 	# Create play history drawer
 	play_history_drawer = PlayHistoryDrawerScript.new()
 	add_child(play_history_drawer)
+
+	# Create in-game menu
+	in_game_menu = InGameMenuScript.new()
+	add_child(in_game_menu)
+	in_game_menu.exit_game_requested.connect(_on_exit_game_requested)
 
 	# Connect play area signal to show history drawer
 	play_area_ui.history_requested.connect(_on_history_requested)
@@ -298,3 +318,14 @@ func _on_new_game_requested() -> void:
 	# Wait one frame for cleanup, then initialize new game
 	await get_tree().process_frame
 	_initialize_game()
+
+
+func _on_menu_button_pressed() -> void:
+	"""Show in-game menu when cog button is pressed"""
+	in_game_menu.show_menu()
+
+
+func _on_exit_game_requested() -> void:
+	"""Handle exit game request from in-game menu"""
+	print("Exiting game, returning to main menu")
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")

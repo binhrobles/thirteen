@@ -29,3 +29,8 @@ text = "Pass"
 layout_mode = 0
 theme_override_font_sizes/font_size = 48
 text = "Connecting..."
+
+[node name="MenuButton" type="Button" parent="."]
+layout_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "⚙"

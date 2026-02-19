@@ -95,6 +95,8 @@ func _setup_ui() -> void:
 
 func show_menu() -> void:
 	"""Show the menu overlay"""
+	# Must be last child to get input priority over game UI added later
+	move_to_front()
 	show()
 
 

@@ -11,8 +11,6 @@ const InGameMenuScript := preload("res://scripts/in_game_menu.gd")
 @onready var play_button: Button = $PlayButton
 @onready var pass_button: Button = $PassButton
 @onready var menu_button: Button = $MenuButton
-@onready var title_label: Label = $Title
-@onready var subtitle_label: Label = $Subtitle
 
 var game_state
 var turn_manager
@@ -34,16 +32,6 @@ func _setup_buttons() -> void:
 	"""Configure buttons and labels for mobile with responsive sizing"""
 	var viewport_size := get_viewport_rect().size
 	var button_font_size := int(viewport_size.y * 0.03)  # 3% of viewport height
-
-	# Configure title labels to be larger and more visible
-	var title_font_size := int(viewport_size.y * 0.05)  # 5% of viewport height
-	var subtitle_font_size := int(viewport_size.y * 0.035)  # 3.5% of viewport height
-	title_label.add_theme_font_size_override("font_size", title_font_size)
-	subtitle_label.add_theme_font_size_override("font_size", subtitle_font_size)
-
-	# Hide title/subtitle when game starts (they'll be hidden by UI anyway)
-	title_label.visible = false
-	subtitle_label.visible = false
 
 	# Position buttons between play area (ends at ~47%) and player hand (starts at 82%)
 	# Buttons go from 58% to 66% of screen height
@@ -126,11 +114,6 @@ func _setup_buttons() -> void:
 
 func _create_persistent_ui() -> void:
 	"""Create UI elements that persist across games"""
-	# Create in-game menu
-	in_game_menu = InGameMenuScript.new()
-	add_child(in_game_menu)
-	in_game_menu.exit_game_requested.connect(_on_exit_game_requested)
-
 	# Create play history drawer
 	play_history_drawer = PlayHistoryDrawerScript.new()
 	add_child(play_history_drawer)
@@ -139,6 +122,11 @@ func _create_persistent_ui() -> void:
 	game_over_screen = GameOverScreenScript.new()
 	add_child(game_over_screen)
 	game_over_screen.new_game_requested.connect(_on_new_game_requested)
+
+	# Create in-game menu
+	in_game_menu = InGameMenuScript.new()
+	add_child(in_game_menu)
+	in_game_menu.exit_game_requested.connect(_on_exit_game_requested)
 
 
 func _initialize_game() -> void:
@@ -332,11 +320,8 @@ func _on_new_game_requested() -> void:
 
 
 func _on_menu_button_pressed() -> void:
-	"""Show in-game menu when cog button is pressed"""
 	in_game_menu.show_menu()
 
 
 func _on_exit_game_requested() -> void:
-	"""Handle exit game request from in-game menu"""
-	print("Exiting game, returning to main menu")
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")

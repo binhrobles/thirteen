@@ -8,7 +8,6 @@ const PlayAreaScene := preload("res://scenes/play_area.tscn")
 const OpponentHandScript := preload("res://scripts/opponent_hand.gd")
 const CardScript := preload("res://scripts/card.gd")
 const InGameMenuScript := preload("res://scripts/in_game_menu.gd")
-
 @onready var play_button: Button = $PlayButton
 @onready var pass_button: Button = $PassButton
 @onready var menu_button: Button = $MenuButton
@@ -55,8 +54,12 @@ func _ready() -> void:
 
 	# Setup UI
 	_setup_buttons()
-	_create_persistent_ui()
 	_setup_game_ui()
+
+	# Create in-game menu
+	in_game_menu = InGameMenuScript.new()
+	add_child(in_game_menu)
+	in_game_menu.exit_game_requested.connect(_on_exit_game_requested)
 
 	# Update turn indicator
 	_update_turn_display()
@@ -145,14 +148,6 @@ func _setup_buttons() -> void:
 	menu_button.add_theme_stylebox_override("pressed", transparent_style)
 	menu_button.add_theme_stylebox_override("focus", transparent_style)
 	menu_button.pressed.connect(_on_menu_button_pressed)
-
-
-func _create_persistent_ui() -> void:
-	"""Create UI elements that persist across the session"""
-	# Create in-game menu
-	in_game_menu = InGameMenuScript.new()
-	add_child(in_game_menu)
-	in_game_menu.exit_game_requested.connect(_on_exit_game_requested)
 
 
 func _setup_game_ui() -> void:
@@ -355,14 +350,9 @@ func _on_disconnected() -> void:
 
 
 func _on_menu_button_pressed() -> void:
-	"""Show in-game menu when cog button is pressed"""
 	in_game_menu.show_menu()
 
 
 func _on_exit_game_requested() -> void:
-	"""Handle exit game request from in-game menu"""
-	print("Exiting game, returning to main menu")
-	# Disconnect from WebSocket if connected
-	if WebSocketClient:
-		WebSocketClient.disconnect_from_server()
+	WebSocketClient.disconnect_from_server()
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")

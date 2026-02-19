@@ -28,6 +28,11 @@ var current_player_position: int = -1
 var player_names: Array[String] = []
 var your_hand_cards: Array = []  # Array of card dictionaries
 
+# Message queue for bot turn animation
+var _update_queue: Array[Dictionary] = []
+var _queue_processing: bool = false
+const BOT_MOVE_DELAY := 0.8  # seconds between bot moves
+
 
 func _ready() -> void:
 	# Get game data from WebSocketClient meta
@@ -264,8 +269,38 @@ func _on_pass_pressed() -> void:
 
 
 func _on_game_updated(payload: Dictionary) -> void:
-	print("Game state updated: ", payload)
+	print("Game state updated (queued): ", payload.get("currentPlayer", "?"))
 
+	# Push onto queue
+	_update_queue.append(payload)
+
+	# Start processing if not already running
+	if not _queue_processing:
+		_process_update_queue()
+
+
+func _process_update_queue() -> void:
+	_queue_processing = true
+
+	# Disable input while draining bot moves
+	play_button.disabled = true
+	pass_button.disabled = true
+
+	while not _update_queue.is_empty():
+		var payload: Dictionary = _update_queue.pop_front()
+		_apply_game_update(payload)
+
+		# If there are more queued messages, wait before processing next
+		if not _update_queue.is_empty():
+			await get_tree().create_timer(BOT_MOVE_DELAY).timeout
+
+	_queue_processing = false
+
+	# Re-enable input based on whose turn it is
+	_update_turn_display()
+
+
+func _apply_game_update(payload: Dictionary) -> void:
 	# Update current player
 	current_player_position = payload.get("currentPlayer", current_player_position)
 
@@ -283,6 +318,9 @@ func _on_game_updated(payload: Dictionary) -> void:
 			)
 			cards.append(card)
 		play_area_ui.display_play(cards, combo)
+	elif last_play == null and play_area_ui:
+		# Round reset (power granted) — clear the play area
+		play_area_ui.display_play([], "")
 
 	# Update your hand
 	var your_hand_data = payload.get("yourHand", [])
@@ -306,8 +344,12 @@ func _on_game_updated(payload: Dictionary) -> void:
 		if opponent_pos < hand_counts.size():
 			opponent_hands[i].update_card_count(hand_counts[opponent_pos])
 
-	# Update turn display
-	_update_turn_display()
+	# Update status label to show whose turn it is (without re-enabling buttons)
+	if current_player_position == your_position:
+		status_label.text = "YOUR TURN - Play or Pass"
+	else:
+		var current_player_name = player_names[current_player_position] if current_player_position < player_names.size() else "Player %d" % (current_player_position + 1)
+		status_label.text = "Waiting for %s..." % current_player_name
 
 
 func _on_game_over(payload: Dictionary) -> void:

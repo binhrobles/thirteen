@@ -13,6 +13,7 @@ from typing import List, Dict, Any, Optional
 sys.path.append('/opt/python')
 from tourney import Tourney, TourneyStatus
 from game import Game, Card
+from bot_ai import execute_bot_turns
 
 dynamodb = boto3.resource('dynamodb')
 connections_table = dynamodb.Table(os.environ['CONNECTIONS_TABLE'])
@@ -222,10 +223,17 @@ def handle_ready(connection_id: str, player_id: str, _payload: Dict[str, Any]) -
         if tourney.status == TourneyStatus.IN_PROGRESS and tourney.current_game is None:
             # Start new game
             game = tourney.start_game()
-            save_tourney(tourney)
 
             # Broadcast game start to all players
             broadcast_game_started(tourney, game)
+
+            # If starting player is a bot, run bot turns until human's turn
+            bot_moves = execute_bot_turns(tourney, game)
+            for move in bot_moves:
+                broadcast_game_update(tourney, game, move['player_pos'])
+
+            tourney.current_game = game.to_dict()
+            save_tourney(tourney)
 
         return {'statusCode': 200}
 
@@ -332,6 +340,14 @@ def handle_play_cards(connection_id: str, player_id: str, payload: Dict[str, Any
         # Execute the play
         game.play_cards(seat.position, cards)
 
+        # Broadcast the human's move
+        broadcast_game_update(tourney, game, seat.position)
+
+        # Run bot turns if next player is a bot
+        bot_moves = execute_bot_turns(tourney, game)
+        for move in bot_moves:
+            broadcast_game_update(tourney, game, move['player_pos'])
+
         # Update tourney with new game state
         tourney.current_game = game.to_dict()
 
@@ -352,9 +368,6 @@ def handle_play_cards(connection_id: str, player_id: str, payload: Dict[str, Any
             broadcast_game_over(tourney, game.win_order, tourney_complete)
         else:
             save_tourney(tourney)
-
-            # Broadcast game state update
-            broadcast_game_update(tourney, game, seat.position)
 
         return {'statusCode': 200}
 
@@ -386,12 +399,29 @@ def handle_pass(connection_id: str, player_id: str, _payload: Dict[str, Any]) ->
         if not game.pass_turn(seat.position):
             return send_error(connection_id, 'CANT_PASS', 'Cannot pass')
 
+        # Broadcast the human's pass
+        broadcast_game_update(tourney, game, seat.position)
+
+        # Run bot turns if next player is a bot
+        bot_moves = execute_bot_turns(tourney, game)
+        for move in bot_moves:
+            broadcast_game_update(tourney, game, move['player_pos'])
+
         # Update tourney with new game state
         tourney.current_game = game.to_dict()
-        save_tourney(tourney)
 
-        # Broadcast game state update
-        broadcast_game_update(tourney, game, seat.position)
+        # Check if game is over (bots may have finished the game)
+        if game.is_game_over():
+            for i in range(4):
+                if i not in game.win_order:
+                    game.win_order.append(i)
+                    break
+
+            _success, tourney_complete = tourney.complete_game(game.win_order)
+            save_tourney(tourney)
+            broadcast_game_over(tourney, game.win_order, tourney_complete)
+        else:
+            save_tourney(tourney)
 
         return {'statusCode': 200}
 
@@ -456,13 +486,21 @@ def handle_debug_quick_start(connection_id: str, player_id: str, player_name: st
 
         # All 4 are ready — status is now IN_PROGRESS. Start the game.
         game = tourney.start_game()
-        save_tourney(tourney)
 
         # Broadcast tourney state then game start
         broadcast_tourney_update(tourney)
         broadcast_game_started(tourney, game)
 
-        print(f'[DEBUG] Quick start: {player_name} in seat {seat_position} with 3 bots')
+        # If starting player is a bot, run bot turns until human's turn
+        bot_moves = execute_bot_turns(tourney, game)
+        for move in bot_moves:
+            broadcast_game_update(tourney, game, move['player_pos'])
+
+        # Save after bot turns
+        tourney.current_game = game.to_dict()
+        save_tourney(tourney)
+
+        print(f'[DEBUG] Quick start: {player_name} in seat {seat_position} with 3 bots, {len(bot_moves)} bot moves')
 
         return {'statusCode': 200}
 

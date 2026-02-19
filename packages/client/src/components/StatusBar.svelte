@@ -8,10 +8,10 @@
 
 <style>
   .status-bar {
-    padding: 8px 16px;
+    padding: 1vh 4vw;
     text-align: center;
     font-family: monospace;
-    font-size: 0.9rem;
+    font-size: 2.5vh;
     color: #fff;
     background: #111;
     min-height: 1.2em;

@@ -4,11 +4,11 @@ import { Combo } from "@thirteen/game-logic";
 import {
   createCardSprite,
   createCardBack,
-  CARD_WIDTH,
-  CARD_HEIGHT,
+  getCardWidth,
+  getCardHeight,
+  getOpponentCardWidth,
+  getOpponentCardHeight,
 } from "./card-sprite.js";
-
-const SELECTED_LIFT = 20;
 
 export class GameApp {
   app: Application;
@@ -60,28 +60,34 @@ export class GameApp {
     const hand = state.getHand(humanPlayer);
     const screenW = this.app.screen.width;
     const screenH = this.app.screen.height;
+    const cardW = getCardWidth(screenH);
+    const cardH = getCardHeight(screenH);
+    const selectedLift = cardH * 0.2; // 20% of card height, matching Godot
 
-    // Scale cards to fit if hand is large
-    const maxHandWidth = screenW - 20;
+    // Scale cards to fit if hand is large — 5% margin on each side like Godot
+    const maxHandWidth = screenW * 0.9;
     const overlap = Math.min(
-      CARD_WIDTH * 0.7,
+      cardW * 0.7,
       hand.length > 1
-        ? (maxHandWidth - CARD_WIDTH) / (hand.length - 1)
-        : CARD_WIDTH,
+        ? (maxHandWidth - cardW) / (hand.length - 1)
+        : cardW,
     );
     const totalWidth =
       hand.length > 0
-        ? overlap * (hand.length - 1) + CARD_WIDTH
+        ? overlap * (hand.length - 1) + cardW
         : 0;
     const startX = (screenW - totalWidth) / 2;
-    const baseY = screenH - CARD_HEIGHT - 70; // leave room for buttons
+    // Player hand at bottom — Godot places it around 82% of screen
+    const baseY = screenH * 0.82;
 
     for (let i = 0; i < hand.length; i++) {
       const card = hand[i];
       const sprite = createCardSprite(card);
+      sprite.width = cardW;
+      sprite.height = cardH;
       sprite.x = startX + i * overlap;
       sprite.y = selectedCards.has(card.value)
-        ? baseY - SELECTED_LIFT
+        ? baseY - selectedLift
         : baseY;
       sprite.zIndex = i;
 
@@ -100,19 +106,32 @@ export class GameApp {
 
     const screenW = this.app.screen.width;
     const screenH = this.app.screen.height;
-    const centerY = screenH * 0.35;
+    const cardW = getCardWidth(screenH);
+    const cardH = getCardHeight(screenH);
+    // Play area centered vertically between 25%-66% like Godot
+    const centerY = screenH * 0.38;
+    const labelFontSize = Math.round(screenH * 0.025); // 2.5% of viewport
 
     if (state.lastPlay) {
       const cards = state.lastPlay.cards;
-      const overlap = Math.min(CARD_WIDTH * 0.6, CARD_WIDTH);
+      // Available width avoiding opponent areas (Godot: 11.5%-88.5%)
+      const availableWidth = screenW * 0.77;
+      const overlap = Math.min(
+        cardW * 0.6,
+        cards.length > 1
+          ? (availableWidth - cardW) / (cards.length - 1)
+          : cardW,
+      );
       const totalWidth =
         cards.length > 0
-          ? overlap * (cards.length - 1) + CARD_WIDTH
+          ? overlap * (cards.length - 1) + cardW
           : 0;
       const startX = (screenW - totalWidth) / 2;
 
       for (let i = 0; i < cards.length; i++) {
         const sprite = createCardSprite(cards[i]);
+        sprite.width = cardW;
+        sprite.height = cardH;
         sprite.x = startX + i * overlap;
         sprite.y = centerY;
         sprite.eventMode = "none";
@@ -122,24 +141,25 @@ export class GameApp {
       // Combo label
       const label = new Text({
         text: Combo[state.lastPlay.combo],
-        style: { fontSize: 16, fill: 0xffffff, fontFamily: "monospace" },
+        style: { fontSize: labelFontSize, fill: 0xffffff, fontFamily: "monospace" },
       });
       label.x = screenW / 2 - label.width / 2;
-      label.y = centerY - 25;
+      label.y = centerY - labelFontSize * 1.5;
       this.playAreaContainer.addChild(label);
     } else {
       // Power indicator
+      const powerFontSize = Math.round(screenH * 0.03);
       const text = new Text({
         text: "Power!",
         style: {
-          fontSize: 24,
+          fontSize: powerFontSize,
           fill: 0xffcc00,
           fontFamily: "monospace",
           fontWeight: "bold",
         },
       });
       text.x = screenW / 2 - text.width / 2;
-      text.y = centerY + CARD_HEIGHT / 2 - 12;
+      text.y = centerY + cardH / 2 - powerFontSize / 2;
       this.playAreaContainer.addChild(text);
     }
   }
@@ -149,12 +169,16 @@ export class GameApp {
 
     const screenW = this.app.screen.width;
     const screenH = this.app.screen.height;
+    const opW = getOpponentCardWidth(screenH);
+    const opH = getOpponentCardHeight(screenH);
+    const fontSize = Math.round(screenH * 0.02); // 2% of viewport
+    const labelGap = fontSize * 1.4;
 
-    // Opponents: seats 1, 2, 3 relative to human (0)
+    // Positions matching Godot anchors: left 25%-45%, top ~0%, right 25%-45%
     const positions = [
-      { x: 15, y: screenH * 0.35, label: "left" },
-      { x: screenW / 2, y: 15, label: "top" },
-      { x: screenW - 15, y: screenH * 0.35, label: "right" },
+      { x: screenW * 0.05, y: screenH * 0.3, label: "left" },
+      { x: screenW / 2, y: screenH * 0.02, label: "top" },
+      { x: screenW * 0.95, y: screenH * 0.3, label: "right" },
     ];
 
     for (let i = 0; i < 3; i++) {
@@ -175,7 +199,7 @@ export class GameApp {
       const text = new Text({
         text: statusText,
         style: {
-          fontSize: 14,
+          fontSize,
           fill: isActive ? 0xffcc00 : hasWon ? 0x44ff44 : hasPassed ? 0x888888 : 0xffffff,
           fontFamily: "monospace",
           fontWeight: isActive ? "bold" : "normal",
@@ -197,27 +221,27 @@ export class GameApp {
 
       // Show small card backs for card count
       if (!hasWon) {
-        const backScale = 0.3;
-        const smallW = CARD_WIDTH * backScale;
+        const smallW = opW * 0.5;
+        const smallH = opH * 0.5;
         const smallOverlap = smallW * 0.4;
         const maxShow = Math.min(cardCount, 8);
 
         for (let j = 0; j < maxShow; j++) {
           const back = createCardBack();
           back.width = smallW;
-          back.height = CARD_HEIGHT * backScale;
+          back.height = smallH;
 
           if (pos.label === "left") {
             back.x = pos.x + j * smallOverlap;
-            back.y = pos.y + 22;
+            back.y = pos.y + labelGap;
           } else if (pos.label === "top") {
             const totalW = smallOverlap * (maxShow - 1) + smallW;
             back.x = pos.x - totalW / 2 + j * smallOverlap;
-            back.y = pos.y + 22;
+            back.y = pos.y + labelGap;
           } else {
             const totalW = smallOverlap * (maxShow - 1) + smallW;
             back.x = pos.x - totalW + j * smallOverlap;
-            back.y = pos.y + 22;
+            back.y = pos.y + labelGap;
           }
 
           container.addChild(back);

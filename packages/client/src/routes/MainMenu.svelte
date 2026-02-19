@@ -32,31 +32,31 @@
   }
 
   h1 {
-    font-size: 2.5rem;
+    font-size: 6vh;
     margin: 0;
   }
 
   .subtitle {
-    font-size: 1.2rem;
+    font-size: 3vh;
     color: #aaa;
-    margin: 4px 0 40px;
+    margin: 0.5vh 0 6vh;
   }
 
   .menu-buttons {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 2vh;
   }
 
   .btn {
-    padding: 14px 40px;
+    padding: 2vh 10vw;
     border: none;
-    border-radius: 8px;
-    font-size: 1.1rem;
+    border-radius: 1vh;
+    font-size: 3vh;
     font-family: monospace;
     font-weight: bold;
     cursor: pointer;
-    min-width: 200px;
+    min-width: 50vw;
   }
 
   .btn-primary {

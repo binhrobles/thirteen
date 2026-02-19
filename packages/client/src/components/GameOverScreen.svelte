@@ -38,28 +38,28 @@
 
   .game-over-card {
     background: #222;
-    padding: 24px 32px;
-    border-radius: 12px;
+    padding: 3vh 6vw;
+    border-radius: 1.5vh;
     text-align: center;
     color: white;
     font-family: monospace;
-    min-width: 250px;
+    min-width: 60vw;
   }
 
   h2 {
-    margin: 0 0 16px;
-    font-size: 1.5rem;
+    margin: 0 0 2vh;
+    font-size: 4vh;
   }
 
   .results {
     list-style: none;
     padding: 0;
-    margin: 0 0 20px;
+    margin: 0 0 3vh;
   }
 
   .results li {
-    padding: 6px 0;
-    font-size: 1.1rem;
+    padding: 0.8vh 0;
+    font-size: 2.8vh;
   }
 
   .results li.highlight {
@@ -69,15 +69,15 @@
 
   .actions {
     display: flex;
-    gap: 12px;
+    gap: 3vw;
     justify-content: center;
   }
 
   .btn {
-    padding: 10px 24px;
+    padding: 1.5vh 6vw;
     border: none;
-    border-radius: 8px;
-    font-size: 1rem;
+    border-radius: 1vh;
+    font-size: 2.8vh;
     font-family: monospace;
     font-weight: bold;
     cursor: pointer;

@@ -6,7 +6,7 @@
   import { game, toggleCard, HUMAN_PLAYER } from "../lib/stores/game.svelte.js";
 
   let canvasContainer: HTMLDivElement;
-  let gameApp: GameApp | null = null;
+  let gameApp = $state<GameApp | null>(null);
   let loading = $state(true);
 
   onMount(() => {
@@ -47,6 +47,8 @@
   });
 
   $effect(() => {
+    // Read stateVersion to re-run when GameState is mutated (class instances aren't deep-proxied)
+    game.stateVersion;
     if (gameApp && game.gameState) {
       gameApp.updateFromState(game.gameState, game.selectedCards, HUMAN_PLAYER);
     }

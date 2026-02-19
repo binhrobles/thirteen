@@ -43,7 +43,30 @@ export async function preloadCardTextures(): Promise<void> {
   await Assets.load(paths);
 }
 
-/** Card dimensions — 2:3 aspect ratio */
+/** Card dimensions as percentage of viewport height (matching Godot's 18%) */
+const BASE_HEIGHT_PERCENT = 0.18;
+const ASPECT_RATIO = 0.667; // width/height (2:3)
+
+/** Opponent card dimensions (matching Godot's 12%) */
+const OPPONENT_HEIGHT_PERCENT = 0.12;
+
+export function getCardHeight(screenH: number): number {
+  return screenH * BASE_HEIGHT_PERCENT;
+}
+
+export function getCardWidth(screenH: number): number {
+  return getCardHeight(screenH) * ASPECT_RATIO;
+}
+
+export function getOpponentCardHeight(screenH: number): number {
+  return screenH * OPPONENT_HEIGHT_PERCENT;
+}
+
+export function getOpponentCardWidth(screenH: number): number {
+  return getOpponentCardHeight(screenH) * ASPECT_RATIO;
+}
+
+/** Fixed fallback for contexts that don't have screen dimensions */
 export const CARD_WIDTH = 80;
 export const CARD_HEIGHT = 120;
 

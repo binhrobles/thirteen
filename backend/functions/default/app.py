@@ -76,6 +76,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_pass(connection_id, player_id, payload)
         elif action == 'debug/quick_start':
             return handle_debug_quick_start(connection_id, player_id, player_name, payload)
+        elif action == 'debug/reset':
+            return handle_debug_reset(connection_id)
         else:
             return send_error(connection_id, 'UNKNOWN_ACTION', f'Unknown action: {action}')
 
@@ -398,6 +400,29 @@ def handle_pass(connection_id: str, player_id: str, _payload: Dict[str, Any]) ->
         import traceback
         traceback.print_exc()
         return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to pass')
+
+
+def handle_debug_reset(connection_id: str) -> Dict[str, int]:
+    """
+    Debug backdoor: wipe the tourney back to empty WAITING state.
+
+    Usage from wscat:
+        {"action": "debug/reset", "payload": {}}
+    """
+    try:
+        tourney = Tourney()
+        save_tourney(tourney)
+        broadcast_tourney_update(tourney)
+        print('[DEBUG] Tourney reset to empty WAITING state')
+        return send_to_connection(connection_id, {
+            'type': 'debug/reset',
+            'payload': {'message': 'Tourney reset'}
+        })
+    except Exception as e:
+        print(f'Error in debug/reset: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to reset')
 
 
 def handle_debug_quick_start(connection_id: str, player_id: str, player_name: str, payload: Dict[str, Any]) -> Dict[str, int]:

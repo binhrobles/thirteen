@@ -31,7 +31,7 @@ class Card:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Card':
-        return cls(data['rank'], data['suit'])
+        return cls(int(data['rank']), int(data['suit']))
 
     def __repr__(self) -> str:
         rank_names: Dict[int, str] = {11: 'J', 12: 'Q', 13: 'K', 14: 'A', 15: '2'}
@@ -367,9 +367,9 @@ class Game:
         """Create from DynamoDB dict"""
         game = cls(data['playerIds'])
         game.hands = [[Card.from_dict(c) for c in hand] for hand in data['hands']]
-        game.current_player = data['currentPlayer']
+        game.current_player = int(data['currentPlayer'])
         game.last_play = Play.from_dict(data['lastPlay']) if data.get('lastPlay') else None
-        game.passed_players = data['passedPlayers']
-        game.win_order = data['winOrder']
+        game.passed_players = [bool(p) for p in data['passedPlayers']]
+        game.win_order = [int(p) for p in data['winOrder']]
         game.move_history = data.get('moveHistory', [])
         return game

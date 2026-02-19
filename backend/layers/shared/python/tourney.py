@@ -67,7 +67,7 @@ class Seat:
     def from_dict(cls, data: Dict[str, Any]) -> 'Seat':
         """Create from DynamoDB dict"""
         return cls(
-            position=data['position'],
+            position=int(data['position']),
             player_id=data.get('playerId'),
             player_name=data.get('playerName'),
             connection_id=data.get('connectionId'),

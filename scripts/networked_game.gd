@@ -8,6 +8,10 @@ const PlayAreaScene := preload("res://scenes/play_area.tscn")
 const OpponentHandScript := preload("res://scripts/opponent_hand.gd")
 const CardScript := preload("res://scripts/card.gd")
 const InGameMenuScript := preload("res://scripts/in_game_menu.gd")
+
+## Python backend uses ranks 3-15, Godot uses enum 0-12
+const SERVER_RANK_OFFSET := 3
+
 @onready var play_button: Button = $PlayButton
 @onready var pass_button: Button = $PassButton
 @onready var menu_button: Button = $MenuButton
@@ -182,11 +186,11 @@ func _setup_game_ui() -> void:
 	player_hand_ui = PlayerHandScene.instantiate()
 	add_child(player_hand_ui)
 
-	# Convert card dictionaries to Card objects
+	# Convert card dictionaries to Card objects (server ranks are offset by 3)
 	var initial_cards: Array[Card] = []
 	for card_data in your_hand_cards:
 		var card = CardScript.new(
-			card_data.get("rank", 3),
+			card_data.get("rank", 3) - SERVER_RANK_OFFSET,
 			card_data.get("suit", 0)
 		)
 		initial_cards.append(card)
@@ -213,10 +217,12 @@ func _get_selected_cards_data() -> Array:
 	if player_hand_ui:
 		var selected = player_hand_ui.get_selected_cards()
 		for card in selected:
+			# Convert Godot ranks (0-12) back to server ranks (3-15)
+			var server_rank = card.rank + SERVER_RANK_OFFSET
 			cards_data.append({
-				"rank": card.rank,
+				"rank": server_rank,
 				"suit": card.suit,
-				"value": card.value
+				"value": server_rank * 4 + card.suit
 			})
 	return cards_data
 
@@ -268,11 +274,11 @@ func _on_game_updated(payload: Dictionary) -> void:
 	if last_play and play_area_ui:
 		var combo = last_play.get("combo", "")
 		var cards_data = last_play.get("cards", [])
-		# Convert to Card objects for display
+		# Convert to Card objects for display (server ranks are offset by 3)
 		var cards = []
 		for card_data in cards_data:
 			var card = CardScript.new(
-				card_data.get("rank", 3),
+				card_data.get("rank", 3) - SERVER_RANK_OFFSET,
 				card_data.get("suit", 0)
 			)
 			cards.append(card)
@@ -281,11 +287,11 @@ func _on_game_updated(payload: Dictionary) -> void:
 	# Update your hand
 	var your_hand_data = payload.get("yourHand", [])
 	if not your_hand_data.is_empty() and player_hand_ui:
-		# Convert card data to Card objects
+		# Convert card data to Card objects (server ranks are offset by 3)
 		var updated_cards: Array[Card] = []
 		for card_data in your_hand_data:
 			var card = CardScript.new(
-				card_data.get("rank", 3),
+				card_data.get("rank", 3) - SERVER_RANK_OFFSET,
 				card_data.get("suit", 0)
 			)
 			updated_cards.append(card)

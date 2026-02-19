@@ -1,7 +1,12 @@
 import { Card } from "./card.js";
-import { Play } from "./play.js";
+import { Combo, Play } from "./play.js";
 import { validate, type MoveResult } from "./move-validator.js";
 import { findStartingPlayer } from "./deck.js";
+import type {
+  CardData,
+  GameStateSnapshot,
+  PlayData,
+} from "./types.js";
 
 export type GameEvent =
   | { type: "turn_changed"; player: number }
@@ -197,5 +202,56 @@ export class GameState {
 
   hasPower(): boolean {
     return this.lastPlay === null;
+  }
+
+  /** Serialize to a plain object for DynamoDB storage */
+  toSnapshot(): GameStateSnapshot {
+    return {
+      hands: this.hands.map((hand) =>
+        hand.map((c): CardData => ({ rank: c.rank, suit: c.suit, value: c.value })),
+      ),
+      currentPlayer: this.currentPlayer,
+      lastPlay: this.lastPlay
+        ? {
+            combo: Combo[this.lastPlay.combo],
+            cards: this.lastPlay.cards.map(
+              (c): CardData => ({ rank: c.rank, suit: c.suit, value: c.value }),
+            ),
+            suited: this.lastPlay.suited,
+          }
+        : null,
+      lastPlayBy: this.lastPlayBy,
+      passedPlayers: this.playersInRound.map((inRound) => !inRound),
+      winOrder: [...this.winOrder],
+      playersInGame: [...this.playersInGame],
+    };
+  }
+
+  /** Reconstruct a GameState from a snapshot (e.g. loaded from DynamoDB) */
+  static fromSnapshot(snapshot: GameStateSnapshot): GameState {
+    const hands = snapshot.hands.map((hand) =>
+      hand.map((c) => Card.fromValue(c.value)),
+    );
+    // Use Object.create to bypass the constructor (which calls findStartingPlayer/deal)
+    const state = Object.create(GameState.prototype) as GameState;
+    state.hands = hands;
+    state.currentPlayer = snapshot.currentPlayer;
+    state.lastPlayBy = snapshot.lastPlayBy;
+    state.playersInRound = snapshot.passedPlayers.map((passed) => !passed);
+    state.playersInGame = [...snapshot.playersInGame];
+    state.winOrder = [...snapshot.winOrder];
+    state.playLog = [];
+    state.listeners = [];
+
+    if (snapshot.lastPlay) {
+      const lp = snapshot.lastPlay;
+      const cards = lp.cards.map((c) => Card.fromValue(c.value));
+      const combo = Combo[lp.combo as keyof typeof Combo];
+      state.lastPlay = new Play(combo, cards, lp.suited);
+    } else {
+      state.lastPlay = null;
+    }
+
+    return state;
   }
 }

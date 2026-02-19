@@ -1,3 +1,6 @@
+import { deal } from "./deck.js";
+import { GameState } from "./game-state.js";
+
 export enum TourneyStatus {
   WAITING = "waiting",
   STARTING = "starting",
@@ -355,6 +358,67 @@ export class Tourney {
         this.gameHistory.length + (this.currentGame ? 1 : 0),
       readyCount: this.getReadyCount(),
     };
+  }
+
+  /** Deal cards, create a GameState, store snapshot as currentGame */
+  startGame(): GameState {
+    const playerIds = this.seats.map((s) => s.playerId);
+    if (playerIds.some((id) => id === null)) {
+      throw new Error(
+        `Cannot start game: expected ${Tourney.SEATS_COUNT} players, got ${this.getOccupiedCount()}`,
+      );
+    }
+
+    const hands = deal(Tourney.SEATS_COUNT);
+    const game = new GameState(hands);
+
+    this.currentGame = {
+      ...game.toSnapshot(),
+      gameNumber: this.gameHistory.length + 1,
+    };
+
+    // Reset ready flags
+    for (const seat of this.seats) {
+      seat.ready = false;
+    }
+
+    return game;
+  }
+
+  /**
+   * Remove players who have been disconnected longer than grace period.
+   * Only applies to WAITING/STARTING tournaments.
+   * Returns true if any players were removed.
+   */
+  cleanupDisconnectedPlayers(
+    gracePeriodSeconds: number,
+    now?: number,
+  ): boolean {
+    if (
+      this.status !== TourneyStatus.WAITING &&
+      this.status !== TourneyStatus.STARTING
+    ) {
+      return false;
+    }
+
+    const currentTime = now ?? Math.floor(Date.now() / 1000);
+    let removedAny = false;
+
+    for (const seat of this.seats) {
+      if (seat.isOccupied() && seat.disconnectedAt !== undefined) {
+        const elapsed = currentTime - seat.disconnectedAt;
+        if (elapsed >= gracePeriodSeconds) {
+          seat.clear();
+          removedAny = true;
+
+          if (this.getOccupiedCount() < Tourney.SEATS_COUNT) {
+            this.status = TourneyStatus.WAITING;
+          }
+        }
+      }
+    }
+
+    return removedAny;
   }
 
   // ── Helpers ──

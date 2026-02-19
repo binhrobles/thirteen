@@ -22,6 +22,7 @@ export interface GameStateSnapshot {
   hands: CardData[][];
   currentPlayer: number;
   lastPlay: PlayData | null;
+  lastPlayBy: number;
   passedPlayers: boolean[];
   winOrder: number[];
   playersInGame: boolean[];

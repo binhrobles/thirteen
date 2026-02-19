@@ -9,7 +9,12 @@ export {
   hasAnyPlays,
   type EvaluationResult,
 } from "./bot/hand-evaluator.js";
-export { choosePlay, greedyBot, type BotStrategy } from "./bot/bot-player.js";
+export {
+  choosePlay,
+  executeBotTurns,
+  greedyBot,
+  type BotStrategy,
+} from "./bot/bot-player.js";
 export {
   Tourney,
   Seat,

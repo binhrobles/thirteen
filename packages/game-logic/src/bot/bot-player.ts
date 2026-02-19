@@ -1,6 +1,8 @@
 import { Card } from "../card.js";
+import type { GameState } from "../game-state.js";
 import { Play } from "../play.js";
-import type { GameStateSnapshot } from "../types.js";
+import type { SeatData } from "../tourney.js";
+import type { CardData, GameStateSnapshot, MoveEntry } from "../types.js";
 import { evaluate, getAllPlays } from "./hand-evaluator.js";
 
 /** Strategy interface for future ONNX integration */
@@ -47,3 +49,43 @@ export const greedyBot: BotStrategy = {
     return choosePlay(hand, lastPlay);
   },
 };
+
+/**
+ * Execute bot turns in a loop until it's a human's turn or game over.
+ * Returns list of MoveEntry objects describing each bot action.
+ */
+export function executeBotTurns(
+  seats: SeatData[],
+  game: GameState,
+): MoveEntry[] {
+  const moves: MoveEntry[] = [];
+  const SAFETY_CAP = 100;
+
+  for (let i = 0; i < SAFETY_CAP; i++) {
+    if (game.isGameOver()) break;
+
+    const pos = game.currentPlayer;
+    const seat = seats[pos];
+
+    if (!seat.isBot) break; // Human's turn
+
+    const hand = game.getHand(pos);
+    const cardsToPlay = choosePlay(hand, game.lastPlay);
+
+    if (cardsToPlay.length > 0) {
+      game.playCards(pos, cardsToPlay);
+      moves.push({
+        player: pos,
+        action: "play",
+        cards: cardsToPlay.map(
+          (c): CardData => ({ rank: c.rank, suit: c.suit, value: c.value }),
+        ),
+      });
+    } else {
+      game.passTurn(pos);
+      moves.push({ player: pos, action: "pass" });
+    }
+  }
+
+  return moves;
+}

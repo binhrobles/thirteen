@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "yarn workspace @thirteen/game-logic build && yarn workspace @thirteen/client dev",
     "build": "yarn workspace @thirteen/game-logic build && yarn workspace @thirteen/client build",
+    "build:server": "yarn workspace @thirteen/game-logic build && yarn workspace @thirteen/server build",
     "test": "yarn workspace @thirteen/game-logic test",
     "test:watch": "yarn workspace @thirteen/game-logic test:watch",
     "preview": "yarn workspace @thirteen/client preview"

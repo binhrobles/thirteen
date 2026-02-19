@@ -1,0 +1,12 @@
+{
+  "name": "thirteen",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "yarn workspace @thirteen/game-logic test",
+    "test:watch": "yarn workspace @thirteen/game-logic test:watch",
+    "build": "yarn workspace @thirteen/game-logic build"
+  }
+}

@@ -74,6 +74,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return handle_play_cards(connection_id, player_id, payload)
         elif action == 'game/pass':
             return handle_pass(connection_id, player_id, payload)
+        elif action == 'debug/quick_start':
+            return handle_debug_quick_start(connection_id, player_id, player_name, payload)
         else:
             return send_error(connection_id, 'UNKNOWN_ACTION', f'Unknown action: {action}')
 
@@ -396,6 +398,54 @@ def handle_pass(connection_id: str, player_id: str, _payload: Dict[str, Any]) ->
         import traceback
         traceback.print_exc()
         return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to pass')
+
+
+def handle_debug_quick_start(connection_id: str, player_id: str, player_name: str, payload: Dict[str, Any]) -> Dict[str, int]:
+    """
+    Debug backdoor: reset tourney, seat the caller + 3 bots, start game immediately.
+
+    Usage from wscat:
+        {"action": "debug/quick_start", "payload": {}}
+
+    Optional payload fields:
+        seatPosition: int (0-3, default 0) - which seat you want
+    """
+    try:
+        # Nuke existing tourney — fresh slate
+        tourney = Tourney()
+        save_tourney(tourney)
+
+        # Claim a seat for the requesting player
+        seat_position: int = payload.get('seatPosition', 0)
+        success, error_code, _ = tourney.claim_seat(player_id, player_name, connection_id, seat_position)
+        if not success:
+            return send_error(connection_id, error_code, f'Failed to claim seat: {error_code}')
+
+        # Fill remaining seats with bots
+        for i in range(4):
+            if tourney.seats[i].is_empty():
+                tourney.add_bot(i)
+
+        # Ready up the human player (bots are already ready)
+        tourney.set_ready(player_id, True)
+
+        # All 4 are ready — status is now IN_PROGRESS. Start the game.
+        game = tourney.start_game()
+        save_tourney(tourney)
+
+        # Broadcast tourney state then game start
+        broadcast_tourney_update(tourney)
+        broadcast_game_started(tourney, game)
+
+        print(f'[DEBUG] Quick start: {player_name} in seat {seat_position} with 3 bots')
+
+        return {'statusCode': 200}
+
+    except Exception as e:
+        print(f'Error in debug/quick_start: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return send_error(connection_id, 'INTERNAL_ERROR', 'Failed to quick start')
 
 
 def get_or_create_tourney() -> Tourney:

@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 export enum TourneyStatus {
   WAITING = "waiting",
   STARTING = "starting",
@@ -230,7 +228,7 @@ export class Tourney {
     const seat = this.seats[seatPosition];
     if (seat.isOccupied()) return [false, "SEAT_TAKEN"];
 
-    const botId = `bot_${randomUUID().slice(0, 8)}`;
+    const botId = `bot_${crypto.randomUUID().slice(0, 8)}`;
     seat.playerId = botId;
     seat.playerName = `Bot_${seatPosition + 1}`;
     seat.connectionId = null;

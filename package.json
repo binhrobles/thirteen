@@ -5,8 +5,10 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "yarn workspace @thirteen/game-logic build && yarn workspace @thirteen/client dev",
+    "build": "yarn workspace @thirteen/game-logic build && yarn workspace @thirteen/client build",
     "test": "yarn workspace @thirteen/game-logic test",
     "test:watch": "yarn workspace @thirteen/game-logic test:watch",
-    "build": "yarn workspace @thirteen/game-logic build"
+    "preview": "yarn workspace @thirteen/client preview"
   }
 }

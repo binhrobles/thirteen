@@ -86,7 +86,7 @@ jobs:
         working-directory: backend
         run: |
           sam deploy \
-            --stack-name thirteen-prod \
+            --stack-name thirteen \
             --parameter-overrides Stage=prod \
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \

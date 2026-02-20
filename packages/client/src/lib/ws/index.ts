@@ -5,4 +5,4 @@ export {
   type GameStartedPayload,
   type GameUpdatedPayload,
   type GameOverPayload,
-} from "./client.js";
+} from "./client.svelte.js";

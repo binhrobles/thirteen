@@ -2,9 +2,13 @@
   import { navigate } from "../lib/stores/router.svelte.js";
   import { startLocalGame } from "../lib/stores/game.svelte.js";
 
-  function handlePlay() {
+  function handleLocalPlay() {
     startLocalGame();
     navigate("local-game");
+  }
+
+  function handleOnlinePlay() {
+    navigate("online-lobby");
   }
 </script>
 
@@ -13,8 +17,11 @@
   <p class="subtitle">Thirteen</p>
 
   <div class="menu-buttons">
-    <button class="btn btn-primary" onclick={handlePlay}>
+    <button class="btn btn-primary" onclick={handleLocalPlay}>
       Play vs Bots
+    </button>
+    <button class="btn btn-secondary" onclick={handleOnlinePlay}>
+      Play Online
     </button>
   </div>
 </div>
@@ -66,5 +73,14 @@
 
   .btn-primary:hover {
     background: #3dd84e;
+  }
+
+  .btn-secondary {
+    background: #555;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #666;
   }
 </style>

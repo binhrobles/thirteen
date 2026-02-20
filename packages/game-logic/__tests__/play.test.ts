@@ -167,14 +167,17 @@ describe("Play", () => {
   });
 
   describe("Play construction", () => {
-    it("sorts cards descending and sets value from highest card", () => {
+    it("sorts cards ascending and sets value from highest card", () => {
       const play = new Play(Combo.RUN, [
         c(Rank.THREE, Suit.SPADES),
         c(Rank.FIVE, Suit.CLUBS),
         c(Rank.FOUR, Suit.HEARTS),
       ]);
-      expect(play.cards[0].rank).toBe(Rank.FIVE);
-      expect(play.value).toBe(play.cards[0].value);
+      // Cards sorted ascending: 3, 4, 5
+      expect(play.cards[0].rank).toBe(Rank.THREE);
+      expect(play.cards[2].rank).toBe(Rank.FIVE);
+      // Value is highest card
+      expect(play.value).toBe(play.cards[2].value);
     });
   });
 

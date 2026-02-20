@@ -13,11 +13,12 @@
     addBot,
     kickBot,
     debugQuickStart,
+    debugReset,
   } from "../lib/stores/online.svelte.js";
   import { ConnectionState } from "../lib/ws/index.js";
 
   // Default to local SAM endpoint - change for production
-  const WS_URL = "wss://your-api-gateway-url.execute-api.region.amazonaws.com/Prod";
+  const WS_URL = "wss://6u47cryn67.execute-api.us-east-1.amazonaws.com/prod";
   const LOCAL_WS_URL = "ws://127.0.0.1:3001";
 
   let useLocalServer = $state(true);
@@ -199,7 +200,8 @@
 
         <!-- Debug actions -->
         <div class="debug-actions">
-          <button class="btn btn-small" onclick={handleQuickStart}>Quick Start (Debug)</button>
+          <button class="btn btn-small" onclick={handleQuickStart}>Quick Start</button>
+          <button class="btn btn-small btn-danger" onclick={debugReset}>Reset Tourney</button>
         </div>
       {:else}
         <p>Loading tournament...</p>
@@ -410,6 +412,9 @@
     margin-top: auto;
     padding-top: 2vh;
     border-top: 1px solid rgba(255,255,255,0.2);
+    display: flex;
+    gap: 2vw;
+    justify-content: center;
   }
 
   .btn {
@@ -448,6 +453,11 @@
     padding: 0.8vh 2vw;
     font-size: 1.8vh;
     background: #444;
+    color: white;
+  }
+
+  .btn-danger {
+    background: #a33;
     color: white;
   }
 

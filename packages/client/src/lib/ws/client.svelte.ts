@@ -5,7 +5,7 @@
  * Handles connection state, message routing, and reconnection logic.
  */
 
-import type { CardData } from "@thirteen/game-logic";
+import type { CardData, TourneyClientState } from "@thirteen/game-logic";
 
 // ── Connection State ──
 
@@ -56,7 +56,7 @@ export interface WsEventHandlers {
   onConnected?: () => void;
   onDisconnected?: () => void;
   onError?: (error: string) => void;
-  onTourneyUpdated?: (payload: Record<string, unknown>) => void;
+  onTourneyUpdated?: (payload: TourneyClientState) => void;
   onGameStarted?: (payload: GameStartedPayload) => void;
   onGameUpdated?: (payload: GameUpdatedPayload) => void;
   onGameOver?: (payload: GameOverPayload) => void;
@@ -385,7 +385,7 @@ class WebSocketClient {
         break;
 
       case "tourney/updated":
-        this.handlers.onTourneyUpdated?.(payload);
+        this.handlers.onTourneyUpdated?.(payload as unknown as TourneyClientState);
         break;
 
       case "game/started":

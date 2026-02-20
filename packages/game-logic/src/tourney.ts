@@ -23,6 +23,26 @@ export interface SeatData {
   botProfile?: string;
 }
 
+/** Seat state sent to clients (excludes sensitive fields like connectionId) */
+export interface SeatClientState {
+  position: number;
+  playerId: string | null;
+  playerName: string | null;
+  score: number;
+  gamesWon: number;
+  isReady: boolean;
+  isBot: boolean;
+}
+
+/** Tourney state sent to clients */
+export interface TourneyClientState {
+  status: TourneyStatus;
+  seats: SeatClientState[];
+  targetScore: number;
+  currentGameNumber: number;
+  readyCount: number;
+}
+
 export class Seat {
   position: number;
   playerId: string | null;
@@ -342,15 +362,16 @@ export class Tourney {
       .sort((a, b) => b.totalScore - a.totalScore);
   }
 
-  toClientState(): Record<string, unknown> {
+  toClientState(): TourneyClientState {
     return {
       status: this.status,
-      seats: this.seats.map((s) => ({
+      seats: this.seats.map((s): SeatClientState => ({
         position: s.position,
+        playerId: s.playerId,
         playerName: s.playerName,
         score: s.score,
         gamesWon: s.gamesWon,
-        ready: s.ready,
+        isReady: s.ready,
         isBot: s.isBot,
       })),
       targetScore: this.targetScore,

@@ -14,6 +14,7 @@
     kickBot,
     debugQuickStart,
     debugReset,
+    type SeatClientState,
   } from "../lib/stores/online.svelte.js";
   import { ConnectionState } from "../lib/ws/index.js";
 
@@ -51,7 +52,7 @@
     debugQuickStart(0);
   }
 
-  function getSeatDisplay(seat: { position: number; playerId: string | null; playerName: string | null; isBot: boolean; isReady: boolean; score: number } | undefined) {
+  function getSeatDisplay(seat: SeatClientState | undefined) {
     if (!seat) return { name: "Empty", status: "", canClaim: false, canKick: false, isYou: false };
 
     const isYou = seat.playerId === online.playerId;
@@ -73,16 +74,14 @@
     };
   }
 
-  function isInTourney(): boolean {
-    if (!online.tourney) return false;
-    return online.tourney.seats.some(s => s.playerId === online.playerId);
-  }
+  // Reactive derivations - these re-evaluate when online.tourney changes
+  const isInTourney = $derived(
+    online.tourney?.seats.some(s => s.playerId === online.playerId) ?? false
+  );
 
-  function isReady(): boolean {
-    if (!online.tourney) return false;
-    const seat = online.tourney.seats.find(s => s.playerId === online.playerId);
-    return seat?.isReady ?? false;
-  }
+  const isReady = $derived(
+    online.tourney?.seats.find(s => s.playerId === online.playerId)?.isReady ?? false
+  );
 
   // Navigate to game when it starts
   $effect(() => {
@@ -186,8 +185,8 @@
         </div>
 
         <div class="lobby-actions">
-          {#if isInTourney()}
-            {#if !isReady()}
+          {#if isInTourney}
+            {#if !isReady}
               <button class="btn btn-primary" onclick={readyUp}>Ready Up</button>
             {:else}
               <p class="waiting">Waiting for others...</p>

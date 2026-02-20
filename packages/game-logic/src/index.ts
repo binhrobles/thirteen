@@ -20,6 +20,8 @@ export {
   Seat,
   TourneyStatus,
   type SeatData,
+  type SeatClientState,
+  type TourneyClientState,
 } from "./tourney.js";
 export type {
   CardData,

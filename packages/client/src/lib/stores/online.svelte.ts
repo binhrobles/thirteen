@@ -4,7 +4,12 @@
  * Manages state for online multiplayer games via WebSocket.
  */
 
-import { Card, type CardData } from "@thirteen/game-logic";
+import {
+  Card,
+  type CardData,
+  type SeatClientState,
+  type TourneyClientState,
+} from "@thirteen/game-logic";
 import {
   wsClient,
   ConnectionState,
@@ -13,23 +18,8 @@ import {
   type GameOverPayload,
 } from "../ws/index.js";
 
-// ── Tourney Types ──
-
-export interface Seat {
-  position: number;
-  playerId: string | null;
-  playerName: string | null;
-  isBot: boolean;
-  isReady: boolean;
-  score: number;
-}
-
-export interface TourneyState {
-  status: "waiting" | "in_progress" | "complete";
-  seats: Seat[];
-  targetScore: number;
-  gamesPlayed: number;
-}
+// Re-export for components that need the types
+export type { SeatClientState, TourneyClientState };
 
 // ── Store ──
 
@@ -43,7 +33,7 @@ class OnlineStore {
   yourPosition = $state<number>(-1);
 
   // Tourney state
-  tourney = $state<TourneyState | null>(null);
+  tourney = $state<TourneyClientState | null>(null);
 
   // Game state
   inGame = $state<boolean>(false);
@@ -104,7 +94,7 @@ export function initOnline(): void {
     },
 
     onTourneyUpdated: (payload) => {
-      online.tourney = payload as unknown as TourneyState;
+      online.tourney = payload;
       online.statusMessage = "";
     },
 

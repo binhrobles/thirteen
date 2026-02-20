@@ -22,27 +22,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Godot
-        uses: chickensoft-games/setup-godot@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          version: 4.6.0
-          use-dotnet: false
-          include-templates: true
+          node-version: '20'
+          cache: 'yarn'
 
-      - name: Verify Godot Installation
-        run: |
-          godot --version
-          ls -la ~/.local/share/godot/export_templates/ || echo "Templates not found yet"
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
 
-      - name: Build for Web
-        run: |
-          mkdir -p build/web
-          godot --headless --export-release "Web" ./build/web/index.html
+      - name: Build
+        run: yarn build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './build/web'
+          path: './packages/client/dist'
 
   deploy:
     environment:

@@ -10,7 +10,7 @@ This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get sta
 
 A multiplayer Vietnamese card game (Tiến Lên / Thirteen) playable on mobile browsers. The MVP is single-game, 1 human vs 3 bots, with placeholder art.
 
-**Reference codebase:** https://github.com/binhrobles/thirteen (boardgame.io/JS implementation of the same game)
+**Reference codebase:** https://github.com/binhrobles/thirteen-2020 (boardgame.io/JS implementation of the same game)
 
 ### Game Rules (House Variant)
 

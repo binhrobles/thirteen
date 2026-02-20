@@ -15,6 +15,7 @@ class GameStore {
   stateVersion = $state(0);
   winOrder = $state<number[] | null>(null);
   statusMessage = $state<string>("");
+  isStatusError = $state<boolean>(false);
   botThinking = $state<boolean>(false);
   showRoundHistory = $state<boolean>(false);
 }
@@ -73,11 +74,13 @@ export function startLocalGame(): void {
     if (event.type === "game_over") {
       game.winOrder = event.winOrder;
       game.statusMessage = "Game over!";
+      game.isStatusError = false;
     }
   });
 
   game.gameState = gs;
   game.statusMessage = `Player ${gs.currentPlayer + 1}'s turn`;
+  game.isStatusError = false;
 
   if (gs.currentPlayer !== HUMAN_PLAYER) {
     runBotTurns();
@@ -94,6 +97,7 @@ export function playSelectedCards(): boolean {
   if (!result.valid) {
     console.log(`[game] You tried to play ${cards.map(String).join(" ")} -> INVALID: ${result.error}`);
     game.statusMessage = result.error;
+    game.isStatusError = true;
     return false;
   }
 
@@ -118,6 +122,7 @@ export function passTurn(): boolean {
   if (!passed) {
     console.log("[game] You tried to pass -> DENIED (you have power)");
     game.statusMessage = "You can't pass right now";
+    game.isStatusError = true;
     return false;
   }
 
@@ -146,6 +151,7 @@ async function runBotTurns(): Promise<void> {
   ) {
     const player = game.gameState.currentPlayer;
     game.statusMessage = `Player ${player + 1} is thinking...`;
+    game.isStatusError = false;
 
     await new Promise((r) => setTimeout(r, 800));
 
@@ -167,5 +173,6 @@ async function runBotTurns(): Promise<void> {
 
   if (game.gameState && !game.gameState.isGameOver()) {
     game.statusMessage = "Your turn";
+    game.isStatusError = false;
   }
 }

@@ -67,6 +67,7 @@ export function createLocalAdapter(): UnifiedGameContext {
       // UI state
       selectedCards: game.selectedCards,
       statusMessage: game.statusMessage,
+      isStatusError: game.isStatusError,
       isThinking: game.botThinking,
       showRoundHistory: game.showRoundHistory,
       playLog: gs?.playLog ?? [],

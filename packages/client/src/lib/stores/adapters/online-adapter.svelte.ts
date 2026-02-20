@@ -65,6 +65,7 @@ export function createOnlineAdapter(): UnifiedGameContext {
       // UI state
       selectedCards: online.selectedCards,
       statusMessage: online.statusMessage,
+      isStatusError: online.errorMessage !== "",
       isThinking: false, // Online doesn't show thinking state
       showRoundHistory: false, // Online doesn't support round history yet
       playLog: [], // Online doesn't track play log on client

@@ -21,6 +21,7 @@ export interface UnifiedGameState {
   // UI state
   selectedCards: Set<number>;
   statusMessage: string;
+  isStatusError: boolean;
   isThinking: boolean;
   showRoundHistory: boolean;
   playLog: PlayLogEntry[];

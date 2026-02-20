@@ -74,10 +74,10 @@ describe("GameState", () => {
     const gs = makeGame(hands);
     // Player 0 plays
     gs.playCards(0, [c(Rank.THREE, Suit.SPADES)]);
-    // Player 1 passes
-    expect(gs.currentPlayer).toBe(1);
-    gs.passTurn(1);
-    expect(gs.playersInRound[1]).toBe(false);
+    // Counter-clockwise: 0 → 3 → 2 → 1
+    expect(gs.currentPlayer).toBe(3);
+    gs.passTurn(3);
+    expect(gs.playersInRound[3]).toBe(false);
   });
 
   it("can't pass with power", () => {
@@ -105,10 +105,10 @@ describe("GameState", () => {
 
     // Player 0 plays 3♠
     gs.playCards(0, [c(Rank.THREE, Suit.SPADES)]);
-    // Players 1, 2, 3 all pass
-    gs.passTurn(1);
-    gs.passTurn(2);
+    // Counter-clockwise: players 3, 2, 1 all pass
     gs.passTurn(3);
+    gs.passTurn(2);
+    gs.passTurn(1);
 
     // Player 0 should have power again
     expect(gs.currentPlayer).toBe(0);
@@ -120,25 +120,27 @@ describe("GameState", () => {
 
   it("emits game_over when only 1 player remains", () => {
     // Give each player just one card so they win immediately
+    // Counter-clockwise order: 0 → 3 → 2 → 1, so cards increase in that order
     const hands: Card[][] = [
-      [c(Rank.THREE, Suit.SPADES)],
-      [c(Rank.FOUR, Suit.HEARTS)],
-      [c(Rank.FIVE, Suit.CLUBS)],
-      [c(Rank.SIX, Suit.DIAMONDS)],
+      [c(Rank.THREE, Suit.SPADES)],   // Player 0: 3♠ (starts)
+      [c(Rank.SIX, Suit.DIAMONDS)],   // Player 1: 6♦ (last, won't play)
+      [c(Rank.FIVE, Suit.CLUBS)],     // Player 2: 5♣
+      [c(Rank.FOUR, Suit.HEARTS)],    // Player 3: 4♥
     ];
     const gs = makeGame(hands);
     const events: GameEvent[] = [];
     gs.on((e) => events.push(e));
 
+    // Counter-clockwise order: 0 → 3 → 2 → 1
     // Player 0 plays and wins
     gs.playCards(0, [c(Rank.THREE, Suit.SPADES)]);
-    // Player 1 plays and wins (has power after round reset)
-    gs.playCards(1, [c(Rank.FOUR, Suit.HEARTS)]);
+    // Player 3 plays and wins
+    gs.playCards(3, [c(Rank.FOUR, Suit.HEARTS)]);
     // Player 2 plays and wins
     gs.playCards(2, [c(Rank.FIVE, Suit.CLUBS)]);
 
     expect(gs.isGameOver()).toBe(true);
-    expect(gs.winOrder).toEqual([0, 1, 2, 3]);
+    expect(gs.winOrder).toEqual([0, 3, 2, 1]);
 
     const gameOverEvents = events.filter((e) => e.type === "game_over");
     expect(gameOverEvents.length).toBe(1);

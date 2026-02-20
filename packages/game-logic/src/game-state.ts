@@ -173,7 +173,8 @@ export class GameState {
   private advanceTurn(): void {
     const start = this.currentPlayer;
     while (true) {
-      this.currentPlayer = (this.currentPlayer + 1) % NUM_PLAYERS;
+      // Counter-clockwise play order
+      this.currentPlayer = (this.currentPlayer + NUM_PLAYERS - 1) % NUM_PLAYERS;
       if (
         this.playersInGame[this.currentPlayer] &&
         this.playersInRound[this.currentPlayer]

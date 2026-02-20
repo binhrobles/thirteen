@@ -46,7 +46,7 @@ export class GameApp {
     humanPlayer: number,
   ): void {
     this.renderPlayerHand(state, selectedCards, humanPlayer);
-    this.renderPlayArea(state);
+    this.renderPlayArea(state, humanPlayer);
     this.renderOpponents(state, humanPlayer);
   }
 
@@ -55,6 +55,8 @@ export class GameApp {
     selectedCards: Set<number>,
     humanPlayer: number,
   ): void {
+    const hasPassed = !state.playersInRound[humanPlayer];
+
     this.playerHandContainer.removeChildren();
 
     const hand = state.getHand(humanPlayer);
@@ -62,9 +64,9 @@ export class GameApp {
     const screenH = this.app.screen.height;
     const cardW = getCardWidth(screenH);
     const cardH = getCardHeight(screenH);
-    const selectedLift = cardH * 0.2; // 20% of card height, matching Godot
+    const selectedLift = cardH * 0.2; // 20% of card height
 
-    // Scale cards to fit if hand is large — 5% margin on each side like Godot
+    // Scale cards to fit if hand is large — 5% margin on each side
     const maxHandWidth = screenW * 0.9;
     const overlap = Math.min(
       cardW * 0.7,
@@ -77,7 +79,7 @@ export class GameApp {
         ? overlap * (hand.length - 1) + cardW
         : 0;
     const startX = (screenW - totalWidth) / 2;
-    // Player hand at bottom — Godot places it around 82% of screen
+    // Player hand at bottom
     const baseY = screenH * 0.82;
 
     for (let i = 0; i < hand.length; i++) {
@@ -85,6 +87,11 @@ export class GameApp {
       const sprite = createCardSprite(card);
       sprite.width = cardW;
       sprite.height = cardH;
+
+      if (hasPassed) {
+        sprite.tint = 0x808080;
+      }
+
       sprite.x = startX + i * overlap;
       sprite.y = selectedCards.has(card.value)
         ? baseY - selectedLift
@@ -101,7 +108,7 @@ export class GameApp {
     this.playerHandContainer.sortableChildren = true;
   }
 
-  private renderPlayArea(state: GameState): void {
+  private renderPlayArea(state: GameState, humanPlayer: number): void {
     this.playAreaContainer.removeChildren();
 
     const screenW = this.app.screen.width;
@@ -111,6 +118,10 @@ export class GameApp {
     // Play area centered vertically between 25%-66% like Godot
     const centerY = screenH * 0.38;
     const labelFontSize = Math.round(screenH * 0.025); // 2.5% of viewport
+
+    const playerIsActive =
+      state.currentPlayer === humanPlayer &&
+      !state.isGameOver();
 
     if (state.lastPlay) {
       const cards = state.lastPlay.cards;
@@ -137,16 +148,7 @@ export class GameApp {
         sprite.eventMode = "none";
         this.playAreaContainer.addChild(sprite);
       }
-
-      // Combo label
-      const label = new Text({
-        text: Combo[state.lastPlay.combo],
-        style: { fontSize: labelFontSize, fill: 0xffffff, fontFamily: "monospace" },
-      });
-      label.x = screenW / 2 - label.width / 2;
-      label.y = centerY - labelFontSize * 1.5;
-      this.playAreaContainer.addChild(label);
-    } else {
+    } else if (playerIsActive) {
       // Power indicator
       const powerFontSize = Math.round(screenH * 0.03);
       const text = new Text({
@@ -185,44 +187,46 @@ export class GameApp {
       const pos = positions[i];
       const container = this.opponentContainers[i];
       const cardCount = state.getHand(playerId).length;
+
       const isActive =
         state.currentPlayer === playerId &&
         !state.isGameOver();
       const hasPassed = !state.playersInRound[playerId];
-      const hasWon = !state.playersInGame[playerId];
+      // const hasWon = !state.playersInGame[playerId];
+
+      let overlap;
+      if (cardCount > 6) {
+        overlap = opponentCardWidth * 0.2;
+      } else {
+        overlap = opponentCardWidth * 0.4;
+      };
 
       // Show small card backs for card count
-      if (!hasWon) {
-        let overlap;
+      for (let j = 0; j < cardCount; j++) {
+        const back = createCardBack();
+        back.width = opponentCardWidth;
+        back.height = opponentCardHeight;
+        back.anchor.set(0.5);
 
-        if (cardCount > 6) {
-          overlap = opponentCardWidth * 0.2;
-        } else {
-          overlap = opponentCardWidth * 0.4;
-        };
-
-        for (let j = 0; j < cardCount; j++) {
-          const back = createCardBack();
-          back.width = opponentCardWidth;
-          back.height = opponentCardHeight;
-          back.anchor.set(0.5);
-
-          if (pos.label === "left") {
-            back.x = pos.x;
-            back.y = pos.y + j * overlap;
-            back.rotation = Math.PI / 2;
-          } else if (pos.label === "top") {
-            const totalW = opponentCardWidth + overlap * (cardCount - 1);
-            back.x = pos.x - totalW / 2 + j * overlap + opponentCardWidth / 2;
-            back.y = pos.y;
-          } else {
-            back.x = pos.x;
-            back.y = pos.y + j * overlap;
-            back.rotation = -Math.PI / 2;
-          }
-
-          container.addChild(back);
+        if (hasPassed) {
+          back.tint = 0x808080;
         }
+
+        if (pos.label === "left") {
+          back.x = pos.x;
+          back.y = pos.y + j * overlap;
+          back.rotation = Math.PI / 2;
+        } else if (pos.label === "top") {
+          const totalW = opponentCardWidth + overlap * (cardCount - 1);
+          back.x = pos.x - totalW / 2 + j * overlap + opponentCardWidth / 2;
+          back.y = pos.y;
+        } else {
+          back.x = pos.x;
+          back.y = pos.y + j * overlap;
+          back.rotation = -Math.PI / 2;
+        }
+
+        container.addChild(back);
       }
     }
   }

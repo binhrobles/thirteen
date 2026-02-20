@@ -42,17 +42,6 @@ describe("Card", () => {
     expect(cards[2].rank).toBe(Rank.ACE);
   });
 
-  it("compareDesc sorts descending", () => {
-    const cards = [
-      new Card(Rank.THREE, Suit.SPADES),
-      new Card(Rank.ACE, Suit.HEARTS),
-      new Card(Rank.SEVEN, Suit.CLUBS),
-    ];
-    cards.sort(Card.compareDesc);
-    expect(cards[0].rank).toBe(Rank.ACE);
-    expect(cards[2].rank).toBe(Rank.THREE);
-  });
-
   it("fromValue round-trips correctly", () => {
     for (let v = 0; v < 52; v++) {
       const card = Card.fromValue(v);

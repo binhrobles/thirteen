@@ -3,7 +3,14 @@
   import type { PlayLogEntry } from "@thirteen/game-logic";
   import { getCardTexturePath } from "../lib/pixi/card-sprite.js";
 
-  const PLAYER_NAMES = ["You", "Player 2", "Player 3", "Player 4"];
+  // Bot names matching Opponents.svelte
+  const BOT_NAMES = ["Bot Alice", "Bot Bob", "Bot Carol"];
+
+  function getPlayerName(position: number): string {
+    if (position === HUMAN_PLAYER) return "You";
+    const botIndex = position > HUMAN_PLAYER ? position - 1 : position;
+    return BOT_NAMES[botIndex] ?? `Bot ${position}`;
+  }
 
   function getCurrentRoundPlays(): PlayLogEntry[] {
     if (!game.gameState) return [];
@@ -64,8 +71,16 @@
         {:else}
           {#each [...currentRoundPlays].reverse() as entry}
             {#if entry !== "round_reset"}
+              {@const playerName = getPlayerName(entry.player)}
               <div class="play-entry">
-                <span class="player-name">{PLAYER_NAMES[entry.player]}</span>
+                <div class="player-row">
+                  <img
+                    class="player-avatar"
+                    src={`https://api.dicebear.com/9.x/croodles/svg?seed=${encodeURIComponent(playerName)}`}
+                    alt={playerName}
+                  />
+                  <span class="player-name">{playerName}</span>
+                </div>
                 {#if entry.play === "pass"}
                   <span class="pass-label">PASS</span>
                 {:else}
@@ -135,6 +150,19 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  .player-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .player-avatar {
+    width: 5vh;
+    height: 5vh;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
   }
 
   .player-name {

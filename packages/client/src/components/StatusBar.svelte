@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { game } from "../lib/stores/game.svelte.js";
+  import { getGameContext } from "../lib/stores/game-context.svelte.js";
+
+  const ctx = getGameContext();
 </script>
 
 <div class="status-bar">
-  {game.statusMessage}
+  {ctx.state.statusMessage}
 </div>
 
 <style>

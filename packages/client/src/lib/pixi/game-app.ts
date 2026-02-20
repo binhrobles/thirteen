@@ -1,6 +1,6 @@
 import { Application, Container, Text, Graphics } from "pixi.js";
-import type { GameState } from "@thirteen/game-logic";
 import { Combo } from "@thirteen/game-logic";
+import type { GameStateView } from "../stores/types.js";
 import {
   createCardSprite,
   createCardBack,
@@ -133,7 +133,7 @@ export class GameApp {
   }
 
   updateFromState(
-    state: GameState,
+    state: GameStateView,
     selectedCards: Set<number>,
     humanPlayer: number,
   ): void {
@@ -143,7 +143,7 @@ export class GameApp {
   }
 
   private renderPlayerHand(
-    state: GameState,
+    state: GameStateView,
     selectedCards: Set<number>,
     humanPlayer: number,
   ): void {
@@ -238,7 +238,7 @@ export class GameApp {
     this.playerHandScrollArea.sortableChildren = true;
   }
 
-  private renderPlayArea(state: GameState, humanPlayer: number): void {
+  private renderPlayArea(state: GameStateView, humanPlayer: number): void {
     this.playAreaContainer.removeChildren();
 
     const screenW = this.app.screen.width;
@@ -300,7 +300,7 @@ export class GameApp {
     }
   }
 
-  private renderOpponents(state: GameState, humanPlayer: number): void {
+  private renderOpponents(state: GameStateView, humanPlayer: number): void {
     for (const c of this.opponentContainers) c.removeChildren();
 
     const screenW = this.app.screen.width;

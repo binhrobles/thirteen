@@ -1,53 +1,31 @@
 <script lang="ts">
-  import {
-    game,
-    playSelectedCards,
-    passTurn,
-    HUMAN_PLAYER,
-  } from "../lib/stores/game.svelte.js";
+  import { getGameContext } from "../lib/stores/game-context.svelte.js";
+
+  const ctx = getGameContext();
 
   let canPlay = $derived(
-    // stateVersion forces re-evaluation when GameState is mutated (class instances aren't deep-proxied)
-    game.stateVersion >= 0 &&
-    game.gameState !== null &&
-    !game.gameState.isGameOver() &&
-    game.gameState.currentPlayer === HUMAN_PLAYER &&
-    !game.botThinking
+    ctx.helpers.isYourTurn() && !ctx.state.isThinking
   );
 
   let canPass = $derived(
-    canPlay && game.gameState !== null && !game.gameState.hasPower()
+    ctx.helpers.canPass() && !ctx.state.isThinking
   );
 
-  let hasSelection = $derived(game.selectedCards.size > 0);
-
-  $effect(() => {
-    const gs = game.gameState;
-    console.log("[buttons]", {
-      canPlay,
-      canPass,
-      hasSelection,
-      currentPlayer: gs?.currentPlayer,
-      isHumanTurn: gs?.currentPlayer === HUMAN_PLAYER,
-      botThinking: game.botThinking,
-      isGameOver: gs?.isGameOver(),
-      hasPower: gs?.hasPower(),
-    });
-  });
+  let hasSelection = $derived(ctx.state.selectedCards.size > 0);
 </script>
 
 <div class="action-buttons">
   <button
     class="btn btn-pass"
     disabled={!canPass}
-    onclick={passTurn}
+    onclick={ctx.actions.pass}
   >
     Pass
   </button>
   <button
     class="btn btn-play"
     disabled={!canPlay || !hasSelection}
-    onclick={playSelectedCards}
+    onclick={ctx.actions.playCards}
   >
     Play
   </button>

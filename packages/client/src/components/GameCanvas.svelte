@@ -3,7 +3,9 @@
   import { Application } from "pixi.js";
   import { GameApp } from "../lib/pixi/game-app.js";
   import { preloadCardTextures } from "../lib/pixi/card-sprite.js";
-  import { game, toggleCard, toggleRoundHistory, HUMAN_PLAYER } from "../lib/stores/game.svelte.js";
+  import { getGameContext } from "../lib/stores/game-context.svelte.js";
+
+  const ctx = getGameContext();
 
   let canvasContainer: HTMLDivElement;
   let gameApp = $state<GameApp | null>(null);
@@ -36,8 +38,8 @@
       }
 
       const ga = new GameApp(app);
-      ga.onCardClick(toggleCard);
-      ga.onPlayAreaClick(toggleRoundHistory);
+      ga.onCardClick(ctx.actions.toggleCard);
+      ga.onPlayAreaClick(ctx.actions.toggleRoundHistory);
       gameApp = ga;
       loading = false;
     })();
@@ -50,10 +52,13 @@
   });
 
   $effect(() => {
-    // Read stateVersion to re-run when GameState is mutated (class instances aren't deep-proxied)
-    game.stateVersion;
-    if (gameApp && game.gameState) {
-      gameApp.updateFromState(game.gameState, game.selectedCards, HUMAN_PLAYER);
+    // Access state to trigger reactivity
+    const view = ctx.stateView;
+    const selected = ctx.state.selectedCards;
+    const yourPos = ctx.state.yourPosition;
+
+    if (gameApp && view.currentPlayer >= 0) {
+      gameApp.updateFromState(view, selected, yourPos);
     }
   });
 </script>

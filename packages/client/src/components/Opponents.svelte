@@ -1,31 +1,19 @@
 <script lang="ts">
-  import { game, HUMAN_PLAYER } from "../lib/stores/game.svelte.js";
+  import { getGameContext } from "../lib/stores/game-context.svelte.js";
 
-  // Default bot names for local play
-  const BOT_NAMES = ["Bot Alice", "Bot Bob", "Bot Carol"];
+  const ctx = getGameContext();
 
-  function getPlayerName(position: number): string {
-    if (position === HUMAN_PLAYER) return "You";
-    // Map position to bot index (skip human player)
-    const botIndex = position > HUMAN_PLAYER ? position - 1 : position;
-    return BOT_NAMES[botIndex] ?? `Bot ${position}`;
-  }
-
-  // Derive opponent data from game state, reading stateVersion to trigger updates
+  // Derive opponent data from unified state
   const opponents = $derived.by(() => {
-    // Read stateVersion to ensure reactivity when GameState mutates
-    game.stateVersion;
-    const gs = game.gameState;
-    if (!gs) return [];
-
+    const yourPos = ctx.state.yourPosition;
     return [0, 1, 2, 3]
-      .filter(pos => pos !== HUMAN_PLAYER)
-      .map(pos => ({
+      .filter((pos) => pos !== yourPos)
+      .map((pos) => ({
         position: pos,
-        name: getPlayerName(pos),
-        cardCount: gs.getHand(pos).length,
-        passed: !gs.playersInRound[pos],
-        current: gs.currentPlayer === pos,
+        name: ctx.helpers.getPlayerName(pos),
+        cardCount: ctx.state.handCounts[pos],
+        passed: ctx.state.passedPlayers[pos],
+        current: ctx.state.currentPlayer === pos,
       }));
   });
 </script>

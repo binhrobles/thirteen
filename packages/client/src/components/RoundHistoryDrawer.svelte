@@ -1,20 +1,14 @@
 <script lang="ts">
-  import { game, closeRoundHistory, HUMAN_PLAYER } from "../lib/stores/game.svelte.js";
+  import { getGameContext } from "../lib/stores/game-context.svelte.js";
   import type { PlayLogEntry } from "@thirteen/game-logic";
   import { getCardTexturePath } from "../lib/pixi/card-sprite.js";
 
-  // Bot names matching Opponents.svelte
-  const BOT_NAMES = ["Bot Alice", "Bot Bob", "Bot Carol"];
-
-  function getPlayerName(position: number): string {
-    if (position === HUMAN_PLAYER) return "You";
-    const botIndex = position > HUMAN_PLAYER ? position - 1 : position;
-    return BOT_NAMES[botIndex] ?? `Bot ${position}`;
-  }
+  const ctx = getGameContext();
 
   function getCurrentRoundPlays(): PlayLogEntry[] {
-    if (!game.gameState) return [];
-    const playLog = game.gameState.playLog;
+    const playLog = ctx.state.playLog;
+    if (!playLog || playLog.length === 0) return [];
+
     const roundPlays: PlayLogEntry[] = [];
 
     // Find the last round_reset marker
@@ -40,27 +34,25 @@
 
   function handleBackgroundClick(e: MouseEvent) {
     if (e.target === e.currentTarget) {
-      closeRoundHistory();
+      ctx.actions.closeRoundHistory();
     }
   }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
-      closeRoundHistory();
+      ctx.actions.closeRoundHistory();
     }
   }
 
   // Reactive derivation of current round plays
   let currentRoundPlays = $derived.by(() => {
-    // Access stateVersion to re-derive when game state changes
-    game.stateVersion;
     return getCurrentRoundPlays();
   });
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
 
-{#if game.showRoundHistory}
+{#if ctx.state.showRoundHistory}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="overlay" onclick={handleBackgroundClick}>
     <div class="drawer">
@@ -71,7 +63,7 @@
         {:else}
           {#each [...currentRoundPlays].reverse() as entry}
             {#if entry !== "round_reset"}
-              {@const playerName = getPlayerName(entry.player)}
+              {@const playerName = ctx.helpers.getPlayerName(entry.player)}
               <div class="play-entry">
                 <div class="player-row">
                   <img

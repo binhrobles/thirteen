@@ -25,7 +25,7 @@ await Promise.all(
     build({
       ...shared,
       entryPoints: [`src/${name}.ts`],
-      outfile: `dist/${name}/index.js`,
+      outfile: `dist/${name}/index.mjs`,
     }),
   ),
 );

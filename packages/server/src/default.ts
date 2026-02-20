@@ -392,6 +392,8 @@ async function finishMove(tourney: Tourney, game: GameState): Promise<void> {
     const [, tourneyComplete] = tourney.completeGame(game.winOrder);
     await saveTourney(tourney);
     await broadcastGameOver(tourney, game.winOrder, tourneyComplete);
+    // Send updated tourney state with new scores and reset ready status
+    await broadcastTourneyUpdate(tourney);
   } else {
     await saveTourney(tourney);
   }

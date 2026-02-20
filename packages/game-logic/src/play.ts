@@ -19,14 +19,11 @@ export class Play {
 
   constructor(combo: Combo, cards: Card[], suited = false) {
     this.combo = combo;
-    console.log('[Play] Input cards:', cards.map(c => `${c}(${c.value})`).join(', '));
     // Sort ascending so cards[0] is lowest
     this.cards = [...cards].sort(Card.compare);
-    console.log('[Play] After sort:', this.cards.map(c => `${c}(${c.value})`).join(', '));
     this.suited = suited;
     // Value is the highest card (for comparison)
     this.value = this.cards[this.cards.length - 1].value;
-    console.log('[Play] Value set to:', this.value);
   }
 
   toString(): string {

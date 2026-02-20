@@ -7,7 +7,7 @@ Description: >
 Globals:
   Function:
     Timeout: 30
-    Runtime: python3.11
+    Runtime: nodejs20.x
     MemorySize: 256
     Environment:
       Variables:
@@ -93,24 +93,13 @@ Resources:
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
 
-  # Lambda Layer: Shared code
-  SharedLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: !Sub 'thirteen-shared-${Stage}'
-      Description: Shared tournament logic and utilities
-      ContentUri: layers/shared/
-      CompatibleRuntimes:
-        - python3.11
-      RetentionPolicy: Retain
-
   # Lambda Function: $connect
   ConnectFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub 'thirteen-connect-${Stage}'
-      CodeUri: functions/connect/
-      Handler: app.handler
+      CodeUri: ../packages/server/dist/connect/
+      Handler: index.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionsTable
@@ -144,8 +133,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub 'thirteen-disconnect-${Stage}'
-      CodeUri: functions/disconnect/
-      Handler: app.handler
+      CodeUri: ../packages/server/dist/disconnect/
+      Handler: index.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionsTable
@@ -184,10 +173,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub 'thirteen-default-${Stage}'
-      CodeUri: functions/default/
-      Handler: app.handler
-      Layers:
-        - !Ref SharedLayer
+      CodeUri: ../packages/server/dist/default/
+      Handler: index.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionsTable

@@ -245,8 +245,8 @@ export class GameApp {
     const screenH = this.app.screen.height;
     const cardW = getCardWidth(screenH);
     const cardH = getCardHeight(screenH);
-    // Play area centered vertically between 25%-66% like Godot
-    const centerY = screenH * 0.38;
+    // Play area centered vertically
+    const centerY = screenH * 0.3;
     const labelFontSize = Math.round(screenH * 0.025); // 2.5% of viewport
 
     const playerIsActive =
@@ -282,21 +282,6 @@ export class GameApp {
         });
         this.playAreaContainer.addChild(sprite);
       }
-    } else if (playerIsActive) {
-      // Power indicator
-      const powerFontSize = Math.round(screenH * 0.03);
-      const text = new Text({
-        text: "Power!",
-        style: {
-          fontSize: powerFontSize,
-          fill: 0xffcc00,
-          fontFamily: "monospace",
-          fontWeight: "bold",
-        },
-      });
-      text.x = screenW / 2 - text.width / 2;
-      text.y = centerY + cardH / 2 - powerFontSize / 2;
-      this.playAreaContainer.addChild(text);
     }
   }
 

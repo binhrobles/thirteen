@@ -19,9 +19,11 @@
 </script>
 
 <div class="game">
-  <StatusBar />
   <Opponents />
-  <GameCanvas />
+  <div class="canvas-area">
+    <GameCanvas />
+    <StatusBar />
+  </div>
   <ActionButtons />
   <GameOverScreen />
   {#if mode === "local"}
@@ -35,5 +37,13 @@
     flex-direction: column;
     height: 100%;
     background: #1a5c2a;
+  }
+
+  .canvas-area {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 </style>

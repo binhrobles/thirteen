@@ -18,11 +18,8 @@
   } from "../lib/stores/online.svelte.js";
   import { ConnectionState } from "../lib/ws/index.js";
 
-  // Default to local SAM endpoint - change for production
   const WS_URL = "wss://6u47cryn67.execute-api.us-east-1.amazonaws.com/prod";
-  const LOCAL_WS_URL = "ws://127.0.0.1:3001";
 
-  let useLocalServer = $state(true);
   let nameInput = $state("Player");
 
   onMount(() => {
@@ -35,8 +32,7 @@
 
   function handleConnect() {
     setPlayerName(nameInput);
-    const url = useLocalServer ? LOCAL_WS_URL : WS_URL;
-    connectToServer(url);
+    connectToServer(WS_URL);
   }
 
   function handleDisconnect() {
@@ -115,13 +111,6 @@
           placeholder="Enter your name"
           maxlength="12"
         />
-      </div>
-
-      <div class="form-group checkbox-group">
-        <label>
-          <input type="checkbox" bind:checked={useLocalServer} />
-          Use local server (dev)
-        </label>
       </div>
 
       <button class="btn btn-primary" onclick={handleConnect}>
@@ -275,23 +264,6 @@
     border: none;
     border-radius: 0.5vh;
     text-align: center;
-  }
-
-  .checkbox-group {
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .checkbox-group label {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-  }
-
-  .form-group input[type="checkbox"] {
-    margin-right: 1vh;
-    width: 2vh;
-    height: 2vh;
   }
 
   .lobby-content {

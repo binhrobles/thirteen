@@ -4,10 +4,12 @@
   import ActionButtons from "../components/ActionButtons.svelte";
   import GameOverScreen from "../components/GameOverScreen.svelte";
   import RoundHistoryDrawer from "../components/RoundHistoryDrawer.svelte";
+  import Opponents from "../components/Opponents.svelte";
 </script>
 
 <div class="local-game">
   <StatusBar />
+  <Opponents />
   <GameCanvas />
   <ActionButtons />
   <GameOverScreen />

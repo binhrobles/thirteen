@@ -100,6 +100,12 @@
   {#if online.connectionState === ConnectionState.DISCONNECTED || online.connectionState === ConnectionState.ERROR}
     <!-- Connection Form -->
     <div class="connect-form">
+      <img
+        class="avatar"
+        src={`https://api.dicebear.com/9.x/croodles/svg?seed=${encodeURIComponent(nameInput || 'Player')}`}
+        alt="Your avatar"
+      />
+
       <div class="form-group">
         <label for="name">Your Name</label>
         <input
@@ -107,11 +113,11 @@
           type="text"
           bind:value={nameInput}
           placeholder="Enter your name"
-          maxlength="20"
+          maxlength="12"
         />
       </div>
 
-      <div class="form-group">
+      <div class="form-group checkbox-group">
         <label>
           <input type="checkbox" bind:checked={useLocalServer} />
           Use local server (dev)
@@ -147,11 +153,23 @@
           {#each online.tourney.seats as seat, i}
             {@const display = getSeatDisplay(seat)}
             <div class="seat" class:occupied={seat.playerId || seat.isBot} class:you={display.isYou}>
-              <div class="seat-number">Seat {i + 1}</div>
-              <div class="seat-name">{display.name}</div>
-              {#if display.status}
-                <div class="seat-status" class:ready={seat.isReady}>{display.status}</div>
-              {/if}
+              <div class="seat-header">
+                {#if seat.playerId || seat.isBot}
+                  <img
+                    class="seat-avatar"
+                    src={`https://api.dicebear.com/9.x/croodles/svg?seed=${encodeURIComponent(seat.playerName || 'Bot')}`}
+                    alt={seat.playerName || 'Player'}
+                  />
+                {:else}
+                  <div class="seat-avatar-placeholder"></div>
+                {/if}
+                <div class="seat-info">
+                  <div class="seat-name">{display.name}</div>
+                  {#if display.status}
+                    <div class="seat-status" class:ready={seat.isReady}>{display.status}</div>
+                  {/if}
+                </div>
+              </div>
               <div class="seat-score">Score: {seat.score}</div>
 
               <div class="seat-actions">
@@ -227,7 +245,14 @@
     flex-direction: column;
     align-items: center;
     gap: 2vh;
-    margin-top: 4vh;
+    margin-top: 2vh;
+  }
+
+  .avatar {
+    width: 20vh;
+    height: 20vh;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
   }
 
   .form-group {
@@ -248,10 +273,24 @@
     font-family: monospace;
     border: none;
     border-radius: 0.5vh;
+    text-align: center;
+  }
+
+  .checkbox-group {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .checkbox-group label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
   }
 
   .form-group input[type="checkbox"] {
     margin-right: 1vh;
+    width: 2vh;
+    height: 2vh;
   }
 
   .lobby-content {
@@ -287,7 +326,7 @@
   .seat {
     background: rgba(0, 0, 0, 0.2);
     border-radius: 1vh;
-    padding: 2vh;
+    padding: 1.5vh;
     display: flex;
     flex-direction: column;
     gap: 0.5vh;
@@ -301,18 +340,46 @@
     border: 2px solid #2ecc40;
   }
 
-  .seat-number {
-    font-size: 1.8vh;
-    color: #888;
+  .seat-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5vh;
+  }
+
+  .seat-avatar {
+    width: 8vh;
+    height: 8vh;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+  }
+
+  .seat-avatar-placeholder {
+    width: 8vh;
+    height: 8vh;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    flex-shrink: 0;
+  }
+
+  .seat-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3vh;
+    min-width: 0;
   }
 
   .seat-name {
-    font-size: 2.5vh;
+    font-size: 2.2vh;
     font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .seat-status {
-    font-size: 1.8vh;
+    font-size: 1.6vh;
     color: #ff851b;
   }
 
@@ -321,14 +388,14 @@
   }
 
   .seat-score {
-    font-size: 1.6vh;
+    font-size: 1.5vh;
     color: #aaa;
   }
 
   .seat-actions {
     display: flex;
     gap: 1vh;
-    margin-top: 1vh;
+    margin-top: 0.5vh;
   }
 
   .lobby-actions {

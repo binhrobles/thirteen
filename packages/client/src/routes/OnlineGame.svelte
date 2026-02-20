@@ -44,16 +44,24 @@
   <div class="opponents">
     {#each [0, 1, 2, 3] as pos}
       {#if pos !== online.yourPosition}
+        {@const playerName = online.tourney?.seats[pos]?.playerName ?? `Player ${pos + 1}`}
         <div
           class="opponent"
           class:current={online.currentPlayer === pos}
           class:passed={online.passedPlayers[pos]}
         >
-          <div class="opponent-name">{getPlayerName(pos)}</div>
-          <div class="opponent-cards">{online.handCounts[pos]} cards</div>
-          {#if online.passedPlayers[pos]}
-            <div class="opponent-status">Passed</div>
-          {/if}
+          <img
+            class="opponent-avatar"
+            src={`https://api.dicebear.com/9.x/croodles/svg?seed=${encodeURIComponent(playerName)}`}
+            alt={playerName}
+          />
+          <div class="opponent-info">
+            <div class="opponent-name">{getPlayerName(pos)}</div>
+            <div class="opponent-cards">{online.handCounts[pos]} cards</div>
+            {#if online.passedPlayers[pos]}
+              <div class="opponent-status">Passed</div>
+            {/if}
+          </div>
         </div>
       {/if}
     {/each}
@@ -177,9 +185,22 @@
 
   .opponent {
     background: rgba(0, 0, 0, 0.3);
-    padding: 1vh 3vw;
+    padding: 1vh 2vw;
     border-radius: 1vh;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 1.5vw;
+  }
+
+  .opponent-avatar {
+    width: 6vh;
+    height: 6vh;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .opponent-info {
+    text-align: left;
   }
 
   .opponent.current {

@@ -21,6 +21,16 @@ import {
 // Re-export for components that need the types
 export type { SeatClientState, TourneyClientState };
 
+// ── Constants ──
+
+const EVENT_RENDER_DELAY_MS = 800;
+
+// ── Helpers ──
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // ── Store ──
 
 class OnlineStore {
@@ -58,9 +68,93 @@ class OnlineStore {
   // UI state
   statusMessage = $state<string>("");
   errorMessage = $state<string>("");
+
+  // Event queue for delayed rendering
+  private updateQueue: GameUpdatedPayload[] = [];
+  private isProcessingQueue = false;
+  private lastOwnActionTime = 0;
+  private lastUpdateTime = 0;
+  private readonly OWN_ACTION_WINDOW_MS = 200;
+
+  /**
+   * Mark that we just took an action - the next update should render immediately
+   */
+  markOwnAction(): void {
+    this.lastOwnActionTime = Date.now();
+  }
+
+  /**
+   * Queue a game update for delayed rendering
+   */
+  queueGameUpdate(payload: GameUpdatedPayload): void {
+    this.updateQueue.push(payload);
+    this.processQueue();
+  }
+
+  /**
+   * Process queued updates with delays between them.
+   * Ensures minimum 800ms gap between bot moves for visual clarity.
+   */
+  private async processQueue(): Promise<void> {
+    if (this.isProcessingQueue) return;
+    this.isProcessingQueue = true;
+
+    while (this.updateQueue.length > 0) {
+      const payload = this.updateQueue.shift()!;
+      const isOwnAction = Date.now() - this.lastOwnActionTime < this.OWN_ACTION_WINDOW_MS;
+
+      // Ensure minimum delay since last update (unless own action)
+      if (!isOwnAction && this.lastUpdateTime > 0) {
+        const elapsed = Date.now() - this.lastUpdateTime;
+        const waitTime = Math.max(0, EVENT_RENDER_DELAY_MS - elapsed);
+        if (waitTime > 0) {
+          await sleep(waitTime);
+        }
+      }
+
+      applyGameUpdate(payload);
+      this.lastUpdateTime = Date.now();
+    }
+
+    this.isProcessingQueue = false;
+  }
 }
 
 export const online = new OnlineStore();
+
+// ── Game Update Application ──
+
+/**
+ * Apply a game update to the store (called from queue processor)
+ */
+function applyGameUpdate(payload: GameUpdatedPayload): void {
+  online.yourHand = payload.yourHand.map((c) => Card.fromValue(c.value));
+  online.currentPlayer = payload.currentPlayer;
+  online.passedPlayers = payload.passedPlayers;
+  online.handCounts = payload.handCounts;
+
+  if (payload.lastPlay) {
+    online.lastPlay = {
+      combo: payload.lastPlay.combo,
+      cards: payload.lastPlay.cards.map((c) => Card.fromValue(c.value)),
+      suited: payload.lastPlay.suited,
+    };
+  } else {
+    online.lastPlay = null;
+  }
+
+  // Remove any selected cards that are no longer in hand
+  const handValues = new Set(online.yourHand.map((c) => c.value));
+  const newSelected = new Set<number>();
+  for (const v of online.selectedCards) {
+    if (handValues.has(v)) newSelected.add(v);
+  }
+  online.selectedCards = newSelected;
+
+  online.statusMessage = payload.currentPlayer === online.yourPosition
+    ? "Your turn!"
+    : `Player ${payload.currentPlayer + 1}'s turn`;
+}
 
 // ── Initialization ──
 
@@ -114,32 +208,8 @@ export function initOnline(): void {
     },
 
     onGameUpdated: (payload: GameUpdatedPayload) => {
-      online.yourHand = payload.yourHand.map((c) => Card.fromValue(c.value));
-      online.currentPlayer = payload.currentPlayer;
-      online.passedPlayers = payload.passedPlayers;
-      online.handCounts = payload.handCounts;
-
-      if (payload.lastPlay) {
-        online.lastPlay = {
-          combo: payload.lastPlay.combo,
-          cards: payload.lastPlay.cards.map((c) => Card.fromValue(c.value)),
-          suited: payload.lastPlay.suited,
-        };
-      } else {
-        online.lastPlay = null;
-      }
-
-      // Remove any selected cards that are no longer in hand
-      const handValues = new Set(online.yourHand.map((c) => c.value));
-      const newSelected = new Set<number>();
-      for (const v of online.selectedCards) {
-        if (handValues.has(v)) newSelected.add(v);
-      }
-      online.selectedCards = newSelected;
-
-      online.statusMessage = payload.currentPlayer === online.yourPosition
-        ? "Your turn!"
-        : `Player ${payload.currentPlayer + 1}'s turn`;
+      // Queue updates for delayed rendering (bots play fast, we slow it down)
+      online.queueGameUpdate(payload);
     },
 
     onGameOver: (payload: GameOverPayload) => {
@@ -227,11 +297,13 @@ export function playSelectedCards(): void {
     value: c.value,
   }));
 
+  online.markOwnAction();
   wsClient.playCards(cardData);
   clearSelection();
 }
 
 export function passTurn(): void {
+  online.markOwnAction();
   wsClient.passTurn();
 }
 

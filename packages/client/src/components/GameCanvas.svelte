@@ -18,6 +18,8 @@
         background: 0x1a5c2a,
         resizeTo: canvasContainer,
         antialias: true,
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true,
       });
 
       if (destroyed) {

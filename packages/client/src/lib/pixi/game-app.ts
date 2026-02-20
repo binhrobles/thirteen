@@ -169,16 +169,15 @@ export class GameApp {
 
     const screenW = this.app.screen.width;
     const screenH = this.app.screen.height;
-    const opW = getOpponentCardWidth(screenH);
-    const opH = getOpponentCardHeight(screenH);
+    const opponentCardWidth = getOpponentCardWidth(screenH);
+    const opponentCardHeight = getOpponentCardHeight(screenH);
     const fontSize = Math.round(screenH * 0.02); // 2% of viewport
-    const labelGap = fontSize * 1.4;
 
     // Positions matching Godot anchors: left 25%-45%, top ~0%, right 25%-45%
     const positions = [
-      { x: screenW * 0.05, y: screenH * 0.3, label: "left" },
-      { x: screenW / 2, y: screenH * 0.02, label: "top" },
-      { x: screenW * 0.95, y: screenH * 0.3, label: "right" },
+      { x: 0, y: screenH * 0.3, label: "left" },
+      { x: screenW / 2, y: 0, label: "top" },
+      { x: screenW, y: screenH * 0.3, label: "right" },
     ];
 
     for (let i = 0; i < 3; i++) {
@@ -192,56 +191,34 @@ export class GameApp {
       const hasPassed = !state.playersInRound[playerId];
       const hasWon = !state.playersInGame[playerId];
 
-      let statusText = `P${playerId + 1}: ${cardCount} cards`;
-      if (hasWon) statusText = `P${playerId + 1}: Won!`;
-      else if (hasPassed) statusText = `P${playerId + 1}: Passed`;
-
-      const text = new Text({
-        text: statusText,
-        style: {
-          fontSize,
-          fill: isActive ? 0xffcc00 : hasWon ? 0x44ff44 : hasPassed ? 0x888888 : 0xffffff,
-          fontFamily: "monospace",
-          fontWeight: isActive ? "bold" : "normal",
-        },
-      });
-
-      if (pos.label === "left") {
-        text.x = pos.x;
-        text.y = pos.y;
-      } else if (pos.label === "top") {
-        text.x = pos.x - text.width / 2;
-        text.y = pos.y;
-      } else {
-        text.x = pos.x - text.width;
-        text.y = pos.y;
-      }
-
-      container.addChild(text);
-
       // Show small card backs for card count
       if (!hasWon) {
-        const smallW = opW * 0.5;
-        const smallH = opH * 0.5;
-        const smallOverlap = smallW * 0.4;
-        const maxShow = Math.min(cardCount, 8);
+        let overlap;
 
-        for (let j = 0; j < maxShow; j++) {
+        if (cardCount > 6) {
+          overlap = opponentCardWidth * 0.2;
+        } else {
+          overlap = opponentCardWidth * 0.4;
+        };
+
+        for (let j = 0; j < cardCount; j++) {
           const back = createCardBack();
-          back.width = smallW;
-          back.height = smallH;
+          back.width = opponentCardWidth;
+          back.height = opponentCardHeight;
+          back.anchor.set(0.5);
 
           if (pos.label === "left") {
-            back.x = pos.x + j * smallOverlap;
-            back.y = pos.y + labelGap;
+            back.x = pos.x;
+            back.y = pos.y + j * overlap;
+            back.rotation = Math.PI / 2;
           } else if (pos.label === "top") {
-            const totalW = smallOverlap * (maxShow - 1) + smallW;
-            back.x = pos.x - totalW / 2 + j * smallOverlap;
-            back.y = pos.y + labelGap;
+            const totalW = opponentCardWidth + overlap * (cardCount - 1);
+            back.x = pos.x - totalW / 2 + j * overlap + opponentCardWidth / 2;
+            back.y = pos.y;
           } else {
-            const totalW = smallOverlap * (maxShow - 1) + smallW;
-            back.x = pos.x - totalW + j * smallOverlap;
-            back.y = pos.y + labelGap;
+            back.x = pos.x;
+            back.y = pos.y + j * overlap;
+            back.rotation = -Math.PI / 2;
           }
 
           container.addChild(back);

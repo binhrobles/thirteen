@@ -47,7 +47,7 @@ export async function preloadCardTextures(): Promise<void> {
 const BASE_HEIGHT_PERCENT = 0.18;
 const ASPECT_RATIO = 0.667; // width/height (2:3)
 
-/** Opponent card dimensions (matching Godot's 12%) */
+/** Opponent card dimensions */
 const OPPONENT_HEIGHT_PERCENT = 0.12;
 
 export function getCardHeight(screenH: number): number {

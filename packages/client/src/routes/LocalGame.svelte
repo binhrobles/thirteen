@@ -3,6 +3,7 @@
   import StatusBar from "../components/StatusBar.svelte";
   import ActionButtons from "../components/ActionButtons.svelte";
   import GameOverScreen from "../components/GameOverScreen.svelte";
+  import RoundHistoryDrawer from "../components/RoundHistoryDrawer.svelte";
 </script>
 
 <div class="local-game">
@@ -10,6 +11,7 @@
   <GameCanvas />
   <ActionButtons />
   <GameOverScreen />
+  <RoundHistoryDrawer />
 </div>
 
 <style>

@@ -1,4 +1,4 @@
-import { Application, Container, Text } from "pixi.js";
+import { Application, Container, Text, Graphics } from "pixi.js";
 import type { GameState } from "@thirteen/game-logic";
 import { Combo } from "@thirteen/game-logic";
 import {
@@ -14,14 +14,38 @@ export class GameApp {
   app: Application;
   /** Containers */
   playerHandContainer: Container;
+  playerHandScrollArea: Container; // Inner container that moves for scrolling
   playAreaContainer: Container;
   opponentContainers: Container[];
   private cardClickHandler: ((cardValue: number) => void) | null = null;
+  private playAreaClickHandler: (() => void) | null = null;
+
+  // Scrolling state
+  private scrollX = 0;
+  private isDragging = false;
+  private dragStartX = 0;
+  private scrollStartX = 0;
+  private maxScrollX = 0;
+  private handAreaWidth = 0;
+  private totalHandWidth = 0;
+  private handMask: Graphics | null = null;
+  private dragDistance = 0;
+  private static readonly DRAG_THRESHOLD = 10; // pixels before considering it a drag
+
+  /** Detect if we're likely on a mobile device */
+  private isMobile(): boolean {
+    // Check for touch capability and small screen
+    const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    const smallScreen = window.innerWidth < 768;
+    return hasTouch && smallScreen;
+  }
 
   constructor(app: Application) {
     this.app = app;
 
     this.playerHandContainer = new Container();
+    this.playerHandScrollArea = new Container();
+    this.playerHandContainer.addChild(this.playerHandScrollArea);
     this.playAreaContainer = new Container();
     this.opponentContainers = [
       new Container(), // player 1 (left)
@@ -34,10 +58,78 @@ export class GameApp {
     for (const c of this.opponentContainers) {
       app.stage.addChild(c);
     }
+
+    this.setupScrollHandling();
+  }
+
+  private setupScrollHandling(): void {
+    // Make stage interactive for scroll handling
+    this.app.stage.eventMode = "static";
+    this.app.stage.hitArea = this.app.screen;
+
+    this.app.stage.on("pointerdown", (e) => {
+      const screenH = this.app.screen.height;
+      const handY = screenH * 0.82;
+      // Only start drag if in hand area
+      if (e.global.y >= handY - getCardHeight(screenH) * 0.2) {
+        this.isDragging = true;
+        this.dragStartX = e.global.x;
+        this.scrollStartX = this.scrollX;
+        this.dragDistance = 0;
+      }
+    });
+
+    this.app.stage.on("pointermove", (e) => {
+      if (!this.isDragging) return;
+      const dx = e.global.x - this.dragStartX;
+      this.dragDistance = Math.abs(dx);
+      this.scrollX = Math.max(
+        -this.maxScrollX,
+        Math.min(0, this.scrollStartX + dx),
+      );
+      this.playerHandScrollArea.x = this.scrollX;
+    });
+
+    this.app.stage.on("pointerup", () => {
+      this.isDragging = false;
+    });
+
+    this.app.stage.on("pointerupoutside", () => {
+      this.isDragging = false;
+    });
+
+    // Mouse wheel / trackpad scrolling
+    this.app.canvas.addEventListener("wheel", (e) => {
+      const screenH = this.app.screen.height;
+      const handY = screenH * 0.82;
+      const canvasRect = this.app.canvas.getBoundingClientRect();
+      const mouseY = e.clientY - canvasRect.top;
+
+      // Only scroll if mouse is in hand area
+      if (mouseY >= handY - getCardHeight(screenH) * 0.2) {
+        e.preventDefault();
+        // Use deltaX for horizontal scroll, fall back to deltaY for vertical scroll wheels
+        const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+        this.scrollX = Math.max(
+          -this.maxScrollX,
+          Math.min(0, this.scrollX - delta),
+        );
+        this.playerHandScrollArea.x = this.scrollX;
+      }
+    }, { passive: false });
+  }
+
+  /** Check if the last interaction was a drag (vs a tap) */
+  private wasDrag(): boolean {
+    return this.dragDistance > GameApp.DRAG_THRESHOLD;
   }
 
   onCardClick(handler: (cardValue: number) => void): void {
     this.cardClickHandler = handler;
+  }
+
+  onPlayAreaClick(handler: () => void): void {
+    this.playAreaClickHandler = handler;
   }
 
   updateFromState(
@@ -57,7 +149,8 @@ export class GameApp {
   ): void {
     const hasPassed = !state.playersInRound[humanPlayer];
 
-    this.playerHandContainer.removeChildren();
+    // Clear scroll area but keep it in the container
+    this.playerHandScrollArea.removeChildren();
 
     const hand = state.getHand(humanPlayer);
     const screenW = this.app.screen.width;
@@ -65,22 +158,58 @@ export class GameApp {
     const cardW = getCardWidth(screenH);
     const cardH = getCardHeight(screenH);
     const selectedLift = cardH * 0.2; // 20% of card height
+    const sidePadding = screenW * 0.05; // 5% padding on sides
 
-    // Scale cards to fit if hand is large — 5% margin on each side
-    const maxHandWidth = screenW * 0.9;
-    const overlap = Math.min(
-      cardW * 0.7,
-      hand.length > 1
-        ? (maxHandWidth - cardW) / (hand.length - 1)
-        : cardW,
-    );
-    const totalWidth =
-      hand.length > 0
-        ? overlap * (hand.length - 1) + cardW
-        : 0;
-    const startX = (screenW - totalWidth) / 2;
     // Player hand at bottom
     const baseY = screenH * 0.82;
+
+    let cardSpacing: number;
+    let startX: number;
+
+    if (this.isMobile()) {
+      // Mobile: No overlap, full cards with margin, scrollable carousel
+      const cardMargin = cardW * 0.15;
+      cardSpacing = cardW + cardMargin;
+      this.totalHandWidth =
+        hand.length > 0 ? sidePadding * 2 + hand.length * cardW + (hand.length - 1) * cardMargin : 0;
+      this.handAreaWidth = screenW;
+      this.maxScrollX = Math.max(0, this.totalHandWidth - this.handAreaWidth);
+      this.scrollX = Math.max(-this.maxScrollX, Math.min(0, this.scrollX));
+      this.playerHandScrollArea.x = this.scrollX;
+      startX = sidePadding;
+
+      // Create or update mask for clipping
+      if (this.handMask) {
+        this.handMask.clear();
+      } else {
+        this.handMask = new Graphics();
+        this.playerHandContainer.addChild(this.handMask);
+      }
+      this.handMask.rect(0, baseY - selectedLift - 5, screenW, cardH + selectedLift + 10);
+      this.handMask.fill(0xffffff);
+      this.playerHandContainer.mask = this.handMask;
+    } else {
+      // Desktop: Overlap cards to fit on screen, centered
+      const maxHandWidth = screenW * 0.9;
+      const overlap = Math.min(
+        cardW * 0.7,
+        hand.length > 1 ? (maxHandWidth - cardW) / (hand.length - 1) : cardW,
+      );
+      cardSpacing = overlap;
+      const totalWidth = hand.length > 0 ? overlap * (hand.length - 1) + cardW : 0;
+      startX = (screenW - totalWidth) / 2;
+
+      // No scrolling needed on desktop
+      this.maxScrollX = 0;
+      this.scrollX = 0;
+      this.playerHandScrollArea.x = 0;
+
+      // Remove mask on desktop
+      this.playerHandContainer.mask = null;
+      if (this.handMask) {
+        this.handMask.clear();
+      }
+    }
 
     for (let i = 0; i < hand.length; i++) {
       const card = hand[i];
@@ -92,20 +221,21 @@ export class GameApp {
         sprite.tint = 0x808080;
       }
 
-      sprite.x = startX + i * overlap;
-      sprite.y = selectedCards.has(card.value)
-        ? baseY - selectedLift
-        : baseY;
+      sprite.x = startX + i * cardSpacing;
+      sprite.y = selectedCards.has(card.value) ? baseY - selectedLift : baseY;
       sprite.zIndex = i;
 
-      sprite.on("pointerdown", () => {
-        this.cardClickHandler?.(card.value);
+      // Only trigger click if it wasn't a drag
+      sprite.on("pointerup", () => {
+        if (!this.wasDrag()) {
+          this.cardClickHandler?.(card.value);
+        }
       });
 
-      this.playerHandContainer.addChild(sprite);
+      this.playerHandScrollArea.addChild(sprite);
     }
 
-    this.playerHandContainer.sortableChildren = true;
+    this.playerHandScrollArea.sortableChildren = true;
   }
 
   private renderPlayArea(state: GameState, humanPlayer: number): void {
@@ -145,7 +275,11 @@ export class GameApp {
         sprite.height = cardH;
         sprite.x = startX + i * overlap;
         sprite.y = centerY;
-        sprite.eventMode = "none";
+        sprite.eventMode = "static";
+        sprite.cursor = "pointer";
+        sprite.on("pointerup", () => {
+          this.playAreaClickHandler?.();
+        });
         this.playAreaContainer.addChild(sprite);
       }
     } else if (playerIsActive) {

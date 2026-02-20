@@ -16,6 +16,7 @@ class GameStore {
   winOrder = $state<number[] | null>(null);
   statusMessage = $state<string>("");
   botThinking = $state<boolean>(false);
+  showRoundHistory = $state<boolean>(false);
 }
 
 export const game = new GameStore();
@@ -29,6 +30,14 @@ export function toggleCard(cardValue: number): void {
 
 export function clearSelection(): void {
   game.selectedCards = new Set();
+}
+
+export function toggleRoundHistory(): void {
+  game.showRoundHistory = !game.showRoundHistory;
+}
+
+export function closeRoundHistory(): void {
+  game.showRoundHistory = false;
 }
 
 export function startLocalGame(): void {

@@ -3,7 +3,7 @@
   import { Application } from "pixi.js";
   import { GameApp } from "../lib/pixi/game-app.js";
   import { preloadCardTextures } from "../lib/pixi/card-sprite.js";
-  import { game, toggleCard, HUMAN_PLAYER } from "../lib/stores/game.svelte.js";
+  import { game, toggleCard, toggleRoundHistory, HUMAN_PLAYER } from "../lib/stores/game.svelte.js";
 
   let canvasContainer: HTMLDivElement;
   let gameApp = $state<GameApp | null>(null);
@@ -37,6 +37,7 @@
 
       const ga = new GameApp(app);
       ga.onCardClick(toggleCard);
+      ga.onPlayAreaClick(toggleRoundHistory);
       gameApp = ga;
       loading = false;
     })();

@@ -128,6 +128,9 @@ export function createLocalAdapter(): UnifiedGameContext {
     startNewGame: () => {
       startLocalGame();
     },
+    readyUp: () => {
+      // No-op for local mode - no tournament readying
+    },
   };
 
   const helpers: GameHelpers = {

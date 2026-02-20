@@ -12,6 +12,7 @@ import {
   clearSelection as onlineClearSelection,
   playSelectedCards,
   passTurn,
+  readyUp as onlineReadyUp,
   isYourTurn as onlineIsYourTurn,
   hasPower as onlineHasPower,
   canPass as onlineCanPass,
@@ -48,6 +49,8 @@ export function createOnlineAdapter(): UnifiedGameContext {
             position: s.position,
             playerName: s.playerName,
             isBot: s.isBot,
+            score: s.score,
+            isReady: s.isReady,
           })) ?? [],
       };
     }
@@ -133,6 +136,9 @@ export function createOnlineAdapter(): UnifiedGameContext {
       online.inGame = false;
       online.gameOver = false;
       navigate("online-lobby");
+    },
+    readyUp: () => {
+      onlineReadyUp();
     },
   };
 

@@ -45,6 +45,8 @@ export interface TourneySeat {
   position: number;
   playerName: string | null;
   isBot: boolean;
+  score: number;
+  isReady: boolean;
 }
 
 // ── Game Actions ──
@@ -57,6 +59,7 @@ export interface GameActions {
   toggleRoundHistory(): void;
   closeRoundHistory(): void;
   startNewGame(): void;
+  readyUp(): void;
 }
 
 // ── Game Helpers ──

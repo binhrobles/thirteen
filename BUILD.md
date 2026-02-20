@@ -1,74 +1,82 @@
 # Building Thirteen Vibes
 
-## Web (HTML5) Export
+## Prerequisites
 
-### Prerequisites
+- Node.js 20+
+- yarn (`npm install -g yarn`)
+- AWS CLI + SAM CLI (for backend deployment)
 
-1. **Godot 4.6 installed** (already present at `/Applications/Godot.app`)
-2. **Export templates** - Download Godot 4.6 export templates:
-   - Open Godot Editor
-   - Go to **Editor → Manage Export Templates**
-   - Click **Download and Install**
-   - This downloads templates to: `~/Library/Application Support/Godot/export_templates/4.6.stable/`
-
-### Build for Web
+## Client (Svelte + PixiJS)
 
 ```bash
-# Export to HTML5 (after templates are installed)
-/Applications/Godot.app/Contents/MacOS/Godot --headless --export-release "Web" ./build/web/index.html
+# Install dependencies
+yarn install
 
-# Or export debug build
-/Applications/Godot.app/Contents/MacOS/Godot --headless --export-debug "Web" ./build/web/index.html
+# Development server (localhost:5173)
+yarn workspace @thirteen/client dev
+
+# Build for production
+yarn workspace @thirteen/client build
+
+# Preview production build
+yarn workspace @thirteen/client preview
 ```
 
-### Test Locally
+Built files go to `packages/client/dist/`.
+
+## Game Logic
 
 ```bash
-# Start a local web server
-cd build/web
-python3 -m http.server 8000
+# Run tests
+yarn workspace @thirteen/game-logic test
 
-# Open in browser (mobile simulation)
-# Desktop: http://localhost:8000
-# Mobile: http://<your-ip>:8000
+# Build (transpile TypeScript)
+yarn workspace @thirteen/game-logic build
 ```
 
-**Mobile Testing:**
+## Server (AWS Lambda)
+
+```bash
+# Build Lambda handlers
+yarn workspace @thirteen/server build
+
+# Local testing with SAM
+cd backend
+sam build
+sam local start-api
+
+# Deploy to AWS
+sam deploy --guided  # First time
+sam deploy           # Subsequent deploys
+```
+
+## CI/CD
+
+GitHub Actions automatically:
+1. Builds and deploys client to GitHub Pages on push to main
+2. Deploys backend via SAM on push to main
+
+See `.github/workflows/` for workflow definitions.
+
+## Testing Locally
+
+### Client
+```bash
+yarn workspace @thirteen/client dev
+# Open http://localhost:5173 in browser
+```
+
+### Backend (with SAM)
+```bash
+cd backend
+sam build && sam local start-api
+# Use wscat to test WebSocket: wscat -c ws://localhost:3001
+```
+
+## Mobile Testing
+
 - Use Chrome DevTools Device Emulator for quick testing
 - For real device testing:
   - Find your local IP: `ifconfig | grep "inet " | grep -v 127.0.0.1`
-  - Ensure phone is on same WiFi network
-  - Navigate to `http://<your-ip>:8000` on mobile browser
-
-### Export Settings
-
-Configured in `export_presets.cfg`:
-- **Platform:** Web (HTML5)
-- **Canvas resize policy:** Adaptive (fits mobile screens)
-- **Orientation:** Portrait (locked for mobile)
-- **VRAM compression:** Desktop (better quality for web)
-
-### Deployment
-
-For production deployment:
-1. Upload `build/web/` contents to web server or hosting service
-2. Ensure server serves with correct MIME types:
-   - `.wasm` → `application/wasm`
-   - `.pck` → `application/octet-stream`
-3. Enable HTTPS for best mobile compatibility
-4. Consider enabling PWA for installable experience
-
-### Common Issues
-
-**SharedArrayBuffer not available:**
-- Web export uses `web_nothreads` template (no threading)
-- If you need threading, enable COOP/COEP headers on your server
-
-**Touch not working:**
-- Godot automatically handles touch as mouse events
-- Test on actual mobile device, not just emulator
-
-**Performance issues:**
-- Use mobile renderer (already configured in project.godot)
-- Profile with Chrome DevTools on mobile
-- Consider reducing resolution or visual effects
+  - Start dev server: `yarn workspace @thirteen/client dev --host`
+  - Navigate to `http://<your-ip>:5173` on mobile browser

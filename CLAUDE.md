@@ -4,13 +4,20 @@ This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get sta
 
 ## Project Overview
 
-**Tiến Lên (Thirteen)** -- a mobile-first card game built with Godot 4 (web export).
+**Tiến Lên (Thirteen)** -- a mobile-first card game built with Svelte + PixiJS (web client) and Node.js (AWS Lambda backend).
 
 ### What We're Building
 
-A multiplayer Vietnamese card game (Tiến Lên / Thirteen) playable on mobile browsers. The MVP is single-game, 1 human vs 3 bots, with placeholder art.
+A multiplayer Vietnamese card game (Tiến Lên / Thirteen) playable on mobile browsers. Local play (1 human vs 3 bots) and online multiplayer via WebSocket.
 
-**Reference codebase:** https://github.com/binhrobles/thirteen-2020 (boardgame.io/JS implementation of the same game)
+**Reference codebase:** https://github.com/binhrobles/thirteen-2020 (boardgame.io/JS implementation)
+
+### Monorepo Structure
+
+- `packages/game-logic` - TypeScript game rules (Card, Play, MoveValidator, GameState, BotPlayer, Tourney)
+- `packages/client` - Svelte + PixiJS web client
+- `packages/server` - Node.js Lambda handlers (WebSocket API)
+- `backend/` - SAM template for AWS infrastructure
 
 ### Game Rules (House Variant)
 
@@ -25,17 +32,23 @@ A multiplayer Vietnamese card game (Tiến Lên / Thirteen) playable on mobile b
 - **Passing:** locks you out of the round until it resets. When all others pass, last player gets "power" (can play anything)
 - **Winning:** first to shed all cards is 1st, game continues until 1 player remains
 
-### Future Phases (not yet tracked in beads)
+### Current Features
 
+- **Local play:** 1 human vs 3 greedy bots
 - **Online multiplayer:** AWS Lambda + WebSocket API Gateway, seat-based lobbying
 - **Tournament mode:** 4/2/1/0 point scoring, play to 21
+
+### Future Work
+
 - **RL-trained bots:** reinforcement learning model, deployed as Lambda or similar
+- **Tournament leaderboard UI:** Between-game standings display
 
 ### Tech Stack
 
-- **Engine:** Godot 4, GDScript
-- **Target:** Web (HTML5 export), mobile-first portrait orientation
-- **Backend (future):** AWS serverless (Lambda + API Gateway WebSocket)
+- **Client:** Svelte 5, PixiJS 8, TypeScript, Vite
+- **Server:** Node.js 20, AWS Lambda, API Gateway WebSocket, DynamoDB
+- **Target:** Web (mobile browsers, portrait orientation)
+- **Deploy:** GitHub Actions → GitHub Pages (client) + SAM (backend)
 
 ### UX Principles
 
@@ -47,11 +60,18 @@ A multiplayer Vietnamese card game (Tiến Lên / Thirteen) playable on mobile b
 ## Quick Reference
 
 ```bash
+# Issue tracking
 bd ready              # Find available work
 bd show <id>          # View issue details
 bd update <id> --status in_progress  # Claim work
 bd close <id>         # Complete work
 bd sync               # Sync with git
+
+# Development
+yarn install          # Install dependencies
+yarn workspace @thirteen/game-logic test  # Run game-logic tests
+yarn workspace @thirteen/client dev       # Start dev server (localhost:5173)
+yarn workspace @thirteen/client build     # Build for production
 ```
 
 ## Landing the Plane (Session Completion)
@@ -62,8 +82,8 @@ bd sync               # Sync with git
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed):
-   - For Godot: Use `mcp__godot__run_project` to compile and check for errors
-   - Tests, linters, builds
+   - `yarn workspace @thirteen/game-logic test` - Run game logic tests
+   - `yarn workspace @thirteen/client build` - Verify client builds
    - Fix any errors before proceeding
 3. **Update issue status** - Close finished work, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:

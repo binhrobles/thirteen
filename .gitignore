@@ -1,16 +1,19 @@
-# Godot 4 import cache
-.godot/
+# Node.js
+node_modules/
+dist/
+*.log
 
 # Builds
 builds/
 build/
 *.tmp
-*.log
 
-# Node.js
-node_modules/
-dist/
+# OS
+.DS_Store
 
 # bv (beads viewer) local config and caches
 .bv/
-.DS_STORE
+
+# SAM
+.aws-sam/
+samconfig.toml

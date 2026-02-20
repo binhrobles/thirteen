@@ -21,7 +21,7 @@ This document describes the architecture for online multiplayer in Tiến Lên (
 
 ```
 ┌─────────────┐     WebSocket      ┌──────────────────┐
-│   Godot     │◄──────────────────►│  API Gateway     │
+│    Web      │◄──────────────────►│  API Gateway     │
 │   Client    │      (WSS)         │   (WebSocket)    │
 └─────────────┘                    └────────┬─────────┘
                                             │
@@ -639,7 +639,7 @@ Use **AWS CDK** (TypeScript) for infrastructure definition
 - Scoring and leaderboard updates
 
 ### E2E Tests
-- Godot client → API Gateway → Lambda → DynamoDB
+- Web client → API Gateway → Lambda → DynamoDB
 - Full tournament from seat claiming to tournament winner
 - Between-game transitions and leaderboard display
 - Reconnection scenarios (before/during/between games)
@@ -731,7 +731,7 @@ Use **AWS CDK** (TypeScript) for infrastructure definition
 2. ⬜ Review and get approval
 3. ⬜ Set up AWS infrastructure (CDK)
 4. ⬜ Implement Lambda functions
-5. ⬜ Build Godot WebSocket client
+5. ✅ Build WebSocket client
 6. ⬜ Integration testing
 7. ⬜ Deploy to staging
 8. ⬜ User acceptance testing
@@ -740,6 +740,5 @@ Use **AWS CDK** (TypeScript) for infrastructure definition
 ## References
 
 - AWS API Gateway WebSocket: https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-websocket-api.html
-- Godot WebSocket: https://docs.godotengine.org/en/stable/classes/class_websocketpeer.html
-- AWS CDK: https://docs.aws.amazon.com/cdk/v2/guide/home.html
+- AWS SAM: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html
 - DynamoDB Best Practices: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html

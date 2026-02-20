@@ -1,6 +1,6 @@
 # Thirteen Vibes
 
-A mobile-first [Tiến Lên (Thirteen)](https://en.wikipedia.org/wiki/Ti%E1%BA%BFn_l%C3%AAn) card game built with Godot 4.
+A mobile-first [Tiến Lên (Thirteen)](https://en.wikipedia.org/wiki/Ti%E1%BA%BFn_l%C3%AAn) card game.
 
 ## Status
 
@@ -8,10 +8,11 @@ A mobile-first [Tiến Lên (Thirteen)](https://en.wikipedia.org/wiki/Ti%E1%BA%B
 
 Early development. See `bd ready` for current work items.
 
-## Tech
+## Tech Stack
 
-- **Engine:** Godot 4 (GDScript)
-- **Target:** Web (HTML5 export), mobile browsers, portrait orientation
+- **Client:** Svelte 5 + PixiJS 8 + TypeScript
+- **Server:** Node.js 20 + AWS Lambda + API Gateway WebSocket + DynamoDB
+- **Deploy:** GitHub Actions → GitHub Pages (client) + SAM (backend)
 
 ## The Game
 
@@ -19,37 +20,40 @@ Early development. See `bd ready` for current work items.
 
 ## Development
 
-**Run the game:**
 ```bash
-# Open project in Godot editor
-open -a Godot thirteen-vibes/project.godot
+# Install dependencies
+yarn install
 
-# Or run from command line
-/Applications/Godot.app/Contents/MacOS/Godot --path /path/to/thirteen-vibes
+# Run game-logic tests
+yarn workspace @thirteen/game-logic test
+
+# Start client dev server
+yarn workspace @thirteen/client dev
+
+# Build client
+yarn workspace @thirteen/client build
 ```
 
-**Issue tracking:**
+## Issue Tracking
+
 ```bash
 bd ready        # See available work
 bd show <id>    # View issue details
 bd sync         # Sync with git
 ```
 
-## Building
+## Monorepo Structure
 
-See [BUILD.md](BUILD.md) for web export instructions.
-
-**Quick start:**
-1. Install Godot 4.6 export templates (via Editor → Manage Export Templates)
-2. Export: `/Applications/Godot.app/Contents/MacOS/Godot --headless --export-release "Web" ./build/web/index.html`
-3. Test: `cd build/web && python3 -m http.server 8000`
+```
+packages/
+  game-logic/   # TypeScript game rules (Card, Play, GameState, etc.)
+  client/       # Svelte + PixiJS web client
+  server/       # Node.js Lambda handlers
+backend/        # SAM template for AWS infrastructure
+assets/         # Shared assets (card sprites)
+```
 
 ## Assets & Attribution
 
 **Card Sprites:**
 [Jorel's Card Pack by Jorel](https://games-by-jorel.itch.io/jorels-card-pack) (96x128px pixel art)
-
-**UI Theme:**
-[Soft Retro Theme by Intergenic](https://intergenic.itch.io/godot-theme-soft-retro)
-
-

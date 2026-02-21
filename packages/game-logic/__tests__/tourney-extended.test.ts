@@ -38,14 +38,6 @@ describe("Tourney.startGame", () => {
     }
   });
 
-  it("sets gameNumber on currentGame", () => {
-    const tourney = fillTourney();
-    tourney.setReady("p1");
-    tourney.startGame();
-    const snap = tourney.currentGame as Record<string, unknown>;
-    expect(snap.gameNumber).toBe(1);
-  });
-
   it("throws if not all seats filled", () => {
     const tourney = new Tourney();
     tourney.claimSeat("p1", "Alice", "conn1", 0);

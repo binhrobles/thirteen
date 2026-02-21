@@ -298,7 +298,10 @@ class WebSocketClient {
     const message: OutgoingMessage = { action, payload };
     const json = JSON.stringify(message);
     this.socket.send(json);
-    console.log("[ws] Sent:", action, payload);
+
+    if (action !== "ping") {
+      console.log("[ws] Sent:", action, payload);
+    }
   }
 
   private onConnectionEstablished(): void {
@@ -392,7 +395,9 @@ class WebSocketClient {
     }
 
     const { type, payload } = message;
-    console.log("[ws] Received:", type, payload);
+    if (type !== "pong") {
+      console.log("[ws] Received:", type, payload);
+    }
 
     switch (type) {
       case "pong":

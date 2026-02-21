@@ -26,6 +26,9 @@ Use **bd** (beads) for issue tracking **only when explicitly asked** to file and
 
 Run `bd prime` for session close protocol and full workflow guide.
 
+## Deploying / Testing
+If we need to test a server side change, do _not_ deploy sam manually. Commit and push, and GH Actions will auto-deploy.
+
 ## Detailed Documentation
 
 - **[Game Rules](docs/game-rules.md)** - Tiến Lên card game rules (read before modifying game logic)

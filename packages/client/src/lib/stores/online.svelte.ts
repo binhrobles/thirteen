@@ -202,8 +202,8 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
   console.log("[playLog] Update received:", {
     prevCounts: prevHandCounts,
     newCounts: payload.handCounts,
-    prevLP: prevLastPlay?.cards.map(c => c.toString()).join(","),
-    newLP: payload.lastPlay?.cards.map(c => c.toString()).join(","),
+    prevLP: `${prevLastPlay?.playedBy}: ${prevLastPlay?.cards.map(c => Card.fromValue(c.value).toString()).join(",")}`,
+    newLP: `${payload.lastPlay?.playedBy}: ${payload.lastPlay?.cards.map(c => Card.fromValue(c.value).toString()).join(",")}`,
   });
 
   online.yourHand = payload.yourHand.map((c) => Card.fromValue(c.value));

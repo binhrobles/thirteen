@@ -46,10 +46,16 @@ export interface OutgoingMessage {
   payload?: Record<string, unknown>;
 }
 
-export interface IncomingMessage {
-  type: IncomingMessageType;
-  payload: Record<string, unknown>;
-}
+export type IncomingMessage =
+  | { type: "pong"; payload: Record<string, unknown> }
+  | { type: "tourney/updated"; payload: TourneyClientState }
+  | { type: "game/started"; payload: GameStartedPayload }
+  | { type: "game/updated"; payload: GameUpdatedPayload }
+  | { type: "game/over"; payload: GameOverPayload }
+  | {
+      type: "error";
+      payload: { code?: string; message?: string };
+    };
 
 // ── Event Handlers ──
 
@@ -405,24 +411,24 @@ class WebSocketClient {
         break;
 
       case "tourney/updated":
-        await this.handlers.onTourneyUpdated?.(payload as unknown as TourneyClientState);
+        await this.handlers.onTourneyUpdated?.(payload);
         break;
 
       case "game/started":
-        this.handlers.onGameStarted?.(payload as unknown as GameStartedPayload);
+        this.handlers.onGameStarted?.(payload);
         break;
 
       case "game/updated":
-        this.handlers.onGameUpdated?.(payload as unknown as GameUpdatedPayload);
+        this.handlers.onGameUpdated?.(payload);
         break;
 
       case "game/over":
-        await this.handlers.onGameOver?.(payload as unknown as GameOverPayload);
+        await this.handlers.onGameOver?.(payload);
         break;
 
       case "error": {
-        const code = (payload.code as string) ?? "UNKNOWN";
-        const msg = (payload.message as string) ?? "Unknown error";
+        const code = payload.code ?? "UNKNOWN";
+        const msg = payload.message ?? "Unknown error";
         console.error(`[ws] Server error: [${code}] ${msg}`);
         this.handlers.onServerError?.(code, msg);
         break;

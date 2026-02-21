@@ -317,7 +317,7 @@ async function handleReady(
     // Run bot turns if starting player is a bot, broadcasting after each
     await executeBotTurnsWithBroadcast(tourney, game);
 
-    tourney.currentGame = game.toSnapshot() as unknown as Record<string, unknown>;
+    tourney.currentGame = game.toSnapshot();
     await saveTourney(tourney);
   }
 
@@ -497,7 +497,7 @@ async function handleDebugQuickStart(
   // Run bot turns if starting player is a bot, broadcasting after each
   const botMoveCount = await executeBotTurnsWithBroadcast(tourney, game);
 
-  tourney.currentGame = game.toSnapshot() as unknown as Record<string, unknown>;
+  tourney.currentGame = game.toSnapshot();
   await saveTourney(tourney);
 
   console.log(
@@ -560,7 +560,7 @@ async function executeBotTurnsWithBroadcast(
 }
 
 async function finishMove(tourney: Tourney, game: GameState): Promise<void> {
-  tourney.currentGame = game.toSnapshot() as unknown as Record<string, unknown>;
+  tourney.currentGame = game.toSnapshot();
 
   if (game.isGameOver()) {
     const [, tourneyComplete] = tourney.completeGame(game.winOrder);

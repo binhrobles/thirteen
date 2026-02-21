@@ -342,6 +342,15 @@ export class Tourney {
       ? TourneyStatus.COMPLETED
       : TourneyStatus.BETWEEN_GAMES;
 
+    // Auto-ready bots for next game
+    if (this.status === TourneyStatus.BETWEEN_GAMES) {
+      for (const seat of this.seats) {
+        if (seat.isBot) {
+          seat.ready = true;
+        }
+      }
+    }
+
     return [true, tournamentComplete];
   }
 

@@ -212,6 +212,54 @@ describe("Tourney", () => {
       expect(t.seats[0].score).toBe(24);
       expect(t.status).toBe(TourneyStatus.COMPLETED);
     });
+
+    it("auto-readies bots after game completion when BETWEEN_GAMES", () => {
+      const t = new Tourney();
+      t.claimSeat("p1", "Human", "c1");
+      t.addBot(1);
+      t.addBot(2);
+      t.addBot(3);
+      t.currentGame = { dummy: true };
+
+      // Complete first game
+      const [ok, complete] = t.completeGame([0, 1, 2, 3]);
+      expect(ok).toBe(true);
+      expect(complete).toBe(false);
+      expect(t.status).toBe(TourneyStatus.BETWEEN_GAMES);
+
+      // Bots should be auto-readied
+      expect(t.seats[0].ready).toBe(false); // human player
+      expect(t.seats[1].ready).toBe(true);  // bot
+      expect(t.seats[2].ready).toBe(true);  // bot
+      expect(t.seats[3].ready).toBe(true);  // bot
+    });
+
+    it("does not auto-ready bots when tournament is COMPLETED", () => {
+      const t = new Tourney();
+      t.claimSeat("p1", "Human", "c1");
+      t.addBot(1);
+      t.addBot(2);
+      t.addBot(3);
+      t.seats[0].score = 20; // one game away from winning
+
+      // Simulate game start (which resets ready flags)
+      for (const seat of t.seats) {
+        seat.ready = false;
+      }
+      t.currentGame = { dummy: true };
+
+      // Complete final game
+      const [ok, complete] = t.completeGame([0, 1, 2, 3]);
+      expect(ok).toBe(true);
+      expect(complete).toBe(true);
+      expect(t.status).toBe(TourneyStatus.COMPLETED);
+
+      // No seats should be ready (tournament is over, no auto-ready for COMPLETED)
+      expect(t.seats[0].ready).toBe(false);
+      expect(t.seats[1].ready).toBe(false);
+      expect(t.seats[2].ready).toBe(false);
+      expect(t.seats[3].ready).toBe(false);
+    });
   });
 
   describe("serialization", () => {

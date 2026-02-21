@@ -32,12 +32,14 @@ export async function handler(event: WebSocketEvent): Promise<LambdaResult> {
     const action: string | undefined = body.action;
     const payload: Record<string, unknown> = body.payload ?? {};
 
-    console.log(`Received action: ${action} from ${connectionId}`);
-
     const connection = await getConnection(connectionId);
     if (!connection) {
       await sendError(connectionId, "UNAUTHORIZED", "Connection not found");
       return { statusCode: 200 };
+    }
+
+    if (action !== "ping") {
+      console.log(`Received action: ${action} from ${connectionId}`);
     }
 
     const { playerId, playerName } = connection;
@@ -518,28 +520,42 @@ async function executeBotTurnsWithBroadcast(
   let moveCount = 0;
   const SAFETY_CAP = 100;
 
+  console.log(`[botTurns] Starting bot turn execution, currentPlayer: ${game.currentPlayer}`);
+
   for (let i = 0; i < SAFETY_CAP; i++) {
-    if (game.isGameOver()) break;
+    if (game.isGameOver()) {
+      console.log("[botTurns] Game is over, stopping");
+      break;
+    }
 
     const pos = game.currentPlayer;
     const seat = seatData[pos];
 
-    if (!seat.isBot) break; // Human's turn
+    console.log(`[botTurns] Turn ${i}: player ${pos}, isBot: ${seat.isBot}`);
+
+    if (!seat.isBot) {
+      console.log(`[botTurns] Player ${pos} is human, stopping`);
+      break; // Human's turn
+    }
 
     const hand = game.getHand(pos);
     const cardsToPlay = choosePlay(hand, game.lastPlay);
 
     if (cardsToPlay.length > 0) {
+      console.log(`[botTurns] Bot ${pos} playing ${cardsToPlay.length} cards`);
       game.playCards(pos, cardsToPlay);
     } else {
+      console.log(`[botTurns] Bot ${pos} passing`);
       game.passTurn(pos);
     }
 
     // Broadcast after each individual bot move
+    console.log(`[botTurns] Broadcasting update for bot ${pos}`);
     await broadcastGameUpdate(tourney, game);
     moveCount++;
   }
 
+  console.log(`[botTurns] Finished with ${moveCount} bot moves`);
   return moveCount;
 }
 

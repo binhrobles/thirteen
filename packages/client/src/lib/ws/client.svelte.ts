@@ -22,6 +22,7 @@ export enum ConnectionState {
 export type OutgoingAction =
   | "ping"
   | "tourney/info"
+  | "tourney/reconnect"
   | "tourney/claim_seat"
   | "tourney/leave"
   | "tourney/ready"
@@ -118,6 +119,9 @@ class WebSocketClient {
   // Event handlers
   private handlers: WsEventHandlers = {};
 
+  // Reconnection state
+  private reconnectingSeatPosition: number | null = null;
+
   // ── Public API ──
 
   /**
@@ -130,7 +134,7 @@ class WebSocketClient {
   /**
    * Connect to WebSocket server
    */
-  connect(url: string, playerId: string, playerName = "Player"): void {
+  connect(url: string, playerId: string, playerName = "Player", reconnectToSeat?: number): void {
     if (
       this.state === ConnectionState.CONNECTED ||
       this.state === ConnectionState.CONNECTING
@@ -142,6 +146,7 @@ class WebSocketClient {
     this.websocketUrl = url;
     this.playerId = playerId;
     this.playerName = playerName;
+    this.reconnectingSeatPosition = reconnectToSeat ?? null;
 
     this.state = ConnectionState.CONNECTING;
 
@@ -304,8 +309,15 @@ class WebSocketClient {
     // Start heartbeat
     this.startPingTimer();
 
-    // Request initial tournament info
-    this.requestTourneyInfo();
+    // Check if this is a reconnection attempt
+    if (this.reconnectingSeatPosition !== null && this.reconnectingSeatPosition >= 0) {
+      console.log(`[ws] Attempting to reconnect to seat ${this.reconnectingSeatPosition}`);
+      this.sendMessage("tourney/reconnect", { seatPosition: this.reconnectingSeatPosition });
+      this.reconnectingSeatPosition = null;
+    } else {
+      // Request initial tournament info
+      this.requestTourneyInfo();
+    }
   }
 
   private onConnectionClosed(): void {

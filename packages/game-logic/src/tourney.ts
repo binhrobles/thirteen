@@ -32,6 +32,7 @@ export interface SeatClientState {
   gamesWon: number;
   isReady: boolean;
   isBot: boolean;
+  isDisconnected: boolean;
 }
 
 /** Tourney state sent to clients */
@@ -373,6 +374,7 @@ export class Tourney {
         gamesWon: s.gamesWon,
         isReady: s.ready,
         isBot: s.isBot,
+        isDisconnected: s.disconnectedAt !== undefined,
       })),
       targetScore: this.targetScore,
       currentGameNumber:

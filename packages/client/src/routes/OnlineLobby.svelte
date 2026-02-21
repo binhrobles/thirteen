@@ -49,24 +49,34 @@
   }
 
   function getSeatDisplay(seat: SeatClientState | undefined) {
-    if (!seat) return { name: "Empty", status: "", canClaim: false, canKick: false, isYou: false };
+    if (!seat) return { name: "Empty", status: "", canClaim: false, canKick: false, isYou: false, isDisconnected: false };
 
     const isYou = seat.playerId === online.playerId;
 
     if (!seat.playerId && !seat.isBot) {
-      return { name: "Empty", status: "", canClaim: true, canKick: false, isYou: false };
+      return { name: "Empty", status: "", canClaim: true, canKick: false, isYou: false, isDisconnected: false };
     }
 
     if (seat.isBot) {
-      return { name: seat.playerName ?? "Bot", status: seat.isReady ? "Ready" : "", canClaim: false, canKick: true, isYou: false };
+      return { name: seat.playerName ?? "Bot", status: seat.isReady ? "Ready" : "", canClaim: false, canKick: true, isYou: false, isDisconnected: false };
+    }
+
+    let status = "";
+    if (seat.isDisconnected) {
+      status = "Disconnected";
+    } else if (seat.isReady) {
+      status = "Ready";
+    } else {
+      status = "Not Ready";
     }
 
     return {
       name: isYou ? `${seat.playerName} (You)` : seat.playerName ?? "Player",
-      status: seat.isReady ? "Ready" : "Not Ready",
+      status,
       canClaim: false,
       canKick: false,
       isYou,
+      isDisconnected: seat.isDisconnected,
     };
   }
 
@@ -141,7 +151,7 @@
         <div class="seats">
           {#each online.tourney.seats as seat, i}
             {@const display = getSeatDisplay(seat)}
-            <div class="seat" class:occupied={seat.playerId || seat.isBot} class:you={display.isYou}>
+            <div class="seat" class:occupied={seat.playerId || seat.isBot} class:you={display.isYou} class:disconnected={display.isDisconnected}>
               <div class="seat-header">
                 {#if seat.playerId || seat.isBot}
                   <img
@@ -155,7 +165,7 @@
                 <div class="seat-info">
                   <div class="seat-name">{display.name}</div>
                   {#if display.status}
-                    <div class="seat-status" class:ready={seat.isReady}>{display.status}</div>
+                    <div class="seat-status" class:ready={seat.isReady} class:disconnected={display.isDisconnected}>{display.status}</div>
                   {/if}
                 </div>
               </div>
@@ -313,6 +323,14 @@
     border: 2px solid #2ecc40;
   }
 
+  .seat.disconnected {
+    opacity: 0.5;
+  }
+
+  .seat.disconnected .seat-avatar {
+    filter: grayscale(100%);
+  }
+
   .seat-header {
     display: flex;
     align-items: center;
@@ -358,6 +376,10 @@
 
   .seat-status.ready {
     color: #2ecc40;
+  }
+
+  .seat-status.disconnected {
+    color: #ff4136;
   }
 
   .seat-score {

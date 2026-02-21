@@ -47,6 +47,8 @@ export async function handler(event: WebSocketEvent): Promise<LambdaResult> {
         return handlePing(connectionId, payload);
       case "tourney/info":
         return handleTourneyInfo(connectionId);
+      case "tourney/reconnect":
+        return handleReconnect(connectionId, playerId, payload);
       case "tourney/claim_seat":
         return handleClaimSeat(connectionId, playerId, playerName, payload);
       case "tourney/leave":
@@ -104,6 +106,127 @@ async function handleTourneyInfo(connectionId: string): Promise<LambdaResult> {
     type: "tourney/updated",
     payload: tourney.toClientState() as Record<string, unknown>,
   });
+  return { statusCode: 200 };
+}
+
+async function handleReconnect(
+  connectionId: string,
+  playerId: string,
+  payload: Record<string, unknown>,
+): Promise<LambdaResult> {
+  const seatPosition = payload.seatPosition as number | undefined;
+
+  // Validate seat position
+  if (seatPosition === undefined || seatPosition < 0 || seatPosition >= 4) {
+    await sendError(connectionId, "INVALID_SEAT", "Invalid seat position");
+    return { statusCode: 200 };
+  }
+
+  const tourney = await getOrCreateTourney();
+  const seat = tourney.seats[seatPosition];
+
+  // Check if seat is empty (game was reset)
+  if (seat.isEmpty()) {
+    await sendError(connectionId, "SEAT_NOT_FOUND", "Seat is empty (game may have been reset)");
+    return { statusCode: 200 };
+  }
+
+  // Security check: verify player ID matches
+  if (seat.playerId !== playerId) {
+    await sendError(connectionId, "SEAT_TAKEN", "Seat is occupied by another player");
+    return { statusCode: 200 };
+  }
+
+  // Update connection ID and clear disconnect timestamp
+  seat.connectionId = connectionId;
+  seat.disconnectedAt = undefined;
+
+  await saveTourney(tourney);
+
+  console.log(`Player ${playerId} reconnected to seat ${seatPosition} (status: ${tourney.status})`);
+
+  // Send appropriate response based on tourney state
+  if (tourney.status === TourneyStatus.IN_PROGRESS && tourney.currentGame) {
+    // Send full game state for active game
+    const game = GameState.fromSnapshot(
+      tourney.currentGame as unknown as ReturnType<GameState["toSnapshot"]>,
+    );
+
+    // Send game/started with initial state
+    const playerNames = tourney.seats.map((s) => s.playerName ?? "Empty");
+    const yourHand = game.hands[seatPosition].map((c) => c.toData());
+
+    await sendToConnection(connectionId, {
+      type: "game/started",
+      payload: {
+        yourPosition: seatPosition,
+        yourHand,
+        currentPlayer: game.currentPlayer,
+        players: playerNames,
+      },
+    });
+
+    // Send game/updated with current state
+    await sendToConnection(connectionId, {
+      type: "game/updated",
+      payload: {
+        currentPlayer: game.currentPlayer,
+        lastPlay: game.lastPlay
+          ? {
+              combo: game.lastPlay.combo,
+              cards: game.lastPlay.cards.map((c) => c.toData()),
+              suited: game.lastPlay.suited,
+            }
+          : null,
+        passedPlayers: game.passedPlayers,
+        handCounts: game.hands.map((h) => h.length),
+        yourHand,
+      },
+    });
+  } else if (
+    tourney.status === TourneyStatus.BETWEEN_GAMES ||
+    tourney.status === TourneyStatus.COMPLETED
+  ) {
+    // Send tourney update with scores
+    await sendToConnection(connectionId, {
+      type: "tourney/updated",
+      payload: tourney.toClientState() as Record<string, unknown>,
+    });
+
+    // If just completed, also send game over
+    if (tourney.status === TourneyStatus.COMPLETED && tourney.gameHistory.length > 0) {
+      const lastGame = tourney.gameHistory[tourney.gameHistory.length - 1] as {
+        winOrder: number[];
+        pointsAwarded: number[];
+      };
+      const leaderboard = tourney.getLeaderboard();
+      const winner = leaderboard[0].position;
+
+      await sendToConnection(connectionId, {
+        type: "game/over",
+        payload: {
+          winOrder: lastGame.winOrder,
+          pointsAwarded: lastGame.pointsAwarded,
+          leaderboard: leaderboard.map((entry) => ({
+            name: entry.playerName ?? "Unknown",
+            score: entry.totalScore,
+          })),
+          tourneyComplete: true,
+          winner,
+        },
+      });
+    }
+  } else {
+    // WAITING or STARTING - just send tourney update
+    await sendToConnection(connectionId, {
+      type: "tourney/updated",
+      payload: tourney.toClientState() as Record<string, unknown>,
+    });
+  }
+
+  // Broadcast updated tourney state to all players (shows reconnection)
+  await broadcastTourneyUpdate(tourney);
+
   return { statusCode: 200 };
 }
 

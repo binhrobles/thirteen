@@ -37,14 +37,20 @@ async function handleTourneyDisconnect(playerId: string): Promise<void> {
     const seat = tourney.getSeatByPlayer(playerId);
     if (!seat) return;
 
+    // Set disconnectedAt timestamp for all states (allows reconnection during active games)
+    const disconnectTime = Math.floor(Date.now() / 1000);
+    await setDisconnectedAt(seat.position, disconnectTime);
+
     if (
       tourney.status === TourneyStatus.WAITING ||
       tourney.status === TourneyStatus.STARTING
     ) {
-      const disconnectTime = Math.floor(Date.now() / 1000);
-      await setDisconnectedAt(seat.position, disconnectTime);
       console.log(
-        `Player ${playerId} disconnected from tournament (grace period: 5s)`,
+        `Player ${playerId} disconnected from lobby (grace period: 5s)`,
+      );
+    } else {
+      console.log(
+        `Player ${playerId} disconnected during ${tourney.status} (can reconnect indefinitely)`,
       );
     }
   } catch (err) {

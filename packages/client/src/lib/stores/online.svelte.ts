@@ -27,6 +27,44 @@ export type { SeatClientState, TourneyClientState };
 
 const EVENT_RENDER_DELAY_MS = 800;
 
+// ── Session Storage ──
+
+const SESSION_KEY = "thirteen_session";
+
+interface SessionData {
+  playerId: string;
+  playerName: string;
+  seatPosition: number;
+  inGame: boolean;
+}
+
+function saveSession(data: SessionData): void {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.warn("[session] Failed to save session:", err);
+  }
+}
+
+function loadSession(): SessionData | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SessionData;
+  } catch (err) {
+    console.warn("[session] Failed to load session:", err);
+    return null;
+  }
+}
+
+function clearSession(): void {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch (err) {
+    console.warn("[session] Failed to clear session:", err);
+  }
+}
+
 // ── Helpers ──
 
 function sleep(ms: number): Promise<void> {
@@ -207,8 +245,14 @@ export function initOnline(): void {
   if (initialized) return;
   initialized = true;
 
-  // Generate player ID if not set
-  if (!online.playerId) {
+  // Try to restore session first
+  const session = loadSession();
+  if (session) {
+    online.playerId = session.playerId;
+    online.playerName = session.playerName;
+    console.log("[session] Restored session:", session);
+  } else if (!online.playerId) {
+    // Generate player ID if not set and no session
     online.playerId = `player-${Math.random().toString(36).slice(2, 10)}`;
   }
 
@@ -233,6 +277,17 @@ export function initOnline(): void {
     onTourneyUpdated: (payload) => {
       online.tourney = payload;
       online.statusMessage = "";
+
+      // Save session if we have a seat
+      const mySeat = payload.seats.find((s) => s.playerId === online.playerId);
+      if (mySeat) {
+        saveSession({
+          playerId: online.playerId,
+          playerName: online.playerName,
+          seatPosition: mySeat.position,
+          inGame: online.inGame,
+        });
+      }
     },
 
     onGameStarted: (payload: GameStartedPayload) => {
@@ -250,6 +305,14 @@ export function initOnline(): void {
       online.statusMessage = payload.currentPlayer === payload.yourPosition
         ? "Your turn!"
         : `Player ${payload.currentPlayer + 1}'s turn`;
+
+      // Save session with inGame flag
+      saveSession({
+        playerId: online.playerId,
+        playerName: online.playerName,
+        seatPosition: payload.yourPosition,
+        inGame: true,
+      });
     },
 
     onGameUpdated: (payload: GameUpdatedPayload) => {
@@ -273,6 +336,12 @@ export function initOnline(): void {
 
     onServerError: (code, message) => {
       online.errorMessage = `[${code}] ${message}`;
+
+      // Clear session on certain unrecoverable errors
+      if (code === "SEAT_NOT_FOUND" || code === "SEAT_TAKEN") {
+        clearSession();
+        online.statusMessage = "Session expired or game reset";
+      }
     },
   });
 
@@ -288,13 +357,24 @@ export function initOnline(): void {
 
 export function connectToServer(url: string): void {
   initOnline();
-  wsClient.connect(url, online.playerId, online.playerName);
+
+  // Check if we should attempt reconnection
+  const session = loadSession();
+  const reconnectToSeat = session?.seatPosition ?? undefined;
+
+  if (reconnectToSeat !== undefined && reconnectToSeat >= 0) {
+    console.log(`[online] Reconnecting to seat ${reconnectToSeat}`);
+    online.statusMessage = "Reconnecting to your game...";
+  }
+
+  wsClient.connect(url, online.playerId, online.playerName, reconnectToSeat);
 }
 
 export function disconnectFromServer(): void {
   wsClient.disconnect();
   online.inGame = false;
   online.tourney = null;
+  clearSession();
 }
 
 export function setPlayerName(name: string): void {
@@ -307,6 +387,7 @@ export function claimSeat(position?: number): void {
 
 export function leaveTourney(): void {
   wsClient.leaveTourney();
+  clearSession();
 }
 
 export function readyUp(): void {
@@ -380,4 +461,11 @@ export function toggleRoundHistory(): void {
 
 export function closeRoundHistory(): void {
   online.showRoundHistory = false;
+}
+
+/**
+ * Get stored session for reconnection
+ */
+export function getStoredSession(): SessionData | null {
+  return loadSession();
 }

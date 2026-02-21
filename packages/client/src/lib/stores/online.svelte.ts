@@ -189,14 +189,11 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
   } else {
     online.lastPlay = null;
   }
-  console.log(`prev lastPlay: ${prevLastPlay}`);
-  console.log(`new lastPlay: ${online.lastPlay}`);
 
   // Track play log changes
   // Case 1: Round reset (lastPlay went from something to null)
   if (prevLastPlay !== null && online.lastPlay === null) {
     online.playLog.push("round_reset");
-    console.log(`pushed round_reset: ${online.playLog}`);
   }
 
   // Case 2: New play detected (lastPlay changed and is not null)
@@ -216,7 +213,6 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
         online.lastPlay.suited
       );
       online.playLog.push({ player: prevCurrentPlayer, play });
-      console.log(`pushed play: ${online.playLog}`);
     }
   }
 
@@ -225,7 +221,6 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
     if (!prevPassedPlayers[i] && payload.passedPlayers[i]) {
       // Player i just passed
       online.playLog.push({ player: i, play: "pass" });
-      console.log(`pushed pass: ${online.playLog}`);
     }
   }
 

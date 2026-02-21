@@ -26,9 +26,7 @@
   </div>
   <ActionButtons />
   <GameOverScreen />
-  {#if mode === "local"}
-    <RoundHistoryDrawer />
-  {/if}
+  <RoundHistoryDrawer />
 </div>
 
 <style>

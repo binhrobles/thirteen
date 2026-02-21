@@ -201,7 +201,7 @@
 
   .leaderboard-header {
     display: grid;
-    grid-template-columns: 3ch 1fr 5ch 5ch 3ch;
+    grid-template-columns: 3ch 1fr 4ch 8ch 3ch;
     gap: 1vw;
     padding: 1vh 0;
     border-bottom: 1px solid #444;

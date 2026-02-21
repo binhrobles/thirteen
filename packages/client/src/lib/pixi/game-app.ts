@@ -168,7 +168,7 @@ export class GameApp {
 
     if (this.isMobile()) {
       // Mobile: No overlap, full cards with margin, scrollable carousel
-      const cardMargin = cardW * 0.15;
+      const cardMargin = cardW * 0.05;
       cardSpacing = cardW + cardMargin;
       this.totalHandWidth =
         hand.length > 0 ? sidePadding * 2 + hand.length * cardW + (hand.length - 1) * cardMargin : 0;

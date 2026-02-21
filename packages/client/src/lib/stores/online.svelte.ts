@@ -25,7 +25,7 @@ export type { SeatClientState, TourneyClientState };
 
 // ── Constants ──
 
-const EVENT_RENDER_DELAY_MS = 800;
+const EVENT_RENDER_DELAY_MS = 1200;
 
 // ── Session Storage ──
 

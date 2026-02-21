@@ -2,7 +2,7 @@ import {
   Card,
   GameState,
   TourneyStatus,
-  executeBotTurns,
+  choosePlay,
   type Tourney,
 } from "@thirteen/game-logic";
 import {
@@ -312,12 +312,8 @@ async function handleReady(
     const game = tourney.startGame();
     await broadcastGameStarted(tourney, game);
 
-    // Run bot turns if starting player is a bot
-    const seatData = tourney.seats.map((s) => s.toDict());
-    const botMoves = executeBotTurns(seatData, game);
-    for (const _move of botMoves) {
-      await broadcastGameUpdate(tourney, game);
-    }
+    // Run bot turns if starting player is a bot, broadcasting after each
+    await executeBotTurnsWithBroadcast(tourney, game);
 
     tourney.currentGame = game.toSnapshot() as unknown as Record<string, unknown>;
     await saveTourney(tourney);
@@ -407,12 +403,8 @@ async function handlePlayCards(
   game.playCards(seat.position, cards);
   await broadcastGameUpdate(tourney, game);
 
-  // Run bot turns
-  const seatData = tourney.seats.map((s) => s.toDict());
-  const botMoves = executeBotTurns(seatData, game);
-  for (const _move of botMoves) {
-    await broadcastGameUpdate(tourney, game);
-  }
+  // Run bot turns one at a time, broadcasting after each
+  await executeBotTurnsWithBroadcast(tourney, game);
 
   await finishMove(tourney, game);
   return { statusCode: 200 };
@@ -446,12 +438,8 @@ async function handlePass(
 
   await broadcastGameUpdate(tourney, game);
 
-  // Run bot turns
-  const seatData = tourney.seats.map((s) => s.toDict());
-  const botMoves = executeBotTurns(seatData, game);
-  for (const _move of botMoves) {
-    await broadcastGameUpdate(tourney, game);
-  }
+  // Run bot turns one at a time, broadcasting after each
+  await executeBotTurnsWithBroadcast(tourney, game);
 
   await finishMove(tourney, game);
   return { statusCode: 200 };
@@ -504,23 +492,56 @@ async function handleDebugQuickStart(
   await broadcastTourneyUpdate(tourney);
   await broadcastGameStarted(tourney, game);
 
-  // Run bot turns if starting player is a bot
-  const seatData = tourney.seats.map((s) => s.toDict());
-  const botMoves = executeBotTurns(seatData, game);
-  for (const _move of botMoves) {
-    await broadcastGameUpdate(tourney, game);
-  }
+  // Run bot turns if starting player is a bot, broadcasting after each
+  const botMoveCount = await executeBotTurnsWithBroadcast(tourney, game);
 
   tourney.currentGame = game.toSnapshot() as unknown as Record<string, unknown>;
   await saveTourney(tourney);
 
   console.log(
-    `[DEBUG] Quick start: ${playerName} in seat ${seatPosition} with 3 bots, ${botMoves.length} bot moves`,
+    `[DEBUG] Quick start: ${playerName} in seat ${seatPosition} with 3 bots, ${botMoveCount} bot moves`,
   );
   return { statusCode: 200 };
 }
 
 // ── Helpers ──
+
+/**
+ * Execute bot turns one at a time, broadcasting after each move.
+ * Returns the number of bot moves executed.
+ */
+async function executeBotTurnsWithBroadcast(
+  tourney: Tourney,
+  game: GameState,
+): Promise<number> {
+  const seatData = tourney.seats.map((s) => s.toDict());
+  let moveCount = 0;
+  const SAFETY_CAP = 100;
+
+  for (let i = 0; i < SAFETY_CAP; i++) {
+    if (game.isGameOver()) break;
+
+    const pos = game.currentPlayer;
+    const seat = seatData[pos];
+
+    if (!seat.isBot) break; // Human's turn
+
+    const hand = game.getHand(pos);
+    const cardsToPlay = choosePlay(hand, game.lastPlay);
+
+    if (cardsToPlay.length > 0) {
+      game.playCards(pos, cardsToPlay);
+    } else {
+      game.passTurn(pos);
+    }
+
+    // Broadcast after each individual bot move
+    await broadcastGameUpdate(tourney, game);
+    moveCount++;
+  }
+
+  return moveCount;
+}
 
 async function finishMove(tourney: Tourney, game: GameState): Promise<void> {
   tourney.currentGame = game.toSnapshot() as unknown as Record<string, unknown>;

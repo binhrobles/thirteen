@@ -57,10 +57,10 @@ export interface WsEventHandlers {
   onConnected?: () => void;
   onDisconnected?: () => void;
   onError?: (error: string) => void;
-  onTourneyUpdated?: (payload: TourneyClientState) => void;
+  onTourneyUpdated?: (payload: TourneyClientState) => void | Promise<void>;
   onGameStarted?: (payload: GameStartedPayload) => void;
   onGameUpdated?: (payload: GameUpdatedPayload) => void;
-  onGameOver?: (payload: GameOverPayload) => void;
+  onGameOver?: (payload: GameOverPayload) => void | Promise<void>;
   onServerError?: (code: string, message: string) => void;
 }
 
@@ -385,7 +385,7 @@ class WebSocketClient {
     }
   }
 
-  private handleMessage(data: string): void {
+  private async handleMessage(data: string): Promise<void> {
     let message: IncomingMessage;
     try {
       message = JSON.parse(data);
@@ -405,7 +405,7 @@ class WebSocketClient {
         break;
 
       case "tourney/updated":
-        this.handlers.onTourneyUpdated?.(payload as unknown as TourneyClientState);
+        await this.handlers.onTourneyUpdated?.(payload as unknown as TourneyClientState);
         break;
 
       case "game/started":
@@ -417,7 +417,7 @@ class WebSocketClient {
         break;
 
       case "game/over":
-        this.handlers.onGameOver?.(payload as unknown as GameOverPayload);
+        await this.handlers.onGameOver?.(payload as unknown as GameOverPayload);
         break;
 
       case "error": {

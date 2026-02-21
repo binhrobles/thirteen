@@ -122,6 +122,10 @@ class OnlineStore {
   private lastUpdateTime = 0;
   private readonly OWN_ACTION_WINDOW_MS = 200;
 
+  // Promise for waiting on queue drain
+  private queueDrainPromise: Promise<void> | null = null;
+  private queueDrainResolve: (() => void) | null = null;
+
   /**
    * Mark that we just took an action - the next update should render immediately
    */
@@ -135,6 +139,29 @@ class OnlineStore {
   queueGameUpdate(payload: GameUpdatedPayload): void {
     this.updateQueue.push(payload);
     this.processQueue();
+  }
+
+  /**
+   * Returns a promise that resolves when the update queue is empty
+   * and all updates have been processed.
+   */
+  waitForQueueDrain(): Promise<void> {
+    // If queue is empty and not processing, resolve immediately
+    if (this.updateQueue.length === 0 && !this.isProcessingQueue) {
+      return Promise.resolve();
+    }
+
+    // Reuse existing promise if already waiting
+    if (this.queueDrainPromise) {
+      return this.queueDrainPromise;
+    }
+
+    // Create new promise
+    this.queueDrainPromise = new Promise((resolve) => {
+      this.queueDrainResolve = resolve;
+    });
+
+    return this.queueDrainPromise;
   }
 
   /**
@@ -169,20 +196,24 @@ class OnlineStore {
         console.log(`[queue] No sleep (shouldSkipSleep: ${shouldSkipSleep}, firstUpdate: ${this.lastUpdateTime === 0})`);
       }
 
-      console.log("[queue] Applying update...");
       applyGameUpdate(payload);
       this.lastUpdateTime = Date.now();
-      console.log("[queue] Update applied, stateVersion now:", online.stateVersion);
 
       // Yield to allow UI to update after each state change
       await Promise.resolve();
-      console.log("[queue] Yielded to UI");
 
       isFirstUpdate = false;
     }
 
     console.log("[queue] Queue empty, processing complete");
     this.isProcessingQueue = false;
+
+    // Resolve any waiting promises
+    if (this.queueDrainResolve) {
+      this.queueDrainResolve();
+      this.queueDrainResolve = null;
+      this.queueDrainPromise = null;
+    }
   }
 }
 
@@ -314,7 +345,12 @@ export function initOnline(): void {
       online.errorMessage = error;
     },
 
-    onTourneyUpdated: (payload) => {
+    onTourneyUpdated: async (payload) => {
+      // If game is over, wait for queue drain
+      if (online.gameOver) {
+        await online.waitForQueueDrain();
+      }
+
       online.tourney = payload;
       online.statusMessage = "";
 
@@ -361,7 +397,10 @@ export function initOnline(): void {
       online.queueGameUpdate(payload);
     },
 
-    onGameOver: (payload: GameOverPayload) => {
+    onGameOver: async (payload: GameOverPayload) => {
+      // Wait for queue to drain before showing overlay
+      await online.waitForQueueDrain();
+
       online.gameOver = true;
       online.winOrder = payload.winOrder;
       online.pointsAwarded = payload.pointsAwarded;

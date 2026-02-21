@@ -111,6 +111,9 @@ class OnlineStore {
   showRoundHistory = $state<boolean>(false);
   playLog = $state<PlayLogEntry[]>([]);
 
+  /** Bumped on every state update to force Svelte reactivity */
+  stateVersion = $state(0);
+
   // Event queue for delayed rendering
   private updateQueue: GameUpdatedPayload[] = [];
   private isProcessingQueue = false;
@@ -156,6 +159,9 @@ class OnlineStore {
 
       applyGameUpdate(payload);
       this.lastUpdateTime = Date.now();
+
+      // Yield to allow UI to update after each state change
+      await Promise.resolve();
     }
 
     this.isProcessingQueue = false;
@@ -247,6 +253,9 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
   }
 
   console.log("[playLog] Current log length:", online.playLog.length);
+
+  // Bump version to trigger reactivity
+  online.stateVersion++;
 
   // Remove any selected cards that are no longer in hand
   const handValues = new Set(online.yourHand.map((c) => c.value));

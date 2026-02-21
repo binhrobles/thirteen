@@ -39,6 +39,9 @@ function getOnlinePlayerName(position: number): string {
 export function createOnlineAdapter(): UnifiedGameContext {
   // Derive unified state from online store
   const state: UnifiedGameState = $derived.by(() => {
+    // Access stateVersion to trigger reactivity
+    online.stateVersion;
+
     // Build tournament state if available
     let tournament: TournamentState | undefined;
     if (online.gameOver) {
@@ -86,6 +89,9 @@ export function createOnlineAdapter(): UnifiedGameContext {
 
   // Create a synthetic GameStateView for Pixi rendering
   const stateView: GameStateView = $derived.by(() => {
+    // Access stateVersion to trigger reactivity
+    online.stateVersion;
+
     // For online mode, we create a synthetic view since we only have partial data
     // Create placeholder cards for opponents based on hand counts
 

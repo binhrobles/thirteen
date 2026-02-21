@@ -43,8 +43,8 @@ export async function preloadCardTextures(): Promise<void> {
   await Assets.load(paths);
 }
 
-/** Card dimensions as percentage of viewport height (matching Godot's 18%) */
-const BASE_HEIGHT_PERCENT = 0.18;
+/** Card dimensions as percentage of viewport height */
+const BASE_HEIGHT_PERCENT = 0.25;
 const ASPECT_RATIO = 0.667; // width/height (2:3)
 
 /** Opponent card dimensions */

@@ -93,6 +93,7 @@ class OnlineStore {
     combo: number;
     cards: Card[];
     suited: boolean;
+    playedBy: number;
   } | null>(null);
   passedPlayers = $state<boolean[]>([false, false, false, false]);
   handCounts = $state<number[]>([13, 13, 13, 13]);
@@ -215,6 +216,7 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
       combo: payload.lastPlay.combo,
       cards: payload.lastPlay.cards.map((c) => Card.fromValue(c.value)),
       suited: payload.lastPlay.suited,
+      playedBy: payload.lastPlay.playedBy,
     };
   } else {
     online.lastPlay = null;
@@ -228,7 +230,7 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
   }
 
   // Case 2: New play detected (lastPlay changed and is not null)
-  if (online.lastPlay !== null) {
+  if (online.lastPlay !== null && payload.lastPlay !== null) {
     const playChanged =
       prevLastPlay === null ||
       prevLastPlay.cards.length !== online.lastPlay.cards.length ||
@@ -237,31 +239,14 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
       );
 
     if (playChanged) {
-      // Infer who played by checking which player's hand decreased
-      let playerWhoPlayed = -1;
-      const handChanges = [];
-      for (let i = 0; i < 4; i++) {
-        const change = online.handCounts[i] - prevHandCounts[i];
-        handChanges.push(change);
-        if (prevHandCounts[i] > online.handCounts[i]) {
-          playerWhoPlayed = i;
-          break;
-        }
-      }
-
-      console.log("[playLog] Hand changes:", handChanges, "detected player:", playerWhoPlayed);
-
-      if (playerWhoPlayed >= 0) {
-        const play = new Play(
-          online.lastPlay.combo,
-          online.lastPlay.cards,
-          online.lastPlay.suited
-        );
-        console.log(`[playLog] Play detected: player ${playerWhoPlayed} played ${online.lastPlay.cards.map(c => c.toString()).join(",")}`);
-        online.playLog.push({ player: playerWhoPlayed, play });
-      } else {
-        console.warn("[playLog] Play detected but couldn't infer player. prevCounts:", prevHandCounts, "newCounts:", online.handCounts);
-      }
+      // Use playedBy from the server (declarative!)
+      const play = new Play(
+        online.lastPlay.combo,
+        online.lastPlay.cards,
+        online.lastPlay.suited
+      );
+      console.log(`[playLog] Play detected: player ${payload.lastPlay.playedBy} played ${online.lastPlay.cards.map(c => c.toString()).join(",")}`);
+      online.playLog.push({ player: payload.lastPlay.playedBy, play });
     }
   }
 

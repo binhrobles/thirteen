@@ -79,6 +79,7 @@ export interface GameUpdatedPayload {
     combo: number;
     cards: CardData[];
     suited: boolean;
+    playedBy: number;
   } | null;
   passedPlayers: boolean[];
   handCounts: number[];

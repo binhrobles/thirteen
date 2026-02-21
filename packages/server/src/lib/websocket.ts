@@ -129,6 +129,7 @@ export async function broadcastGameUpdate(
                     value: c.value,
                   })),
                   suited: game.lastPlay.suited,
+                  playedBy: game.lastPlayBy,
                 }
               : null,
             passedPlayers: game.playersInRound.map((inRound) => !inRound),

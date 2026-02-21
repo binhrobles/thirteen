@@ -189,6 +189,7 @@ async function handleReconnect(
                 value: c.value,
               })),
               suited: game.lastPlay.suited,
+              playedBy: game.lastPlayBy,
             }
           : null,
         passedPlayers: game.playersInRound.map((inRound) => !inRound),

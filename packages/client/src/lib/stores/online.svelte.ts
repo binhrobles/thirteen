@@ -144,12 +144,20 @@ class OnlineStore {
     if (this.isProcessingQueue) return;
     this.isProcessingQueue = true;
 
+    // Check if first update should render immediately (player's own action)
+    const isFirstUpdateOwnAction = this.updateQueue.length > 0 &&
+      Date.now() - this.lastOwnActionTime < this.OWN_ACTION_WINDOW_MS;
+
+    let isFirstUpdate = true;
+
     while (this.updateQueue.length > 0) {
       const payload = this.updateQueue.shift()!;
-      const isOwnAction = Date.now() - this.lastOwnActionTime < this.OWN_ACTION_WINDOW_MS;
 
-      // Ensure minimum delay since last update (unless own action)
-      if (!isOwnAction && this.lastUpdateTime > 0) {
+      // Only skip sleep for the FIRST update if it's the player's own action
+      const shouldSkipSleep = isFirstUpdate && isFirstUpdateOwnAction;
+
+      // Ensure minimum delay since last update (unless first update after own action)
+      if (!shouldSkipSleep && this.lastUpdateTime > 0) {
         const elapsed = Date.now() - this.lastUpdateTime;
         const waitTime = Math.max(0, EVENT_RENDER_DELAY_MS - elapsed);
         console.log(`[queue] Sleeping for ${waitTime}ms before next update`);
@@ -157,7 +165,7 @@ class OnlineStore {
           await sleep(waitTime);
         }
       } else {
-        console.log(`[queue] No sleep (isOwnAction: ${isOwnAction}, firstUpdate: ${this.lastUpdateTime === 0})`);
+        console.log(`[queue] No sleep (shouldSkipSleep: ${shouldSkipSleep}, firstUpdate: ${this.lastUpdateTime === 0})`);
       }
 
       console.log("[queue] Applying update...");
@@ -168,6 +176,8 @@ class OnlineStore {
       // Yield to allow UI to update after each state change
       await Promise.resolve();
       console.log("[queue] Yielded to UI");
+
+      isFirstUpdate = false;
     }
 
     console.log("[queue] Queue empty, processing complete");

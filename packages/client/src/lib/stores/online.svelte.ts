@@ -189,11 +189,14 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
   } else {
     online.lastPlay = null;
   }
+  console.log(`prev lastPlay: ${prevLastPlay}`);
+  console.log(`new lastPlay: ${online.lastPlay}`);
 
   // Track play log changes
   // Case 1: Round reset (lastPlay went from something to null)
   if (prevLastPlay !== null && online.lastPlay === null) {
     online.playLog.push("round_reset");
+    console.log(`pushed round_reset: ${online.playLog}`);
   }
 
   // Case 2: New play detected (lastPlay changed and is not null)
@@ -205,7 +208,7 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
         (c, i) => c.value === online.lastPlay!.cards[i].value
       );
 
-    if (playChanged && prevCurrentPlayer >= 0) {
+    if (playChanged) {
       // The previous current player made this play
       const play = new Play(
         online.lastPlay.combo,
@@ -213,6 +216,7 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
         online.lastPlay.suited
       );
       online.playLog.push({ player: prevCurrentPlayer, play });
+      console.log(`pushed play: ${online.playLog}`);
     }
   }
 
@@ -221,6 +225,7 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
     if (!prevPassedPlayers[i] && payload.passedPlayers[i]) {
       // Player i just passed
       online.playLog.push({ player: i, play: "pass" });
+      console.log(`pushed pass: ${online.playLog}`);
     }
   }
 
@@ -297,8 +302,9 @@ export function initOnline(): void {
       online.yourHand = payload.yourHand.map((c) => Card.fromValue(c.value));
       online.currentPlayer = payload.currentPlayer;
       online.lastPlay = null;
-      online.passedPlayers = [false, false, false, false];
-      online.handCounts = [13, 13, 13, 13];
+      // Use provided values for reconnection, or defaults for new game
+      online.passedPlayers = payload.passedPlayers ?? [false, false, false, false];
+      online.handCounts = payload.handCounts ?? [13, 13, 13, 13];
       online.selectedCards = new Set();
       online.playLog = [];
       online.showRoundHistory = false;

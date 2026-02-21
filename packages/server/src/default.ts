@@ -160,6 +160,8 @@ async function handleReconnect(
       value: c.value,
     }));
 
+    // Send game/started with CURRENT state (not initial state)
+    // This is important for reconnection - we need accurate counts/passed status
     await sendToConnection(connectionId, {
       type: "game/started",
       payload: {
@@ -167,6 +169,9 @@ async function handleReconnect(
         yourHand,
         currentPlayer: game.currentPlayer,
         players: playerNames,
+        // Include current state so UI doesn't flash with wrong values
+        passedPlayers: game.passedPlayers,
+        handCounts: game.hands.map((h) => h.length),
       },
     });
 

@@ -69,6 +69,8 @@ export interface GameStartedPayload {
   yourHand: CardData[];
   currentPlayer: number;
   players: string[];
+  passedPlayers?: boolean[];
+  handCounts?: number[];
 }
 
 export interface GameUpdatedPayload {

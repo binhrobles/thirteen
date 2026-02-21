@@ -32,6 +32,14 @@ export class GameApp {
   private dragDistance = 0;
   private static readonly DRAG_THRESHOLD = 10; // pixels before considering it a drag
 
+  // Momentum scrolling
+  private velocityX = 0;
+  private lastPointerX = 0;
+  private lastPointerTime = 0;
+  private momentumAnimation: number | null = null;
+  private static readonly MOMENTUM_FRICTION = 0.95; // Higher = less friction (0-1)
+  private static readonly MIN_VELOCITY = 0.1; // Stop animation below this velocity
+
   /** Detect if we're likely on a mobile device */
   private isMobile(): boolean {
     // Check for touch capability and small screen
@@ -76,11 +84,31 @@ export class GameApp {
         this.dragStartX = e.global.x;
         this.scrollStartX = this.scrollX;
         this.dragDistance = 0;
+
+        // Stop any ongoing momentum
+        this.stopMomentum();
+        this.velocityX = 0;
+        this.lastPointerX = e.global.x;
+        this.lastPointerTime = Date.now();
       }
     });
 
     this.app.stage.on("pointermove", (e) => {
       if (!this.isDragging) return;
+
+      const now = Date.now();
+      const dt = now - this.lastPointerTime;
+
+      if (dt > 0) {
+        // Calculate velocity (pixels per ms)
+        const velocityDx = (e.global.x - this.lastPointerX) / dt;
+        // Smooth velocity with exponential moving average
+        this.velocityX = this.velocityX * 0.5 + velocityDx * 0.5;
+      }
+
+      this.lastPointerX = e.global.x;
+      this.lastPointerTime = now;
+
       const dx = e.global.x - this.dragStartX;
       this.dragDistance = Math.abs(dx);
       this.scrollX = Math.max(
@@ -91,11 +119,17 @@ export class GameApp {
     });
 
     this.app.stage.on("pointerup", () => {
-      this.isDragging = false;
+      if (this.isDragging) {
+        this.isDragging = false;
+        this.startMomentum();
+      }
     });
 
     this.app.stage.on("pointerupoutside", () => {
-      this.isDragging = false;
+      if (this.isDragging) {
+        this.isDragging = false;
+        this.startMomentum();
+      }
     });
 
     // Mouse wheel / trackpad scrolling
@@ -122,6 +156,50 @@ export class GameApp {
   /** Check if the last interaction was a drag (vs a tap) */
   private wasDrag(): boolean {
     return this.dragDistance > GameApp.DRAG_THRESHOLD;
+  }
+
+  private stopMomentum(): void {
+    if (this.momentumAnimation !== null) {
+      cancelAnimationFrame(this.momentumAnimation);
+      this.momentumAnimation = null;
+    }
+  }
+
+  private startMomentum(): void {
+    // Only apply momentum if there's significant velocity
+    if (Math.abs(this.velocityX) < GameApp.MIN_VELOCITY) {
+      return;
+    }
+
+    // Convert velocity from px/ms to px/frame (assuming 60fps)
+    this.velocityX *= 16.67; // ~1000ms/60fps
+
+    const applyMomentumFrame = () => {
+      // Apply velocity to scroll position
+      this.scrollX = Math.max(
+        -this.maxScrollX,
+        Math.min(0, this.scrollX + this.velocityX),
+      );
+      this.playerHandScrollArea.x = this.scrollX;
+
+      // Apply friction
+      this.velocityX *= GameApp.MOMENTUM_FRICTION;
+
+      // Check for bounce at edges
+      if (this.scrollX <= -this.maxScrollX || this.scrollX >= 0) {
+        // At edge, dampen velocity more aggressively
+        this.velocityX *= 0.5;
+      }
+
+      // Continue animation if velocity is still significant
+      if (Math.abs(this.velocityX) > GameApp.MIN_VELOCITY) {
+        this.momentumAnimation = requestAnimationFrame(applyMomentumFrame);
+      } else {
+        this.momentumAnimation = null;
+      }
+    };
+
+    this.momentumAnimation = requestAnimationFrame(applyMomentumFrame);
   }
 
   onCardClick(handler: (cardValue: number) => void): void {
@@ -351,6 +429,7 @@ export class GameApp {
   }
 
   destroy(): void {
+    this.stopMomentum();
     this.app.destroy(true);
   }
 }

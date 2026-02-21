@@ -3,8 +3,12 @@
 
   const ctx = getGameContext();
 
-  // Only show status bar when it's the player's turn or there's an error
-  const shouldShow = $derived(ctx.helpers.isYourTurn() || ctx.state.isStatusError);
+  // Only show status bar when it's the player's turn or there's an error,
+  // and we have a message to display
+  const shouldShow = $derived(
+    (ctx.helpers.isYourTurn() || ctx.state.isStatusError) &&
+    ctx.state.statusMessage.trim() !== ""
+  );
 </script>
 
 {#if shouldShow}

@@ -109,6 +109,7 @@ class OnlineStore {
   // UI state
   statusMessage = $state<string>("");
   errorMessage = $state<string>("");
+  isStatusError = $state<boolean>(false);
   showRoundHistory = $state<boolean>(false);
   playLog = $state<PlayLogEntry[]>([]);
 
@@ -306,6 +307,9 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
   online.statusMessage = payload.currentPlayer === online.yourPosition
     ? "Your turn!"
     : `Player ${payload.currentPlayer + 1}'s turn`;
+
+  // Clear error flag on successful game update
+  online.isStatusError = false;
 }
 
 // ── Initialization ──
@@ -333,6 +337,7 @@ export function initOnline(): void {
       online.connectionState = ConnectionState.CONNECTED;
       online.statusMessage = "Connected to server";
       online.errorMessage = "";
+      online.isStatusError = false;
     },
 
     onDisconnected: () => {
@@ -382,6 +387,7 @@ export function initOnline(): void {
       online.statusMessage = payload.currentPlayer === payload.yourPosition
         ? "Your turn!"
         : `Player ${payload.currentPlayer + 1}'s turn`;
+      online.isStatusError = false;
 
       // Save session with inGame flag
       saveSession({
@@ -416,6 +422,8 @@ export function initOnline(): void {
 
     onServerError: (code, message) => {
       online.errorMessage = `[${code}] ${message}`;
+      online.statusMessage = message;
+      online.isStatusError = true;
 
       // Clear session on certain unrecoverable errors
       if (code === "SEAT_NOT_FOUND" || code === "SEAT_TAKEN") {

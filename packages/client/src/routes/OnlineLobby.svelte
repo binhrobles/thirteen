@@ -17,8 +17,7 @@
     type SeatClientState,
   } from "../lib/stores/online.svelte.js";
   import { ConnectionState } from "../lib/ws/index.js";
-
-  const WS_URL = "wss://6u47cryn67.execute-api.us-east-1.amazonaws.com/prod";
+  import { WS_URL } from "../lib/config.js";
 
   let nameInput = $state("Player");
 

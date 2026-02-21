@@ -152,18 +152,25 @@ class OnlineStore {
       if (!isOwnAction && this.lastUpdateTime > 0) {
         const elapsed = Date.now() - this.lastUpdateTime;
         const waitTime = Math.max(0, EVENT_RENDER_DELAY_MS - elapsed);
+        console.log(`[queue] Sleeping for ${waitTime}ms before next update`);
         if (waitTime > 0) {
           await sleep(waitTime);
         }
+      } else {
+        console.log(`[queue] No sleep (isOwnAction: ${isOwnAction}, firstUpdate: ${this.lastUpdateTime === 0})`);
       }
 
+      console.log("[queue] Applying update...");
       applyGameUpdate(payload);
       this.lastUpdateTime = Date.now();
+      console.log("[queue] Update applied, stateVersion now:", online.stateVersion);
 
       // Yield to allow UI to update after each state change
       await Promise.resolve();
+      console.log("[queue] Yielded to UI");
     }
 
+    console.log("[queue] Queue empty, processing complete");
     this.isProcessingQueue = false;
   }
 }
@@ -222,12 +229,17 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
     if (playChanged) {
       // Infer who played by checking which player's hand decreased
       let playerWhoPlayed = -1;
+      const handChanges = [];
       for (let i = 0; i < 4; i++) {
+        const change = online.handCounts[i] - prevHandCounts[i];
+        handChanges.push(change);
         if (prevHandCounts[i] > online.handCounts[i]) {
           playerWhoPlayed = i;
           break;
         }
       }
+
+      console.log("[playLog] Hand changes:", handChanges, "detected player:", playerWhoPlayed);
 
       if (playerWhoPlayed >= 0) {
         const play = new Play(
@@ -238,7 +250,7 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
         console.log(`[playLog] Play detected: player ${playerWhoPlayed} played ${online.lastPlay.cards.map(c => c.toString()).join(",")}`);
         online.playLog.push({ player: playerWhoPlayed, play });
       } else {
-        console.warn("[playLog] Play detected but couldn't infer player (hand counts didn't change)");
+        console.warn("[playLog] Play detected but couldn't infer player. prevCounts:", prevHandCounts, "newCounts:", online.handCounts);
       }
     }
   }

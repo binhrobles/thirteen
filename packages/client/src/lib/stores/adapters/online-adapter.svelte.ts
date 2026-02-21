@@ -16,6 +16,8 @@ import {
   isYourTurn as onlineIsYourTurn,
   hasPower as onlineHasPower,
   canPass as onlineCanPass,
+  toggleRoundHistory as onlineToggleRoundHistory,
+  closeRoundHistory as onlineCloseRoundHistory,
 } from "../online.svelte.js";
 import { navigate } from "../router.svelte.js";
 import type {
@@ -70,8 +72,8 @@ export function createOnlineAdapter(): UnifiedGameContext {
       statusMessage: online.statusMessage,
       isStatusError: online.errorMessage !== "",
       isThinking: false, // Online doesn't show thinking state
-      showRoundHistory: false, // Online doesn't support round history yet
-      playLog: [], // Online doesn't track play log on client
+      showRoundHistory: online.showRoundHistory,
+      playLog: online.playLog,
 
       // Context
       yourPosition: online.yourPosition,
@@ -125,11 +127,10 @@ export function createOnlineAdapter(): UnifiedGameContext {
       onlineClearSelection();
     },
     toggleRoundHistory: () => {
-      // Online doesn't support round history drawer yet
-      // Could show a toast or implement later
+      onlineToggleRoundHistory();
     },
     closeRoundHistory: () => {
-      // No-op for online
+      onlineCloseRoundHistory();
     },
     startNewGame: () => {
       // In online mode, "new game" returns to lobby

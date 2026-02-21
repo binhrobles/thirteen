@@ -6,7 +6,9 @@
 
 import {
   Card,
+  Play,
   type CardData,
+  type PlayLogEntry,
   type SeatClientState,
   type TourneyClientState,
 } from "@thirteen/game-logic";
@@ -68,6 +70,8 @@ class OnlineStore {
   // UI state
   statusMessage = $state<string>("");
   errorMessage = $state<string>("");
+  showRoundHistory = $state<boolean>(false);
+  playLog = $state<PlayLogEntry[]>([]);
 
   // Event queue for delayed rendering
   private updateQueue: GameUpdatedPayload[] = [];
@@ -128,6 +132,11 @@ export const online = new OnlineStore();
  * Apply a game update to the store (called from queue processor)
  */
 function applyGameUpdate(payload: GameUpdatedPayload): void {
+  // Capture previous state for play log tracking
+  const prevLastPlay = online.lastPlay;
+  const prevPassedPlayers = [...online.passedPlayers];
+  const prevCurrentPlayer = online.currentPlayer;
+
   online.yourHand = payload.yourHand.map((c) => Card.fromValue(c.value));
   online.currentPlayer = payload.currentPlayer;
   online.passedPlayers = payload.passedPlayers;
@@ -141,6 +150,40 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
     };
   } else {
     online.lastPlay = null;
+  }
+
+  // Track play log changes
+  // Case 1: Round reset (lastPlay went from something to null)
+  if (prevLastPlay !== null && online.lastPlay === null) {
+    online.playLog.push("round_reset");
+  }
+
+  // Case 2: New play detected (lastPlay changed and is not null)
+  if (online.lastPlay !== null) {
+    const playChanged =
+      prevLastPlay === null ||
+      prevLastPlay.cards.length !== online.lastPlay.cards.length ||
+      !prevLastPlay.cards.every(
+        (c, i) => c.value === online.lastPlay!.cards[i].value
+      );
+
+    if (playChanged && prevCurrentPlayer >= 0) {
+      // The previous current player made this play
+      const play = new Play(
+        online.lastPlay.combo,
+        online.lastPlay.cards,
+        online.lastPlay.suited
+      );
+      online.playLog.push({ player: prevCurrentPlayer, play });
+    }
+  }
+
+  // Case 3: Pass detected (passedPlayers changed)
+  for (let i = 0; i < 4; i++) {
+    if (!prevPassedPlayers[i] && payload.passedPlayers[i]) {
+      // Player i just passed
+      online.playLog.push({ player: i, play: "pass" });
+    }
   }
 
   // Remove any selected cards that are no longer in hand
@@ -202,6 +245,8 @@ export function initOnline(): void {
       online.passedPlayers = [false, false, false, false];
       online.handCounts = [13, 13, 13, 13];
       online.selectedCards = new Set();
+      online.playLog = [];
+      online.showRoundHistory = false;
       online.statusMessage = payload.currentPlayer === payload.yourPosition
         ? "Your turn!"
         : `Player ${payload.currentPlayer + 1}'s turn`;
@@ -327,4 +372,12 @@ export function hasPower(): boolean {
 
 export function canPass(): boolean {
   return isYourTurn() && !hasPower();
+}
+
+export function toggleRoundHistory(): void {
+  online.showRoundHistory = !online.showRoundHistory;
+}
+
+export function closeRoundHistory(): void {
+  online.showRoundHistory = false;
 }

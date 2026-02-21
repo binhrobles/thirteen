@@ -173,7 +173,14 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
   // Capture previous state for play log tracking
   const prevLastPlay = online.lastPlay;
   const prevPassedPlayers = [...online.passedPlayers];
-  const prevCurrentPlayer = online.currentPlayer;
+  const prevHandCounts = [...online.handCounts];
+
+  console.log("[playLog] Update received:", {
+    prevCounts: prevHandCounts,
+    newCounts: payload.handCounts,
+    prevLP: prevLastPlay?.cards.map(c => c.toString()).join(","),
+    newLP: payload.lastPlay?.cards.map(c => c.toString()).join(","),
+  });
 
   online.yourHand = payload.yourHand.map((c) => Card.fromValue(c.value));
   online.currentPlayer = payload.currentPlayer;
@@ -193,6 +200,7 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
   // Track play log changes
   // Case 1: Round reset (lastPlay went from something to null)
   if (prevLastPlay !== null && online.lastPlay === null) {
+    console.log("[playLog] Round reset detected");
     online.playLog.push("round_reset");
   }
 
@@ -206,13 +214,26 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
       );
 
     if (playChanged) {
-      // The previous current player made this play
-      const play = new Play(
-        online.lastPlay.combo,
-        online.lastPlay.cards,
-        online.lastPlay.suited
-      );
-      online.playLog.push({ player: prevCurrentPlayer, play });
+      // Infer who played by checking which player's hand decreased
+      let playerWhoPlayed = -1;
+      for (let i = 0; i < 4; i++) {
+        if (prevHandCounts[i] > online.handCounts[i]) {
+          playerWhoPlayed = i;
+          break;
+        }
+      }
+
+      if (playerWhoPlayed >= 0) {
+        const play = new Play(
+          online.lastPlay.combo,
+          online.lastPlay.cards,
+          online.lastPlay.suited
+        );
+        console.log(`[playLog] Play detected: player ${playerWhoPlayed} played ${online.lastPlay.cards.map(c => c.toString()).join(",")}`);
+        online.playLog.push({ player: playerWhoPlayed, play });
+      } else {
+        console.warn("[playLog] Play detected but couldn't infer player (hand counts didn't change)");
+      }
     }
   }
 
@@ -220,9 +241,12 @@ function applyGameUpdate(payload: GameUpdatedPayload): void {
   for (let i = 0; i < 4; i++) {
     if (!prevPassedPlayers[i] && payload.passedPlayers[i]) {
       // Player i just passed
+      console.log(`[playLog] Pass detected: player ${i} passed`);
       online.playLog.push({ player: i, play: "pass" });
     }
   }
+
+  console.log("[playLog] Current log length:", online.playLog.length);
 
   // Remove any selected cards that are no longer in hand
   const handValues = new Set(online.yourHand.map((c) => c.value));

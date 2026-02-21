@@ -36,10 +36,18 @@ export function choosePlay(hand: Card[], lastPlay: Play | null): Card[] {
       ...evaluation.singles,
       ...evaluation.pairs,
       ...evaluation.triples,
-      ...evaluation.quads,
       ...evaluation.runs,
     ];
-    if (nonBombPlays.length === 0) return [];
+
+    // no non-bomb plays remain, so play the first bomb
+    if (nonBombPlays.length === 0) {
+      if (evaluation.quads.length > 0) {
+        return evaluation.quads[0];
+      }
+      if (evaluation.bombs.length > 0) {
+        return evaluation.bombs[0];
+      }
+    }
 
     // Find the lowest card value across all plays
     const lowestValue = Math.min(

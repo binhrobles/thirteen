@@ -153,7 +153,7 @@ async function runBotTurns(): Promise<void> {
     game.statusMessage = `Player ${player + 1} is thinking...`;
     game.isStatusError = false;
 
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 1000));
 
     const hand = game.gameState.getHand(player);
     const cards = choosePlay(hand, game.gameState.lastPlay);

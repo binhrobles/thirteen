@@ -170,7 +170,7 @@ async function handleReconnect(
         currentPlayer: game.currentPlayer,
         players: playerNames,
         // Include current state so UI doesn't flash with wrong values
-        passedPlayers: game.passedPlayers,
+        passedPlayers: game.playersInRound.map((inRound) => !inRound),
         handCounts: game.hands.map((h) => h.length),
       },
     });
@@ -191,7 +191,7 @@ async function handleReconnect(
               suited: game.lastPlay.suited,
             }
           : null,
-        passedPlayers: game.passedPlayers,
+        passedPlayers: game.playersInRound.map((inRound) => !inRound),
         handCounts: game.hands.map((h) => h.length),
         yourHand,
       },

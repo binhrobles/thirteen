@@ -24,15 +24,38 @@ function getPlayValue(cards: Card[]): number {
 
 /**
  * Greedy bot: plays the lowest-value valid combo.
- * If opening (has power): plays the lowest single.
+ * If opening (has power): plays the lowest card in the largest non-bomb combo.
  * Returns empty array to pass.
  */
 export function choosePlay(hand: Card[], lastPlay: Play | null): Card[] {
   const evaluation = evaluate(hand, lastPlay);
 
-  // If opening (has power), play the lowest single
-  if (lastPlay === null && evaluation.singles.length > 0) {
-    return evaluation.singles[0];
+  // If opening (has power), play the lowest card in the largest non-bomb combo
+  if (lastPlay === null) {
+    const nonBombPlays = [
+      ...evaluation.singles,
+      ...evaluation.pairs,
+      ...evaluation.triples,
+      ...evaluation.quads,
+      ...evaluation.runs,
+    ];
+    if (nonBombPlays.length === 0) return [];
+
+    // Find the lowest card value across all plays
+    const lowestValue = Math.min(
+      ...nonBombPlays.flatMap((p) => p.map((c) => c.value)),
+    );
+
+    // Filter to plays containing that lowest card
+    const playsWithLowest = nonBombPlays.filter((p) =>
+      p.some((c) => c.value === lowestValue),
+    );
+
+    // Pick the largest combo (most cards); break ties by lowest max value
+    playsWithLowest.sort(
+      (a, b) => b.length - a.length || getPlayValue(a) - getPlayValue(b),
+    );
+    return playsWithLowest[0];
   }
 
   const allPlays = getAllPlays(evaluation);

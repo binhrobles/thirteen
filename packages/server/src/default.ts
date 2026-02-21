@@ -154,7 +154,11 @@ async function handleReconnect(
 
     // Send game/started with initial state
     const playerNames = tourney.seats.map((s) => s.playerName ?? "Empty");
-    const yourHand = game.hands[seatPosition].map((c) => c.toData());
+    const yourHand = game.hands[seatPosition].map((c) => ({
+      rank: c.rank,
+      suit: c.suit,
+      value: c.value,
+    }));
 
     await sendToConnection(connectionId, {
       type: "game/started",
@@ -174,7 +178,11 @@ async function handleReconnect(
         lastPlay: game.lastPlay
           ? {
               combo: game.lastPlay.combo,
-              cards: game.lastPlay.cards.map((c) => c.toData()),
+              cards: game.lastPlay.cards.map((c) => ({
+                rank: c.rank,
+                suit: c.suit,
+                value: c.value,
+              })),
               suited: game.lastPlay.suited,
             }
           : null,

@@ -31,3 +31,4 @@ Run `bd prime` for session close protocol and full workflow guide.
 - **[Game Rules](docs/game-rules.md)** - Tiến Lên card game rules (read before modifying game logic)
 - **[UX Guidelines](docs/ux-guidelines.md)** - Mobile-first design principles (read before modifying client UI)
 - **[Project Context](docs/project-context.md)** - Features, roadmap, tech stack details
+- **[Multiplayer Architecture](docs/multiplayer-architecture.md)** - WebSocket API, Lambda handlers, DynamoDB schema (read before modifying server)

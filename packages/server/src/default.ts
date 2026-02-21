@@ -149,7 +149,7 @@ async function handleReconnect(
   if (tourney.status === TourneyStatus.IN_PROGRESS && tourney.currentGame) {
     // Send full game state for active game
     const game = GameState.fromSnapshot(
-      tourney.currentGame as unknown as ReturnType<GameState["toSnapshot"]>,
+      tourney.currentGame!,
     );
 
     // Send game/started with initial state
@@ -394,7 +394,7 @@ async function handlePlayCards(
   const cards = cardsData.map((c) => Card.fromValue(c.value));
 
   const game = GameState.fromSnapshot(
-    tourney.currentGame as unknown as ReturnType<GameState["toSnapshot"]>,
+    tourney.currentGame!,
   );
 
   const result = game.canPlay(seat.position, cards);
@@ -435,7 +435,7 @@ async function handlePass(
   }
 
   const game = GameState.fromSnapshot(
-    tourney.currentGame as unknown as ReturnType<GameState["toSnapshot"]>,
+    tourney.currentGame!,
   );
 
   if (!game.passTurn(seat.position)) {

@@ -1,5 +1,6 @@
 import { deal } from "./deck.js";
 import { GameState } from "./game-state.js";
+import type { GameStateSnapshot, GameSnapshot } from "./types.js";
 
 export enum TourneyStatus {
   WAITING = "waiting",
@@ -127,8 +128,8 @@ export class Tourney {
   status: TourneyStatus;
   targetScore: number;
   seats: Seat[];
-  currentGame: Record<string, unknown> | null;
-  gameHistory: Record<string, unknown>[];
+  currentGame: GameStateSnapshot | null;
+  gameHistory: GameSnapshot[];
 
   constructor(tourneyId = Tourney.GLOBAL_ID) {
     this.tourneyId = tourneyId;
@@ -152,9 +153,9 @@ export class Tourney {
     }
 
     tourney.currentGame =
-      (item.currentGame as Record<string, unknown>) ?? null;
+      (item.currentGame as GameStateSnapshot) ?? null;
     tourney.gameHistory =
-      (item.gameHistory as Record<string, unknown>[]) ?? [];
+      (item.gameHistory as GameSnapshot[]) ?? [];
 
     return tourney;
   }
@@ -395,10 +396,7 @@ export class Tourney {
     const hands = deal(Tourney.SEATS_COUNT);
     const game = new GameState(hands);
 
-    this.currentGame = {
-      ...game.toSnapshot(),
-      gameNumber: this.gameHistory.length + 1,
-    };
+    this.currentGame = game.toSnapshot();
 
     // Reset ready flags
     for (const seat of this.seats) {

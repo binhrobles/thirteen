@@ -27,3 +27,9 @@ export interface GameStateSnapshot {
   winOrder: number[];
   playersInGame: boolean[];
 }
+
+export interface GameSnapshot {
+  gameNumber: number;
+  winOrder: number[];
+  pointsAwarded: number[];
+}

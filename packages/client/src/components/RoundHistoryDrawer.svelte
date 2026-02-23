@@ -119,7 +119,6 @@
     color: #e5e5e5;
     font-size: 1.5rem;
     margin: 0 0 16px 0;
-    font-family: monospace;
   }
 
   .history-list {
@@ -132,7 +131,6 @@
     text-align: center;
     color: #999;
     font-size: 1rem;
-    font-family: monospace;
   }
 
   .play-entry {
@@ -161,13 +159,11 @@
     color: #fff;
     font-size: 1.1rem;
     font-weight: bold;
-    font-family: monospace;
   }
 
   .pass-label {
     color: #ff6666;
     font-size: 1rem;
-    font-family: monospace;
     font-weight: bold;
   }
 

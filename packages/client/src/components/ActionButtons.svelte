@@ -46,7 +46,7 @@
     border: none;
     border-radius: 1vh;
     font-size: 3vh;
-    font-family: monospace;
+    font-family: 'Playfair Display', serif;
     font-weight: bold;
     cursor: pointer;
   }

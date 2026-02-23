@@ -45,14 +45,14 @@
       {#if ctx.state.tournament?.tourneyComplete}
         <!-- Tournament Complete Banner -->
         <div class="winner-banner">
-          <h2>Tournament Complete!</h2>
+          <h2>Tourney Complete</h2>
           <div class="winner-avatar">
             <img
               src={`https://api.dicebear.com/9.x/croodles/svg?seed=${encodeURIComponent(ctx.helpers.getPlayerName(ctx.state.tournament.tourneyWinner ?? 0))}`}
               alt="Winner"
             />
           </div>
-          <p class="winner-name">{ctx.helpers.getPlayerName(ctx.state.tournament.tourneyWinner ?? 0)} Wins!</p>
+          <p class="winner-name">{ctx.helpers.getPlayerName(ctx.state.tournament.tourneyWinner ?? 0)} Won!</p>
         </div>
       {:else}
         <h2>Game Over</h2>
@@ -152,7 +152,6 @@
     border-radius: 1.5vh;
     text-align: center;
     color: white;
-    font-family: monospace;
     min-width: 85vw;
     max-width: 95vw;
   }
@@ -342,7 +341,7 @@
     border: none;
     border-radius: 1vh;
     font-size: 2.8vh;
-    font-family: monospace;
+    font-family: 'Playfair Display', serif;
     font-weight: bold;
     cursor: pointer;
     background: #2ecc40;

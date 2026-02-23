@@ -47,6 +47,9 @@ export function choosePlay(hand: Card[], lastPlay: Play | null): Card[] {
       if (evaluation.bombs.length > 0) {
         return evaluation.bombs[0];
       }
+      // Safety: if no plays at all (shouldn't happen), return first card as single
+      console.error("[bot] No valid plays found when opening - playing first card");
+      return hand.length > 0 ? [hand[0]] : [];
     }
 
     // Find the lowest card value across all plays
@@ -63,7 +66,7 @@ export function choosePlay(hand: Card[], lastPlay: Play | null): Card[] {
     playsWithLowest.sort(
       (a, b) => b.length - a.length || getPlayValue(a) - getPlayValue(b),
     );
-    return playsWithLowest[0];
+    return playsWithLowest[0] ?? (hand.length > 0 ? [hand[0]] : []);
   }
 
   const allPlays = getAllPlays(evaluation);

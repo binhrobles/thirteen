@@ -8,6 +8,7 @@
   import GameOverScreen from "../components/GameOverScreen.svelte";
   import RoundHistoryDrawer from "../components/RoundHistoryDrawer.svelte";
   import Opponents from "../components/Opponents.svelte";
+  import SettingsMenu from "../components/SettingsMenu.svelte";
 
   interface Props {
     mode: "local" | "online";
@@ -19,6 +20,7 @@
 </script>
 
 <div class="game">
+  <SettingsMenu />
   <Opponents />
   <div class="canvas-area">
     <GameCanvas />
@@ -31,6 +33,7 @@
 
 <style>
   .game {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;

@@ -34,10 +34,6 @@
     connectToServer(WS_URL);
   }
 
-  function handleDisconnect() {
-    disconnectFromServer();
-  }
-
   function handleBack() {
     disconnectFromServer();
     navigate("menu");
@@ -143,7 +139,6 @@
       <div class="connection-status">
         <span class="status-dot connected"></span>
         Connected as <strong>{online.playerName}</strong>
-        <button class="btn btn-small" onclick={handleDisconnect}>Disconnect</button>
       </div>
 
       {#if online.tourney}
@@ -197,8 +192,8 @@
 
         <!-- Debug actions -->
         <div class="debug-actions">
-          <button class="btn btn-small" onclick={handleQuickStart}>Quick Start</button>
-          <button class="btn btn-small btn-danger" onclick={debugReset}>Reset Tourney</button>
+          <button class="btn btn-small btn-admin" onclick={handleQuickStart}>Quick Start</button>
+          <button class="btn btn-small btn-admin btn-danger" onclick={debugReset}>Reset Tourney</button>
         </div>
       {:else}
         <p>Loading tournament...</p>
@@ -222,7 +217,7 @@
     height: 100%;
     background: #1a5c2a;
     color: white;
-    font-family: monospace;
+    font-family: 'Playfair Display', serif;
     padding: 2vh;
     box-sizing: border-box;
   }
@@ -269,7 +264,7 @@
   .form-group input[type="text"] {
     padding: 1.5vh;
     font-size: 2.5vh;
-    font-family: monospace;
+    font-family: 'Playfair Display', serif;
     border: none;
     border-radius: 0.5vh;
     text-align: center;
@@ -414,7 +409,7 @@
     border: none;
     border-radius: 0.5vh;
     font-size: 2.5vh;
-    font-family: monospace;
+    font-family: 'Playfair Display', serif;
     font-weight: bold;
     cursor: pointer;
   }
@@ -424,6 +419,7 @@
     color: white;
     border: 1px solid white;
     padding: 1vh 2vw;
+    margin-right: 4vw;
     font-size: 2vh;
   }
 
@@ -446,6 +442,10 @@
     font-size: 1.8vh;
     background: #444;
     color: white;
+  }
+
+  .btn-admin {
+    font-family: monospace;
   }
 
   .btn-danger {

@@ -67,7 +67,6 @@
 
   .opponent-info {
     text-align: left;
-    font-family: monospace;
     color: white;
   }
 

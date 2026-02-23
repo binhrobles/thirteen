@@ -23,9 +23,8 @@
     bottom: 20vh;
     left: 50%;
     transform: translateX(-50%);
-    padding: 0.5vh 3vw;
+    padding: 1vh 3vw;
     text-align: center;
-    font-family: monospace;
     font-size: 2.5vh;
     color: #fff;
     background: rgba(0, 0, 0, 0.6);

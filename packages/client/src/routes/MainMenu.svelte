@@ -34,7 +34,6 @@
     justify-content: center;
     height: 100%;
     color: white;
-    font-family: monospace;
     background: #1a5c2a;
   }
 
@@ -60,7 +59,7 @@
     border: none;
     border-radius: 1vh;
     font-size: 3vh;
-    font-family: monospace;
+    font-family: 'Playfair Display', serif;
     font-weight: bold;
     cursor: pointer;
     min-width: 50vw;

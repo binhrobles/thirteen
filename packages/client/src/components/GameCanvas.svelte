@@ -88,6 +88,5 @@
     transform: translate(-50%, -50%);
     color: white;
     font-size: 1.2rem;
-    font-family: monospace;
   }
 </style>

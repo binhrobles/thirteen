@@ -57,3 +57,6 @@ assets/         # Shared assets (card sprites)
 
 **Card Sprites:**
 [Jorel's Card Pack by Jorel](https://games-by-jorel.itch.io/jorels-card-pack) (96x128px pixel art)
+
+**Settings Icon:**
+[Settings Cog Line Icon](https://www.svgrepo.com/svg/376667/settings-cog-line) from SVG Repo

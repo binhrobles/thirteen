@@ -162,8 +162,12 @@ async function runBotTurns(): Promise<void> {
       const result = game.gameState.playCards(player, cards);
       console.log(`[game] Bot ${player} played: ${result.play!.toString()} (${game.gameState.getHand(player).length} cards left)`);
     } else {
-      game.gameState.passTurn(player);
-      console.log(`[game] Bot ${player} passed`);
+      const passed = game.gameState.passTurn(player);
+      if (passed) {
+        console.log(`[game] Bot ${player} passed`);
+      } else {
+        console.error(`[game] Bot ${player} tried to pass but was denied (has power or invalid state)`);
+      }
     }
 
     game.stateVersion++;

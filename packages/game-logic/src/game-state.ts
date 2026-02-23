@@ -111,6 +111,17 @@ export class GameState {
     this.playLog.push({ player: playerId, play: "pass" });
 
     if (this.checkRoundOver()) {
+      // Give power to the player who won the trick
+      this.currentPlayer = this.lastPlayBy;
+      // But if they're out of the game (won), find next active player
+      if (!this.playersInGame[this.currentPlayer]) {
+        const start = this.currentPlayer;
+        while (true) {
+          this.currentPlayer = (this.currentPlayer + NUM_PLAYERS - 1) % NUM_PLAYERS;
+          if (this.playersInGame[this.currentPlayer]) break;
+          if (this.currentPlayer === start) break; // Safety check
+        }
+      }
       this.resetRound();
     } else {
       this.advanceTurn();
@@ -145,10 +156,11 @@ export class GameState {
       }
       this.emit({ type: "game_over", winOrder: this.winOrder });
     } else {
+      // Always advance to next player (counter-clockwise)
+      // This gives power to the person to the right of the winner
+      this.advanceTurn();
       if (this.checkRoundOver()) {
         this.resetRound();
-      } else {
-        this.advanceTurn();
       }
     }
   }

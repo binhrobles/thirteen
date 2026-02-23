@@ -1,10 +1,5 @@
 # RL Training Infrastructure Design (bead fl4)
 
-> **TODO**: SUITED_RUN combo is being added to game-logic. Once that lands, revisit:
-> - Section 2 (Action Space): `evaluate()` will return suited runs separately; may affect MAX_ACTIONS sizing
-> - Section 7 (DecisionRecord): `last_play.combo` values will include "SUITED_RUN"
-> - Section 1 (Observation): `last_play_combo` one-hot may need an 8th slot for SUITED_RUN
-
 ## Context
 Design the full RL training infrastructure for Tiến Lên — covering state features, action space, model variants, ONNX deployment, training framework, and (most importantly) training data collection & storage. This is a design document; implementation starts with data collection.
 

@@ -146,6 +146,39 @@ describe("GameState", () => {
     expect(gameOverEvents.length).toBe(1);
   });
 
+  it("gives power to the right when a player wins with last card and no one beats it", () => {
+    // Player 0 has only 3♠ and will play their last card
+    // Players 1, 2, 3 have higher cards but will pass
+    // Power should go to player 3 (counter-clockwise from 0)
+    const hands: Card[][] = [
+      [c(Rank.THREE, Suit.SPADES)],
+      [c(Rank.FIVE, Suit.CLUBS), c(Rank.SIX, Suit.DIAMONDS)],
+      [c(Rank.SEVEN, Suit.HEARTS), c(Rank.EIGHT, Suit.CLUBS)],
+      [c(Rank.NINE, Suit.SPADES), c(Rank.TEN, Suit.DIAMONDS)],
+    ];
+    const gs = makeGame(hands);
+    const events: GameEvent[] = [];
+    gs.on((e) => events.push(e));
+
+    // Player 0 plays their last card
+    gs.playCards(0, [c(Rank.THREE, Suit.SPADES)]);
+    expect(gs.winOrder).toEqual([0]);
+
+    // Counter-clockwise order: 3 → 2 → 1
+    // Everyone passes
+    gs.passTurn(3);
+    gs.passTurn(2);
+    gs.passTurn(1);
+
+    // Player 3 (to the right of player 0) should have power
+    expect(gs.currentPlayer).toBe(3);
+    expect(gs.hasPower()).toBe(true);
+
+    const roundResets = events.filter((e) => e.type === "round_reset");
+    expect(roundResets.length).toBe(1);
+    expect(roundResets[0].player).toBe(3);
+  });
+
   it("plays a full game with dealt hands", () => {
     const hands = deal();
     const gs = new GameState(hands);

@@ -23,12 +23,13 @@
     bottom: 20vh;
     left: 50%;
     transform: translateX(-50%);
-    padding: 1vh 3vw;
+    padding: var(--space-sm) 3vw;
     text-align: center;
-    font-size: 2.5vh;
-    color: #fff;
-    background: rgba(0, 0, 0, 0.6);
-    border-radius: 0.5em;
+    font-size: var(--text-md);
+    font-family: var(--font-mono);
+    color: var(--color-text-primary);
+    background: var(--color-bg-bar);
+    border-radius: var(--radius-md);
     pointer-events: none;
     z-index: 10;
   }

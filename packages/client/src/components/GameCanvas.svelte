@@ -4,6 +4,7 @@
   import { GameApp } from "../lib/pixi/game-app.js";
   import { preloadCardTextures } from "../lib/pixi/card-sprite.js";
   import { getGameContext } from "../lib/stores/game-context.svelte.js";
+  import { PIXI_COLORS } from "../lib/design-tokens.js";
 
   const ctx = getGameContext();
 
@@ -17,7 +18,7 @@
     (async () => {
       const app = new Application();
       await app.init({
-        background: 0x1a5c2a,
+        background: PIXI_COLORS.felt,
         resizeTo: canvasContainer,
         antialias: true,
         resolution: window.devicePixelRatio || 1,

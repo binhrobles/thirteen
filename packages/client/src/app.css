@@ -1,5 +1,71 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap');
 
+:root {
+  /* --- Color Palette --- */
+  --color-felt: #0f3d1e;
+  --color-bg-deep: #0a0a0f;
+  --color-bg-panel: #1a1a22;
+  --color-bg-panel-raised: #24242e;
+  --color-bg-bar: rgba(10, 10, 15, 0.85);
+  --color-primary: #3a8a4f;
+  --color-primary-hover: #458f5a;
+  --color-destructive: #8b3a3a;
+  --color-destructive-hover: #9a4545;
+  --color-secondary: #4a4a56;
+  --color-secondary-hover: #5a5a66;
+  --color-gold: #d4a843;
+  --color-gold-bright: #e8c35a;
+  --color-gold-bg: rgba(212, 168, 67, 0.15);
+  --color-warning: #c47a2a;
+  --color-error: #b94a42;
+  --color-text-primary: #e8e4df;
+  --color-text-secondary: #a09a92;
+  --color-text-tertiary: #706b64;
+  --color-border-subtle: rgba(212, 168, 67, 0.15);
+  --color-border-medium: rgba(212, 168, 67, 0.30);
+  --color-overlay: rgba(5, 5, 10, 0.75);
+
+  /* --- Typography --- */
+  --font-display: 'Playfair Display', serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+
+  /* --- Size Scale (vh-based for mobile-first) --- */
+  --text-xs: 1.6vh;
+  --text-sm: 1.8vh;
+  --text-base: 2.2vh;
+  --text-md: 2.5vh;
+  --text-lg: 3vh;
+  --text-xl: 4vh;
+  --text-2xl: 5vh;
+  --text-hero: 6vh;
+
+  /* --- Spacing --- */
+  --space-xs: 0.5vh;
+  --space-sm: 1vh;
+  --space-md: 1.5vh;
+  --space-lg: 2vh;
+  --space-xl: 3vh;
+  --space-2xl: 4vh;
+
+  /* --- Border Radius --- */
+  --radius-sm: 0.5vh;
+  --radius-md: 1vh;
+  --radius-lg: 1.5vh;
+  --radius-xl: 2vh;
+  --radius-round: 50%;
+
+  /* --- Shadows --- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-inset-panel: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-glow-gold: 0 0 16px rgba(212, 168, 67, 0.2);
+
+  /* --- Transitions --- */
+  --transition-fast: 0.1s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+}
 
 *,
 *::before,
@@ -15,7 +81,7 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #111;
+  background: var(--color-bg-deep);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   user-select: none;

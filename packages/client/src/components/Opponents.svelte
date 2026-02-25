@@ -45,14 +45,15 @@
   .opponents {
     display: flex;
     justify-content: space-around;
-    padding: 1vh 2vw;
-    background: rgba(0, 0, 0, 0.2);
+    padding: var(--space-sm) 2vw;
+    background: var(--color-bg-bar);
+    border-top: 1px solid var(--color-border-subtle);
   }
 
   .opponent {
     background: rgba(0, 0, 0, 0.3);
-    padding: 1vh 2vw;
-    border-radius: 1vh;
+    padding: var(--space-sm) 2vw;
+    border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     gap: 1.5vw;
@@ -61,17 +62,17 @@
   .opponent-avatar {
     width: 6vh;
     height: 6vh;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: rgba(255, 255, 255, 0.1);
   }
 
   .opponent-info {
     text-align: left;
-    color: white;
+    color: var(--color-text-primary);
   }
 
   .opponent.current {
-    border: 2px solid #ff851b;
+    border: 2px solid var(--color-warning);
   }
 
   .opponent.passed {
@@ -79,17 +80,19 @@
   }
 
   .opponent-name {
-    font-size: 2vh;
+    font-size: var(--text-lg);
     font-weight: bold;
   }
 
   .opponent-cards {
-    font-size: 1.8vh;
-    color: #aaa;
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
   }
 
   .opponent-status {
-    font-size: 1.6vh;
-    color: #ff851b;
+    font-size: var(--text-xs);
+    color: var(--color-warning);
+    font-family: var(--font-mono);
   }
 </style>

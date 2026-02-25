@@ -73,19 +73,19 @@
     width: 5vh;
     height: 5vh;
     border: none;
-    background: rgba(0, 0, 0, 0.5);
-    color: #fff;
-    border-radius: 50%;
+    background: var(--color-bg-bar);
+    color: var(--color-text-primary);
+    border-radius: var(--radius-round);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 100;
-    transition: background 0.2s;
+    transition: background var(--transition-base);
   }
 
   .settings-icon:hover {
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--color-bg-panel);
   }
 
   .settings-icon :global(svg) {
@@ -95,7 +95,7 @@
 
   .settings-icon :global(svg path),
   .settings-icon :global(svg circle) {
-    stroke: #fff;
+    stroke: var(--color-text-primary);
   }
 
   .overlay {
@@ -104,7 +104,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--color-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -112,53 +112,50 @@
   }
 
   .menu {
-    background: #222;
-    border-radius: 2vh;
-    padding: 4vh 5vw;
+    background: var(--color-bg-panel);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-2xl) 5vw;
     min-width: 60vw;
     max-width: 80vw;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg), var(--shadow-inset-panel);
   }
 
   .menu-title {
-    margin: 0 0 3vh 0;
-    font-size: 4vh;
-    color: #fff;
+    margin: 0 0 var(--space-xl) 0;
+    font-size: var(--text-xl);
+    color: var(--color-text-primary);
     text-align: center;
   }
 
   .menu-btn {
     width: 100%;
-    padding: 2.5vh 0;
-    margin: 1.5vh 0;
+    padding: var(--space-xl) 0;
+    margin: var(--space-md) 0;
     border: none;
-    border-radius: 1vh;
-    font-size: 3vh;
-    font-family: 'Playfair Display', serif;
+    border-radius: var(--radius-md);
+    font-size: var(--text-lg);
+    font-family: var(--font-display);
     font-weight: bold;
     cursor: pointer;
-    transition: opacity 0.2s;
-  }
-
-  .menu-btn:hover {
-    opacity: 0.9;
+    transition: background var(--transition-base);
   }
 
   .redeal-btn {
-    background: rgba(128, 128, 128, 0.7);
-    color: #fff;
+    background: var(--color-secondary);
+    color: var(--color-text-primary);
   }
 
   .redeal-btn:hover {
-    background: rgba(128, 128, 128, 0.85);
+    background: var(--color-secondary-hover);
   }
 
   .leave-btn {
-    background: rgba(204, 51, 51, 0.7);
-    color: #fff;
+    background: var(--color-destructive);
+    color: var(--color-text-primary);
   }
 
   .leave-btn:hover {
-    background: rgba(204, 51, 51, 0.85);
+    background: var(--color-destructive-hover);
   }
 </style>

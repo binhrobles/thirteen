@@ -37,7 +37,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: #1a5c2a;
+    background: radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.03) 0%, transparent 70%), var(--color-felt);
   }
 
   .canvas-area {

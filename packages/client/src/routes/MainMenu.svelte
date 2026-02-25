@@ -33,53 +33,53 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: white;
-    background: #1a5c2a;
+    color: var(--color-text-primary);
+    background: radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.03) 0%, transparent 70%), var(--color-felt);
   }
 
   h1 {
-    font-size: 6vh;
+    font-size: var(--text-hero);
     margin: 0;
   }
 
   .subtitle {
-    font-size: 3vh;
-    color: #aaa;
-    margin: 0.5vh 0 6vh;
+    font-size: var(--text-lg);
+    color: var(--color-text-secondary);
+    margin: var(--space-xs) 0 var(--space-2xl);
   }
 
   .menu-buttons {
     display: flex;
     flex-direction: column;
-    gap: 2vh;
+    gap: var(--space-lg);
   }
 
   .btn {
-    padding: 2vh 10vw;
+    padding: var(--space-lg) 10vw;
     border: none;
-    border-radius: 1vh;
-    font-size: 3vh;
-    font-family: 'Playfair Display', serif;
+    border-radius: var(--radius-md);
+    font-size: var(--text-lg);
     font-weight: bold;
     cursor: pointer;
     min-width: 50vw;
+    transition: background var(--transition-base);
   }
 
   .btn-primary {
-    background: #2ecc40;
-    color: #111;
+    background: var(--color-primary);
+    color: var(--color-text-primary);
   }
 
   .btn-primary:hover {
-    background: #3dd84e;
+    background: var(--color-primary-hover);
   }
 
   .btn-secondary {
-    background: #555;
-    color: white;
+    background: var(--color-secondary);
+    color: var(--color-text-primary);
   }
 
   .btn-secondary:hover {
-    background: #666;
+    background: var(--color-secondary-hover);
   }
 </style>

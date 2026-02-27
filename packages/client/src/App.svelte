@@ -25,7 +25,7 @@
 
 <style>
   .app {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-display);
     width: 100%;
     height: 100%;
   }

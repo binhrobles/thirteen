@@ -99,7 +99,7 @@
   .overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--color-overlay);
     z-index: 200;
     display: flex;
     flex-direction: column;
@@ -107,74 +107,78 @@
   }
 
   .drawer {
-    background: #1f1f26;
-    border-radius: 20px 20px 0 0;
-    padding: 20px;
+    background: var(--color-bg-panel);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: var(--space-lg);
     max-height: 60vh;
     overflow-y: auto;
+    box-shadow: var(--shadow-lg), var(--shadow-inset-panel);
   }
 
   h2 {
     text-align: center;
-    color: #e5e5e5;
-    font-size: 1.5rem;
-    margin: 0 0 16px 0;
+    color: var(--color-text-primary);
+    font-size: var(--text-xl);
+    margin: 0 0 var(--space-lg) 0;
   }
 
   .history-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-sm);
   }
 
   .empty-message {
     text-align: center;
-    color: #999;
-    font-size: 1rem;
+    color: var(--color-text-secondary);
+    font-size: var(--text-base);
+    font-family: var(--font-mono);
   }
 
   .play-entry {
-    background: #2d2d38;
-    border-radius: 8px;
-    padding: 12px;
+    background: var(--color-bg-panel-raised);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-xs);
   }
 
   .player-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 2vw;
   }
 
   .player-avatar {
     width: 5vh;
     height: 5vh;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: rgba(255, 255, 255, 0.1);
   }
 
   .player-name {
-    color: #fff;
-    font-size: 1.1rem;
+    color: var(--color-text-primary);
+    font-size: var(--text-base);
     font-weight: bold;
   }
 
   .pass-label {
-    color: #ff6666;
-    font-size: 1rem;
+    color: var(--color-destructive-hover);
+    font-size: var(--text-sm);
+    font-family: var(--font-mono);
     font-weight: bold;
   }
 
   .cards-row {
     display: flex;
-    gap: 4px;
+    gap: 1vw;
     flex-wrap: wrap;
   }
 
   .card-image {
     height: 13vh;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 </style>

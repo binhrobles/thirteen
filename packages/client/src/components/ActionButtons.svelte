@@ -35,20 +35,22 @@
   .action-buttons {
     display: flex;
     gap: 2.5vw;
-    padding: 1.5vh 5vw;
+    padding: var(--space-md) 5vw;
     justify-content: center;
-    background: #111;
+    background: var(--color-bg-bar);
+    border-top: 1px solid var(--color-border-subtle);
   }
 
   .btn {
     flex: 1;
-    padding: 2vh 0;
+    padding: var(--space-lg) 0;
     border: none;
-    border-radius: 1vh;
-    font-size: 3vh;
-    font-family: 'Playfair Display', serif;
+    border-radius: var(--radius-md);
+    font-size: var(--text-lg);
+    font-family: var(--font-mono);
     font-weight: bold;
     cursor: pointer;
+    transition: background var(--transition-base);
   }
 
   .btn:disabled {
@@ -57,20 +59,20 @@
   }
 
   .btn-play {
-    background: rgba(46, 204, 64, 0.7);
-    color: #111;
+    background: var(--color-primary);
+    color: var(--color-text-primary);
   }
 
   .btn-play:not(:disabled):hover {
-    background: rgba(61, 216, 78, 0.8);
+    background: var(--color-primary-hover);
   }
 
   .btn-pass {
-    background: rgba(204, 51, 51, 0.7);
-    color: #fff;
+    background: var(--color-destructive);
+    color: var(--color-text-primary);
   }
 
   .btn-pass:not(:disabled):hover {
-    background: rgba(204, 51, 51, 0.85);
+    background: var(--color-destructive-hover);
   }
 </style>

@@ -17,3 +17,6 @@ build/
 # SAM
 .aws-sam/
 samconfig.toml
+
+# training data
+packages/training/data/

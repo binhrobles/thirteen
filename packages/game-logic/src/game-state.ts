@@ -195,6 +195,16 @@ export class GameState {
       }
       if (this.currentPlayer === start) {
         this.resetRound();
+        // After reset, find the next active player (start may have won)
+        if (!this.playersInGame[this.currentPlayer]) {
+          for (let i = 1; i < NUM_PLAYERS; i++) {
+            const next = (this.currentPlayer + i) % NUM_PLAYERS;
+            if (this.playersInGame[next]) {
+              this.currentPlayer = next;
+              break;
+            }
+          }
+        }
         return;
       }
     }

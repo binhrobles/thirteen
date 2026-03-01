@@ -219,6 +219,23 @@ export class GameState {
 
   /** Serialize to a plain object for DynamoDB storage */
   toSnapshot(): GameStateSnapshot {
+    // Derive cards played per player from playLog
+    const cardsPlayedByPlayer: CardData[][] = Array.from(
+      { length: NUM_PLAYERS },
+      () => [],
+    );
+    for (const entry of this.playLog) {
+      if (entry === "round_reset") continue;
+      if (entry.play === "pass") continue;
+      for (const card of entry.play.cards) {
+        cardsPlayedByPlayer[entry.player].push({
+          rank: card.rank,
+          suit: card.suit,
+          value: card.value,
+        });
+      }
+    }
+
     return {
       hands: this.hands.map((hand) =>
         hand.map((c): CardData => ({ rank: c.rank, suit: c.suit, value: c.value })),
@@ -237,6 +254,7 @@ export class GameState {
       passedPlayers: this.playersInRound.map((inRound) => !inRound),
       winOrder: [...this.winOrder],
       playersInGame: [...this.playersInGame],
+      cardsPlayedByPlayer,
     };
   }
 

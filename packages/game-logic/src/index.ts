@@ -29,3 +29,10 @@ export type {
   MoveEntry,
   GameStateSnapshot,
 } from "./types.js";
+export {
+  encodeState,
+  encodeAction,
+  encodePassAction,
+  STATE_SIZE,
+  ACTION_SIZE,
+} from "./training/index.js";

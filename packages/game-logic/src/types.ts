@@ -26,6 +26,8 @@ export interface GameStateSnapshot {
   passedPlayers: boolean[];
   winOrder: number[];
   playersInGame: boolean[];
+  /** Cards each player has played so far (indexed by absolute player). Optional for backward compat. */
+  cardsPlayedByPlayer?: CardData[][];
 }
 
 export interface GameSnapshot {

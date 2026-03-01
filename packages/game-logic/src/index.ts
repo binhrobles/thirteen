@@ -35,4 +35,7 @@ export {
   encodePassAction,
   STATE_SIZE,
   ACTION_SIZE,
+  playAndLog,
+  type GameLog,
+  type LoggedMove,
 } from "./training/index.js";

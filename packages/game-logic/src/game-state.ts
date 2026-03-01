@@ -117,7 +117,7 @@ export class GameState {
       if (!this.playersInGame[this.currentPlayer]) {
         const start = this.currentPlayer;
         while (true) {
-          this.currentPlayer = (this.currentPlayer + NUM_PLAYERS - 1) % NUM_PLAYERS;
+          this.currentPlayer = (this.currentPlayer + 1) % NUM_PLAYERS;
           if (this.playersInGame[this.currentPlayer]) break;
           if (this.currentPlayer === start) break; // Safety check
         }
@@ -156,8 +156,8 @@ export class GameState {
       }
       this.emit({ type: "game_over", winOrder: this.winOrder });
     } else {
-      // Always advance to next player (counter-clockwise)
-      // This gives power to the person to the right of the winner
+      // Always advance to next player (clockwise)
+      // This gives power to the person to the left of the winner
       this.advanceTurn();
       if (this.checkRoundOver()) {
         this.resetRound();
@@ -185,8 +185,8 @@ export class GameState {
   private advanceTurn(): void {
     const start = this.currentPlayer;
     while (true) {
-      // Counter-clockwise play order
-      this.currentPlayer = (this.currentPlayer + NUM_PLAYERS - 1) % NUM_PLAYERS;
+      // Clockwise play order
+      this.currentPlayer = (this.currentPlayer + 1) % NUM_PLAYERS;
       if (
         this.playersInGame[this.currentPlayer] &&
         this.playersInRound[this.currentPlayer]

@@ -10,7 +10,8 @@
 
 import { greedyBot } from "../bot/bot-player.js";
 import { playAndLog } from "./game-logger.js";
-import { writeFileSync, appendFileSync } from "node:fs";
+import { writeFileSync, appendFileSync, mkdirSync, existsSync } from "node:fs";
+import { dirname, resolve, join } from "node:path";
 
 function parseArgs(args: string[]): { games: number; output: string | null } {
   let games = 1000;
@@ -32,9 +33,22 @@ const { games, output } = parseArgs(process.argv.slice(2));
 const strategies = [greedyBot, greedyBot, greedyBot, greedyBot];
 const labels = ["greedy", "greedy", "greedy", "greedy"];
 
-// Clear output file if specified
-if (output) {
-  writeFileSync(output, "");
+// Find repo root (yarn workspace runs from package dir, not repo root)
+function findRepoRoot(from: string): string {
+  let dir = from;
+  while (dir !== dirname(dir)) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    dir = dirname(dir);
+  }
+  return from;
+}
+const repoRoot = findRepoRoot(process.cwd());
+const resolvedOutput = output ? resolve(repoRoot, output) : null;
+
+// Clear output file if specified, creating parent dirs as needed
+if (resolvedOutput) {
+  mkdirSync(dirname(resolvedOutput), { recursive: true });
+  writeFileSync(resolvedOutput, "");
 }
 
 const startTime = Date.now();
@@ -43,8 +57,8 @@ for (let i = 0; i < games; i++) {
   const log = playAndLog(strategies, labels);
   const line = JSON.stringify(log) + "\n";
 
-  if (output) {
-    appendFileSync(output, line);
+  if (resolvedOutput) {
+    appendFileSync(resolvedOutput, line);
   } else {
     process.stdout.write(line);
   }

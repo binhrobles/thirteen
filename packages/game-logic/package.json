@@ -14,7 +14,8 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "generate-data": "tsx src/training/generate.ts"
+    "generate-data": "tsx src/training/generate.ts",
+    "game-server": "tsx src/training/game-server.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

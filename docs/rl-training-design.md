@@ -162,13 +162,17 @@ Value head (for PPO):
 
 **Algorithm:** Proximal Policy Optimization (PPO-Clip)
 
+**Implementation:** `packages/training/python/train_ppo.py`
+
 **Training loop:**
-1. Self-play: 4 copies of current policy play a game
-2. Collect trajectories: (state, action, reward, next_state) for each player
-3. Compute advantages using GAE (λ=0.95, γ=0.99)
-4. Update policy with clipped surrogate objective (ε=0.2)
-5. Update value function with MSE loss
+1. Self-play: 4 copies of current policy play a game via the TS game bridge
+2. Collect trajectories: (state, action, log_prob, value, reward) for each player
+3. Assign terminal rewards based on finish position (4/2/1/0)
+4. Compute advantages using GAE (λ=0.95, γ=0.99)
+5. PPO update: clipped surrogate loss + MSE value loss + entropy bonus
 6. Repeat for N epochs per batch
+
+**Game Bridge:** Since the game engine is in TypeScript, PPO training communicates with a persistent TS subprocess (`game-server.ts`) via stdin/stdout JSON lines. Python drives all 4 seats, sending `new_game`/`step` commands and receiving game state + valid actions. The `GameBridge` class in `game_bridge.py` manages the subprocess lifecycle.
 
 **Hyperparameters (starting point):**
 - Learning rate: 3e-4 (Adam)
@@ -176,6 +180,7 @@ Value head (for PPO):
 - PPO epochs: 4
 - Clip ratio: 0.2
 - Entropy coefficient: 0.01 (encourage exploration)
+- Max gradient norm: 0.5
 
 ### 5C. Vanilla RL (REINFORCE)
 
@@ -187,21 +192,30 @@ Simpler baseline for comparison:
 
 ### 5D. Self-Play Data Generation
 
-**Infrastructure:**
-1. Pool of N policy checkpoints (initially: random + greedy bots)
-2. Each game: sample 4 players from the pool (with replacement)
-3. Newest checkpoint gets 50% of seats (prioritize improving it)
-4. Store all games for replay analysis
-5. Periodically add new checkpoints to the pool as training progresses
+**Implementation:** `packages/game-logic/src/training/game-server.ts` + `packages/training/python/game_bridge.py`
 
-**Seed opponents:**
-- **Deterministic greedy bot** — the existing `choosePlay()`, always plays lowest valid card. Used as the fixed benchmark for Elo measurement (deterministic = reproducible results).
-- **Epsilon-greedy bot** — same strategy but with probability ε (e.g., 0.1) plays a random valid move instead. Prevents PPO from overfitting to one predictable pattern early in training.
-- **Random bot** — picks uniformly from valid plays. Provides maximum diversity.
+**Architecture:** Rather than porting the game engine to Python, self-play uses a stdin/stdout JSON-line bridge:
+
+```
+train_ppo.py → game_bridge.py → [subprocess] game-server.ts → GameState
+```
+
+The TS game server accepts commands (`new_game`, `step`, `quit`) and returns game state snapshots with valid actions. Python controls all 4 seats, selecting actions via the current policy. The TS subprocess stays alive across games for efficiency.
+
+**Current approach:** Pure self-play — 4 copies of the same policy play each game. All 4 seats' trajectories are collected for PPO updates.
+
+**Future enhancements:**
+- Pool of N policy checkpoints (random + greedy + historical RL checkpoints)
+- Mixed games: sample players from the pool (newest checkpoint gets 50% of seats)
+- Distributed workers for parallel game generation
+- Elo tracking against deterministic greedy bot
+
+**Seed opponents (future):**
+- **Deterministic greedy bot** — the existing `choosePlay()`, always plays lowest valid card. Fixed benchmark for Elo measurement.
+- **Epsilon-greedy bot** — same strategy but with probability ε (e.g., 0.1) plays a random valid move instead. Prevents overfitting to one pattern.
+- **Random bot** — picks uniformly from valid plays. Maximum diversity.
 
 **Why not add strategic heuristics (e.g., 2-preservation) to the greedy bot?** Discovering strategies like holding 2s for board control is exactly what RL training should learn on its own. Hand-coding heuristics biases the training toward strategies we *think* are good. The bot might find approaches we wouldn't think of. Keep seed opponents simple; let RL provide the intelligence.
-
-**Elo tracking:** Rate each checkpoint against the deterministic greedy bot to track improvement over time.
 
 ## 6. Training Framework
 
@@ -223,7 +237,7 @@ Simpler baseline for comparison:
 
 ### Export Pipeline
 
-```
+m``
 PyTorch model
   → torch.onnx.export(model, dummy_input, "bot.onnx")
   → onnxruntime validation
@@ -329,37 +343,39 @@ yarn workspace @thirteen/game-logic run generate-training-data --games=100000 --
 New package in the monorepo:
 
 ```
+packages/game-logic/src/training/
+├── state-encoder.ts              # Encode GameStateSnapshot → float[]
+├── action-encoder.ts             # Encode Card[] → float[]
+├── constants.ts                  # Shared constants (STATE_SIZE, ACTION_SIZE)
+├── game-logger.ts                # Record training data during play
+├── game-server.ts                # Stdin/stdout JSON-line game server for PPO bridge
+├── generate.ts                   # CLI: mass game simulation (greedy bot data)
+└── index.ts                      # Public exports
+
 packages/training/
-├── package.json
-├── src/
-│   ├── features/
-│   │   ├── state-encoder.ts      # Encode GameStateSnapshot → float[]
-│   │   └── action-encoder.ts     # Encode Card[] → float[]
-│   ├── data/
-│   │   ├── game-logger.ts        # Record training data during play
-│   │   └── generate.ts           # CLI: mass game simulation
-│   └── export/
-│       └── validate-onnx.ts      # Verify exported model matches PyTorch
+├── run.sh                        # EC2 automation: train → export → upload → evaluate
+├── README.md                     # Pipeline documentation
 ├── python/
-│   ├── requirements.txt          # torch, onnx, onnxruntime
-│   ├── model.py                  # Network architecture
-│   ├── train_imitation.py        # Behavioral cloning
-│   ├── train_ppo.py              # PPO self-play
-│   ├── train_reinforce.py        # Vanilla RL
+│   ├── pyproject.toml            # Dependencies (torch, onnx, onnxruntime)
+│   ├── features.py               # Feature encoding (mirrors TS encoders)
+│   ├── model.py                  # Network architecture (policy + value head)
+│   ├── game_bridge.py            # Python ↔ TS game server subprocess bridge
+│   ├── train_imitation.py        # Behavioral cloning (pipeline validation)
+│   ├── train_ppo.py              # PPO self-play training
 │   ├── export_onnx.py            # PyTorch → ONNX
-│   └── evaluate.py               # Elo rating / benchmarks
-└── data/                         # .gitignored, training data lives here
+│   └── evaluate.py               # Self-play + replay evaluation
+└── data/                         # .gitignored, training data + models live here
 ```
 
-The TypeScript side handles data generation and ONNX validation. The Python side handles training and export. They share the feature encoding spec (documented in this file, implemented in both languages).
+The TypeScript side handles the game engine, feature encoding, data generation, and the game server bridge. The Python side handles training (imitation + PPO), ONNX export, and evaluation. They share the feature encoding spec (documented in this file, implemented in both languages). The game bridge connects them for PPO self-play.
 
 ## 10. Implementation Order
 
-1. **State & action encoders** (`packages/training/src/features/`) — TypeScript, tested against known game states
-2. **Game logger** (`packages/training/src/data/game-logger.ts`) — wraps GameState, outputs JSONL
-3. **Data generation script** — simulate 100K greedy-vs-greedy games
-4. **Python model + imitation training** — train on greedy data, export ONNX
-5. **ONNX integration** — `RLBot` class using onnxruntime, verify it plays valid moves
-6. **PPO self-play training** — train with position rewards
-7. **Evaluation harness** — pit models against greedy bot and each other, track Elo
+1. ~~**State & action encoders** — TypeScript + Python feature encoding~~ ✅
+2. ~~**Game logger + data generation** — greedy bot game simulation to JSONL~~ ✅
+3. ~~**Python model + imitation training** — behavioral cloning pipeline validation~~ ✅
+4. ~~**Game bridge** — stdin/stdout JSON-line bridge between Python and TS game engine~~ ✅
+5. ~~**PPO self-play training** — PPO-Clip with position rewards via game bridge~~ ✅
+6. ~~**Evaluation harness** — self-play + replay evaluation modes~~ ✅
+7. **ONNX integration** — `RLBot` class using onnxruntime in Lambda and client
 8. **Deploy to Lambda** — serve RL bot in multiplayer games

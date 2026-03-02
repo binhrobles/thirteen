@@ -1,11 +1,14 @@
 """
-Evaluate an ONNX model by playing it against the greedy bot.
+Evaluate an ONNX model.
 
-Runs N games with the ONNX model as one player and greedy bots for the rest.
-Reports win rate, average finish position, and head-to-head stats.
+Two modes:
+  --self-play    Play games via the TS game engine bridge. Reports win rate
+                 and average finish position (model controls all 4 seats).
+  --data FILE    Replay JSONL data and compare model choices to greedy bot.
 
 Usage:
-    python evaluate.py --model bot.onnx [--games 1000]
+    python evaluate.py --model bot.onnx --self-play [--games 1000]
+    python evaluate.py --model bot.onnx --data greedy-10k.jsonl [--games 1000]
 """
 
 import argparse
@@ -54,7 +57,88 @@ class OnnxBot:
         return int(np.argmax(scores[:num_actions]))
 
 
-def evaluate(model_path: str, data_path: str, games: int = 1000):
+def _run_eval(bridge, bot, games: int, num_model_seats: int):
+    """Play games with randomized seat assignments and collect model finish positions."""
+    import random
+    from game_bridge import GameOver
+
+    all_positions: list[int] = []  # 1-indexed finish positions for model seats
+
+    for g in range(games):
+        # Randomly assign which seats are model vs greedy
+        seats = list(range(4))
+        random.shuffle(seats)
+        model_seats = set(seats[:num_model_seats])
+        greedy_seats = [s for s in range(4) if s not in model_seats]
+
+        result = bridge.new_game(greedy_seats=greedy_seats)
+
+        while not isinstance(result, GameOver):
+            turn = result
+            state = encode_state(turn.state, turn.player)
+            action_list = [encode_action(cards) for cards in turn.valid_actions]
+            if turn.can_pass:
+                action_list.append(encode_pass_action())
+
+            if len(action_list) == 0:
+                break
+
+            choice = bot.choose_action_index(state, action_list)
+            result = bridge.step(choice)
+
+        if isinstance(result, GameOver):
+            for seat in model_seats:
+                pos = result.win_order.index(seat) + 1  # 1-indexed
+                all_positions.append(pos)
+
+        if (g + 1) % 100 == 0:
+            wr = sum(1 for p in all_positions if p == 1) / len(all_positions) if all_positions else 0
+            print(f"\r  {g + 1}/{games} games, win rate: {wr:.1%}", end="", file=sys.stderr)
+
+    return all_positions
+
+
+def _print_eval_results(label: str, all_positions: list[int], games: int):
+    """Print evaluation results for a configuration."""
+    n = len(all_positions)
+    wins = sum(1 for p in all_positions if p == 1)
+    avg = sum(all_positions) / n if n else 0
+    pos_counts = [sum(1 for p in all_positions if p == rank) for rank in range(1, 5)]
+
+    print(f"\n  {label} ({games} games, {n} model finishes):")
+    print(f"    Win rate:    {wins}/{n} ({wins/n:.1%})")
+    print(f"    Avg finish:  {avg:.2f} (1.0 = always 1st, 2.5 = random)")
+    print(f"    1st: {pos_counts[0]:4d}  2nd: {pos_counts[1]:4d}  3rd: {pos_counts[2]:4d}  4th: {pos_counts[3]:4d}")
+
+
+def evaluate_vs_greedy(model_path: str, games: int = 1000):
+    """
+    Evaluate ONNX model against greedy bots in three configurations
+    with randomized seat assignments each game:
+      1v3: 1 model vs 3 greedy
+      2v2: 2 model vs 2 greedy
+      3v1: 3 model vs 1 greedy
+    """
+    from game_bridge import GameBridge
+
+    bot = OnnxBot(model_path)
+
+    configs = [
+        ("1 model vs 3 greedy", 1),
+        ("2 model vs 2 greedy", 2),
+        ("3 model vs 1 greedy", 3),
+    ]
+
+    print(f"Evaluating model against greedy bots ({games} games per config)...")
+
+    with GameBridge() as bridge:
+        for label, num_model_seats in configs:
+            print(f"\n  Running: {label}...", file=sys.stderr)
+            positions = _run_eval(bridge, bot, games, num_model_seats)
+            _print_eval_results(label, positions, games)
+
+
+def evaluate_replay(model_path: str, data_path: str, games: int = 1000):
     """
     Evaluate by replaying game data and comparing model choices to greedy bot.
 
@@ -130,8 +214,14 @@ def evaluate(model_path: str, data_path: str, games: int = 1000):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate ONNX model")
     parser.add_argument("--model", required=True, help="Path to .onnx model")
-    parser.add_argument("--data", required=True, help="Path to JSONL game data for evaluation")
+    parser.add_argument("--data", help="Path to JSONL game data for replay evaluation")
+    parser.add_argument("--vs-greedy", action="store_true", help="Evaluate model vs greedy bots (1v3, 2v2, 3v1)")
     parser.add_argument("--games", type=int, default=1000)
     args = parser.parse_args()
 
-    evaluate(args.model, args.data, args.games)
+    if args.vs_greedy:
+        evaluate_vs_greedy(args.model, args.games)
+    elif args.data:
+        evaluate_replay(args.model, args.data, args.games)
+    else:
+        parser.error("Must specify either --vs-greedy or --data")

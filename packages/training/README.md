@@ -13,21 +13,21 @@ Simulates 10K games of 4 greedy bots playing each other. At every decision point
 yarn workspace @thirteen/game-logic generate-data --games=10000 --output=packages/training/data/greedy-10k.jsonl
 ```
 
-### 2. Install Python dependencies
-
-Installs PyTorch (training framework), ONNX (model format), and ONNX Runtime (inference engine). ~2GB download for PyTorch.
+### 2. Install uv (if needed)
 
 ```bash
-cd packages/training/python
-pip install -r requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ### 3. Train imitation model
 
 Behavioral cloning: loads every decision from the JSONL, encodes the game state (337 floats) and all valid actions (63 floats each), then trains the neural net to predict which action the greedy bot chose. Uses cross-entropy loss with a 90/10 train/val split. Saves the best checkpoint by validation accuracy.
 
+`uv run` automatically creates a venv and installs dependencies from `pyproject.toml` on first run.
+
 ```bash
-python train_imitation.py --data ../data/greedy-10k.jsonl --epochs 50 --output ../data/model.pt
+cd packages/training/python
+uv run train_imitation.py --data ../data/greedy-10k.jsonl --epochs 50 --output ../data/model.pt
 ```
 
 Expect ~95%+ accuracy on greedy bot cloning (it's a deterministic strategy, so the model should learn it almost perfectly).
@@ -37,7 +37,7 @@ Expect ~95%+ accuracy on greedy bot cloning (it's a deterministic strategy, so t
 Converts the PyTorch model to ONNX format so it can run in TypeScript (via onnxruntime-node on Lambda, or onnxruntime-web in the browser). Validates the export by comparing PyTorch vs ONNX outputs on dummy input — they should match within 1e-4. Produces a ~500KB file.
 
 ```bash
-python export_onnx.py --model ../data/model.pt --output ../data/bot.onnx
+uv run export_onnx.py --model ../data/model.pt --output ../data/bot.onnx
 ```
 
 ### 5. Evaluate
@@ -45,7 +45,7 @@ python export_onnx.py --model ../data/model.pt --output ../data/bot.onnx
 Replays the JSONL training data through the ONNX model and measures how often it picks the same action as the greedy bot. Reports an action match rate (1.0 = perfect clone). This validates the full pipeline: TS encoding → JSONL → Python encoding → training → ONNX export → inference all produce consistent results.
 
 ```bash
-python evaluate.py --model ../data/bot.onnx --data ../data/greedy-10k.jsonl --games 1000
+uv run evaluate.py --model ../data/bot.onnx --data ../data/greedy-10k.jsonl --games 1000
 ```
 
 ## Architecture

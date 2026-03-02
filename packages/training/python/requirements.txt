@@ -1,3 +1,0 @@
-torch>=2.0
-onnx>=1.14
-onnxruntime>=1.16

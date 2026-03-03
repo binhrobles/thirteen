@@ -6,6 +6,7 @@ Usage:
 """
 
 import argparse
+import os
 
 import torch
 import onnx
@@ -78,8 +79,11 @@ def export(model_path: str, output_path: str, max_actions: int = 80):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export model to ONNX")
     parser.add_argument("--model", required=True, help="Path to .pt model file")
-    parser.add_argument("--output", default="bot.onnx", help="Output .onnx path")
+    parser.add_argument("--output-dir", default=None, help="Output directory (default: same directory as model)")
     parser.add_argument("--max-actions", type=int, default=80)
     args = parser.parse_args()
 
-    export(args.model, args.output, args.max_actions)
+    model_basename = os.path.splitext(os.path.basename(args.model))[0] + ".onnx"
+    output_dir = args.output_dir or os.path.dirname(args.model) or "."
+    output_path = os.path.join(output_dir, model_basename)
+    export(args.model, output_path, args.max_actions)

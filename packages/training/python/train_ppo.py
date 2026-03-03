@@ -11,6 +11,8 @@ Usage:
 """
 
 import argparse
+import csv
+import os
 import sys
 import time
 
@@ -92,7 +94,7 @@ class TrajectoryBuffer:
 
 # ── Helper functions ─────────────────────────────────────────────────────────
 
-POSITION_REWARDS = {0: 4.0, 1: 2.0, 2: 1.0, 3: 0.0}
+POSITION_REWARDS = {0: 2.25, 1: 0.25, 2: -0.75, 3: -1.75}
 MAX_ACTIONS = 80
 
 # Reward shaping (small intermediate signals, < 5% of terminal reward)
@@ -233,6 +235,7 @@ def collect_trajectories(
                 break
 
             # Detect power gain: round reset means someone won the trick
+            assert isinstance(result, TurnInfo)
             if use_shaping and not result.can_pass and prev_can_pass:
                 power_player = result.player
                 if player_bufs[power_player].size() > 0:
@@ -256,68 +259,72 @@ def ppo_update(
     optimizer: torch.optim.Optimizer,
     buf: TrajectoryBuffer,
     device: torch.device,
-    ppo_epochs: int = 4,
+    ppo_epochs: int = 2,
     clip_ratio: float = 0.2,
     entropy_coef: float = 0.01,
     value_coef: float = 0.5,
     max_grad_norm: float = 0.5,
+    minibatch_size: int = 512,
 ) -> dict:
-    """Run PPO policy update on collected trajectories."""
+    """Run PPO policy update on collected trajectories with minibatching."""
     (
         states, actions_feat, action_masks, action_indices,
         old_log_probs, old_values, rewards, dones
     ) = buf.to_tensors(device)
 
     advantages, returns = compute_gae(rewards, old_values, dones)
-    # Normalize advantages
     advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
+    n = states.shape[0]
     total_policy_loss = 0.0
     total_value_loss = 0.0
     total_entropy = 0.0
+    total_kl = 0.0
+    num_updates = 0
 
     for _ in range(ppo_epochs):
-        # Forward pass
-        scores = model(states, actions_feat)
-        scores = scores.masked_fill(~action_masks, float("-inf"))
+        for start in range(0, n, minibatch_size):
+            mb = torch.randperm(n, device=device)[start:start + minibatch_size]
 
-        # Compute log probs for chosen actions
-        log_probs_all = torch.log_softmax(scores, dim=-1)
-        new_log_probs = log_probs_all.gather(1, action_indices.unsqueeze(1)).squeeze(1)
+            scores = model(states[mb], actions_feat[mb])
+            scores = scores.masked_fill(~action_masks[mb], float("-inf"))
 
-        # Policy loss (clipped surrogate)
-        ratio = torch.exp(new_log_probs - old_log_probs)
-        surr1 = ratio * advantages
-        surr2 = torch.clamp(ratio, 1.0 - clip_ratio, 1.0 + clip_ratio) * advantages
-        policy_loss = -torch.min(surr1, surr2).mean()
+            log_probs_all = torch.log_softmax(scores, dim=-1)
+            new_log_probs = log_probs_all.gather(1, action_indices[mb].unsqueeze(1)).squeeze(1)
 
-        # Value loss
-        new_values = model.value(states).squeeze(-1)
-        value_loss = nn.functional.mse_loss(new_values, returns)
+            # Approximate KL: E[log π_old - log π_new]
+            approx_kl = (old_log_probs[mb] - new_log_probs).mean()
 
-        # Entropy bonus (encourage exploration)
-        # Only over valid actions
-        probs = torch.softmax(scores, dim=-1)
-        probs = probs.clamp(min=1e-8)  # avoid log(0) for masked positions
-        entropy = -(probs * torch.log(probs)).sum(dim=-1)
-        # Only count entropy from valid actions (masked ones are 0 probability)
-        entropy = entropy.mean()
+            ratio = torch.exp(new_log_probs - old_log_probs[mb])
+            surr1 = ratio * advantages[mb]
+            surr2 = torch.clamp(ratio, 1.0 - clip_ratio, 1.0 + clip_ratio) * advantages[mb]
+            policy_loss = -torch.min(surr1, surr2).mean()
 
-        loss = policy_loss + value_coef * value_loss - entropy_coef * entropy
+            new_values = model.value(states[mb]).squeeze(-1)
+            value_loss = nn.functional.mse_loss(new_values, returns[mb])
 
-        optimizer.zero_grad()
-        loss.backward()
-        nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
-        optimizer.step()
+            probs = torch.softmax(scores, dim=-1)
+            probs = probs.clamp(min=1e-8)
+            entropy = -(probs * torch.log(probs)).sum(dim=-1).mean()
 
-        total_policy_loss += policy_loss.item()
-        total_value_loss += value_loss.item()
-        total_entropy += entropy.item()
+            loss = policy_loss + value_coef * value_loss - entropy_coef * entropy
+
+            optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+            optimizer.step()
+
+            total_policy_loss += policy_loss.item()
+            total_value_loss += value_loss.item()
+            total_entropy += entropy.item()
+            total_kl += approx_kl.item()
+            num_updates += 1
 
     return {
-        "policy_loss": total_policy_loss / ppo_epochs,
-        "value_loss": total_value_loss / ppo_epochs,
-        "entropy": total_entropy / ppo_epochs,
+        "policy_loss": total_policy_loss / num_updates,
+        "value_loss": total_value_loss / num_updates,
+        "entropy": total_entropy / num_updates,
+        "kl": total_kl / num_updates,
     }
 
 
@@ -376,16 +383,27 @@ def train(
     epochs: int = 1000,
     batch_size: int = 2048,
     lr: float = 3e-4,
-    output_path: str = "model.pt",
-    ppo_epochs: int = 4,
+    output_dir: str = ".",
+    ppo_epochs: int = 2,
     clip_ratio: float = 0.2,
     entropy_coef: float = 0.01,
     eval_interval: int = 100,
     eval_games: int = 100,
     use_shaping: bool = True,
+    minibatch_size: int = 512,
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
+
+    # Build output paths from hyperparameters
+    e_str = str(entropy_coef).replace("0.", "").replace(".", "")
+    run_prefix = f"ppo-ep{epochs}-b{batch_size}-e{e_str}{'-shaping' if use_shaping else ''}"
+    os.makedirs(output_dir, exist_ok=True)
+    model_path = os.path.join(output_dir, f"{run_prefix}-model.pt")
+    epoch_csv_path = os.path.join(output_dir, f"{run_prefix}-epoch-stats.csv")
+    eval_csv_path = os.path.join(output_dir, f"{run_prefix}-eval-stats.csv")
+    print(f"Run prefix: {run_prefix}")
+    print(f"Output dir: {output_dir}")
 
     model = TienLenNet().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -398,24 +416,53 @@ def train(
     best_win_rate = -1.0
     entropy_window: list[float] = []
     prev_entropy_mean: float | None = None
+    eval_num = 0
 
-    with GameBridge() as bridge:
+    with (
+        open(epoch_csv_path, "w", newline="") as epoch_f,
+        open(eval_csv_path, "w", newline="") as eval_f,
+        GameBridge() as bridge,
+    ):
+        epoch_writer = csv.writer(epoch_f)
+        epoch_writer.writerow(["epoch", "policy_loss", "value_loss", "entropy", "kl", "games", "elapsed_s"])
+
+        eval_writer = csv.writer(eval_f)
+        eval_writer.writerow([
+            "eval_num", "epoch", "win_rate", "best_win_rate",
+            "entropy_mean", "entropy_min", "entropy_max", "entropy_trend",
+        ])
+
         for epoch in range(epochs):
             t0 = time.time()
 
             # Collect trajectories
             buf, collect_stats = collect_trajectories(bridge, model, device, batch_size, use_shaping)
+            t_collect = time.time() - t0
 
             # PPO update
+            t1 = time.time()
             update_stats = ppo_update(
                 model, optimizer, buf, device,
                 ppo_epochs=ppo_epochs,
                 clip_ratio=clip_ratio,
                 entropy_coef=entropy_coef,
+                minibatch_size=minibatch_size,
             )
+            t_update = time.time() - t1
 
-            elapsed = time.time() - t0
+            elapsed = t_collect + t_update
             entropy_window.append(update_stats["entropy"])
+
+            epoch_writer.writerow([
+                epoch + 1,
+                f"{update_stats['policy_loss']:.6f}",
+                f"{update_stats['value_loss']:.6f}",
+                f"{update_stats['entropy']:.6f}",
+                f"{update_stats['kl']:.6f}",
+                collect_stats["games"],
+                f"{elapsed:.2f}",
+            ])
+            epoch_f.flush()
 
             print(
                 f"Epoch {epoch + 1:4d}/{epochs} | "
@@ -423,12 +470,14 @@ def train(
                 f"policy_loss: {update_stats['policy_loss']:.4f} | "
                 f"value_loss: {update_stats['value_loss']:.4f} | "
                 f"entropy: {update_stats['entropy']:.3f} | "
-                f"{elapsed:.1f}s"
+                f"kl: {update_stats['kl']:.4f} | "
+                f"collect={t_collect:.1f}s update={t_update:.1f}s"
             )
 
             # Periodic evaluation vs greedy
             if (epoch + 1) % eval_interval == 0 or epoch == epochs - 1:
                 win_rate = eval_vs_greedy(bridge, model, device, eval_games)
+                eval_num += 1
 
                 n = len(entropy_window)
                 e_mean = sum(entropy_window) / n
@@ -438,23 +487,33 @@ def train(
                     trend = e_mean - prev_entropy_mean
                     trend_str = f"{'↑' if trend > 0.01 else '↓' if trend < -0.01 else '→'}{trend:+.3f}"
                 else:
+                    trend = 0.0
                     trend_str = "n/a"
                 prev_entropy_mean = e_mean
+
+                if win_rate > best_win_rate:
+                    best_win_rate = win_rate
+                    torch.save(model.state_dict(), model_path)
+                    print(f"  → Saved best model (win_rate={win_rate:.1%}) to {model_path}")
+
+                eval_writer.writerow([
+                    eval_num, epoch + 1,
+                    f"{win_rate:.4f}", f"{best_win_rate:.4f}",
+                    f"{e_mean:.6f}", f"{e_min:.6f}", f"{e_max:.6f}", f"{trend:.6f}",
+                ])
+                eval_f.flush()
+                entropy_window.clear()
 
                 print(
                     f"  ▶ Eval: {win_rate:.1%} win rate vs greedy "
                     f"({eval_games} games, best: {best_win_rate:.1%}) | "
                     f"entropy [{n} epochs]: mean={e_mean:.3f} min={e_min:.3f} max={e_max:.3f} trend={trend_str}"
                 )
-                entropy_window.clear()
-
-                if win_rate > best_win_rate:
-                    best_win_rate = win_rate
-                    torch.save(model.state_dict(), output_path)
-                    print(f"  → Saved best model (win_rate={win_rate:.1%})")
 
     print(f"\nBest win rate vs greedy: {best_win_rate:.1%}")
-    print(f"Model saved to {output_path}")
+    print(f"Model saved to {model_path}")
+    print(f"Epoch stats: {epoch_csv_path}")
+    print(f"Eval stats:  {eval_csv_path}")
 
 
 if __name__ == "__main__":
@@ -462,18 +521,20 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=2048)
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--output", default="model.pt")
-    parser.add_argument("--ppo-epochs", type=int, default=4)
+    parser.add_argument("--output-dir", default=".", help="Directory for model and CSV outputs")
+    parser.add_argument("--ppo-epochs", type=int, default=2)
     parser.add_argument("--clip-ratio", type=float, default=0.2)
     parser.add_argument("--entropy-coef", type=float, default=0.01)
     parser.add_argument("--eval-interval", type=int, default=100, help="Epochs between vs-greedy evals")
     parser.add_argument("--eval-games", type=int, default=100, help="Games per eval round")
     parser.add_argument("--no-shaping", action="store_true", help="Disable reward shaping")
+    parser.add_argument("--minibatch-size", type=int, default=512)
     args = parser.parse_args()
 
     train(
-        args.epochs, args.batch_size, args.lr, args.output,
+        args.epochs, args.batch_size, args.lr, args.output_dir,
         args.ppo_epochs, args.clip_ratio, args.entropy_coef,
         args.eval_interval, args.eval_games,
         use_shaping=not args.no_shaping,
+        minibatch_size=args.minibatch_size,
     )

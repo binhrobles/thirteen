@@ -20,3 +20,4 @@ samconfig.toml
 
 # training data
 packages/training/data/
+packages/training/models/

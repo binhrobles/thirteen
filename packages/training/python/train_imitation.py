@@ -27,7 +27,7 @@ class ImitationDataset(Dataset):
     Dataset of (state, action_features, label) tuples from game logs.
 
     Each sample is one decision point:
-    - state: encoded game state (392 floats)
+    - state: encoded game state (413 floats)
     - action_features: all valid actions padded to max_actions (N × 63)
     - action_mask: which action slots are real vs padding (N bools)
     - label: index of the chosen action among valid actions

@@ -23,7 +23,8 @@ A fixed-size tensor encoding the game state from the perspective of the acting p
 | Win order filled | 3 | Binary per position | Which finish positions are taken |
 | Unseen cards | 52 | Binary (0/1 per card) | Cards not in hand and not yet played — what opponents could hold |
 | Relative hand advantage | 3 | Signed float (-1 to 1) | (myHandSize - opponentHandSize) / 13 per opponent |
-| **Total** | **392** | | |
+| Combo history (per opponent) | 21 | Float (0–1+), normalized /5 | Count of each combo type played by each opponent (3 × 7) |
+| **Total** | **413** | | |
 
 ### Card Encoding
 
@@ -115,7 +116,7 @@ Keep shaping rewards small (< 5% of terminal reward) to avoid distorting the lea
 
 ```
 State encoder (shared):
-  Linear(392, 256) → ReLU → Linear(256, 256) → ReLU
+  Linear(413, 256) → ReLU → Linear(256, 256) → ReLU
   Output: state_embedding (256-dim)
 
 Action encoder:

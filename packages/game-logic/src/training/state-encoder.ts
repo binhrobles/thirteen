@@ -4,6 +4,7 @@ import {
   NUM_PLAYERS,
   NUM_OPPONENTS,
   NUM_COMBO_TYPES,
+  NUM_ACTION_COMBO_TYPES,
   STATE_SIZE,
 } from "./constants.js";
 
@@ -144,6 +145,19 @@ export function encodeState(
   for (let rel = 1; rel <= NUM_OPPONENTS; rel++) {
     const abs = (playerIndex + rel) % NUM_PLAYERS;
     out[offset++] = (mySize - snapshot.hands[abs].length) / 13;
+  }
+
+  // Combo history (3 × 7 = 21) — per-opponent combo type counts, normalized
+  const combos = snapshot.combosPlayedByPlayer;
+  for (let rel = 1; rel <= NUM_OPPONENTS; rel++) {
+    const abs = (playerIndex + rel) % NUM_PLAYERS;
+    if (combos) {
+      const playerCombos = combos[abs];
+      for (const [comboName, idx] of Object.entries(COMBO_INDEX)) {
+        out[offset + idx] = (playerCombos[comboName] ?? 0) / 5;
+      }
+    }
+    offset += NUM_ACTION_COMBO_TYPES;
   }
 
   return out;

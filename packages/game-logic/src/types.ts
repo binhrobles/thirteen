@@ -28,6 +28,8 @@ export interface GameStateSnapshot {
   playersInGame: boolean[];
   /** Cards each player has played so far (indexed by absolute player). Optional for backward compat. */
   cardsPlayedByPlayer?: CardData[][];
+  /** Combo type counts per player (indexed by absolute player). Maps combo string → count. */
+  combosPlayedByPlayer?: Record<string, number>[];
 }
 
 export interface GameSnapshot {

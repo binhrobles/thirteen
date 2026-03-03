@@ -7,11 +7,12 @@ export const NUM_COMBO_TYPES = 8;
 // Combo types for action encoding: 7 from Combo enum (no POWER for actions)
 export const NUM_ACTION_COMBO_TYPES = 7;
 
-// State vector: 52 + 52 + 156 + 3 + 52 + 8 + 1 + 4 + 3 + 3 + 3 + 52 + 3 = 392
+// State vector: 52 + 52 + 156 + 3 + 52 + 8 + 1 + 4 + 3 + 3 + 3 + 52 + 3 + 21 = 413
 // passedPlayers, playersInGame, winOrderFilled use 3 slots (opponents only)
 // unseenCards (52): cards not in hand and not yet played
 // relativeHandAdvantage (3): (myHandSize - opponentHandSize) / 13
-export const STATE_SIZE = 392;
+// comboHistory (21): per-opponent combo type counts (3 opponents × 7 combo types)
+export const STATE_SIZE = 413;
 
 // Action vector: 52 + 7 + 1 + 1 + 1 + 1 = 63
 export const ACTION_SIZE = 63;

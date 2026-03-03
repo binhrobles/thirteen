@@ -323,6 +323,55 @@ describe("encodeState", () => {
     expect(result[advOffset + 2]).toBeCloseTo((2 - 8) / 13); // rel 3 = player 1
   });
 
+  it("encodes combo history per opponent", () => {
+    const snap = emptySnapshot({
+      combosPlayedByPlayer: [
+        {}, // player 0: no combos
+        { SINGLE: 3, PAIR: 1 }, // player 1
+        { RUN: 2 }, // player 2
+        { BOMB: 1, TRIPLE: 4 }, // player 3
+      ],
+    });
+
+    const result = encodeState(snap, 0);
+    const comboOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE + 3; // 392
+
+    // rel 1 = player 1: SINGLE=3/5, PAIR=1/5
+    expect(result[comboOffset + 0]).toBeCloseTo(3 / 5); // SINGLE
+    expect(result[comboOffset + 1]).toBeCloseTo(1 / 5); // PAIR
+    expect(result[comboOffset + 2]).toBe(0); // TRIPLE
+    expect(result[comboOffset + 4]).toBe(0); // RUN
+
+    // rel 2 = player 2: RUN=2/5
+    expect(result[comboOffset + 7 + 4]).toBeCloseTo(2 / 5); // RUN (offset 7 for next opponent)
+    expect(result[comboOffset + 7 + 0]).toBe(0); // SINGLE
+
+    // rel 3 = player 3: BOMB=1/5, TRIPLE=4/5
+    expect(result[comboOffset + 14 + 5]).toBeCloseTo(1 / 5); // BOMB
+    expect(result[comboOffset + 14 + 2]).toBeCloseTo(4 / 5); // TRIPLE
+  });
+
+  it("rotates combo history for different perspectives", () => {
+    const snap = emptySnapshot({
+      combosPlayedByPlayer: [
+        { SINGLE: 5 }, // player 0
+        {}, // player 1
+        {}, // player 2
+        {}, // player 3
+      ],
+    });
+
+    // From player 2's perspective: rel 1=p3, rel 2=p0, rel 3=p1
+    const result = encodeState(snap, 2);
+    const comboOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE + 3; // 392
+
+    // Player 0's combos should be in rel 2 slot (offset + 7)
+    expect(result[comboOffset + 7 + 0]).toBeCloseTo(5 / 5); // SINGLE = 1.0
+    // rel 1 (player 3) and rel 3 (player 1) should be empty
+    expect(result[comboOffset + 0]).toBe(0);
+    expect(result[comboOffset + 14 + 0]).toBe(0);
+  });
+
   it("handles missing cardsPlayedByPlayer gracefully", () => {
     const snap = emptySnapshot();
     delete snap.cardsPlayedByPlayer;

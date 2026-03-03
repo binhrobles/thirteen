@@ -229,10 +229,14 @@ export class GameState {
 
   /** Serialize to a plain object for DynamoDB storage */
   toSnapshot(): GameStateSnapshot {
-    // Derive cards played per player from playLog
+    // Derive cards played and combo counts per player from playLog
     const cardsPlayedByPlayer: CardData[][] = Array.from(
       { length: NUM_PLAYERS },
       () => [],
+    );
+    const combosPlayedByPlayer: Record<string, number>[] = Array.from(
+      { length: NUM_PLAYERS },
+      () => ({}),
     );
     for (const entry of this.playLog) {
       if (entry === "round_reset") continue;
@@ -244,6 +248,9 @@ export class GameState {
           value: card.value,
         });
       }
+      const comboName = Combo[entry.play.combo];
+      combosPlayedByPlayer[entry.player][comboName] =
+        (combosPlayedByPlayer[entry.player][comboName] ?? 0) + 1;
     }
 
     return {
@@ -265,6 +272,7 @@ export class GameState {
       winOrder: [...this.winOrder],
       playersInGame: [...this.playersInGame],
       cardsPlayedByPlayer,
+      combosPlayedByPlayer,
     };
   }
 

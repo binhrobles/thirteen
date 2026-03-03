@@ -209,6 +209,7 @@ The TS game server accepts commands (`new_game`, `step`, `quit`) and returns gam
 - Mixed games: sample players from the pool (newest checkpoint gets 50% of seats)
 - Distributed workers for parallel game generation
 - Elo tracking against deterministic greedy bot
+- Human evaluation via multiplayer match logs (see Section 5E)
 
 **Seed opponents (future):**
 - **Deterministic greedy bot** — the existing `choosePlay()`, always plays lowest valid card. Fixed benchmark for Elo measurement.
@@ -216,6 +217,12 @@ The TS game server accepts commands (`new_game`, `step`, `quit`) and returns gam
 - **Random bot** — picks uniformly from valid plays. Maximum diversity.
 
 **Why not add strategic heuristics (e.g., 2-preservation) to the greedy bot?** Discovering strategies like holding 2s for board control is exactly what RL training should learn on its own. Hand-coding heuristics biases the training toward strategies we *think* are good. The bot might find approaches we wouldn't think of. Keep seed opponents simple; let RL provide the intelligence.
+
+### 5E. Human Evaluation
+
+The training loop selects checkpoints based on 1v3 greedy win rate. This is a reasonable starting benchmark, but a model that beats greedy may just be exploiting its predictable "always play lowest card" pattern rather than learning genuinely strong play.
+
+**Future work:** Once the ONNX model is deployed to Lambda (Section 7), collect game logs from human-vs-bot multiplayer matches. Human eval data provides a more meaningful signal — humans play strategically (holding 2s, bluffing passes, reading opponents) in ways that greedy never does. Use human match win rate alongside greedy win rate to select the best checkpoint.
 
 ## 6. Training Framework
 

@@ -58,11 +58,21 @@ class TrajectoryBuffer:
         self.dones.append(False)
 
     def assign_rewards(self, start_idx: int, end_idx: int, reward: float):
-        """Assign terminal reward to all steps in a player's episode."""
-        for i in range(start_idx, end_idx):
-            self.rewards[i] = reward
+        """Assign terminal reward to the final step only; GAE propagates it backward."""
         if end_idx > start_idx:
+            self.rewards[end_idx - 1] += reward
             self.dones[end_idx - 1] = True
+
+    def extend(self, other: "TrajectoryBuffer"):
+        """Append another buffer's contents (must be a contiguous episode)."""
+        self.states.extend(other.states)
+        self.action_features.extend(other.action_features)
+        self.action_masks.extend(other.action_masks)
+        self.action_indices.extend(other.action_indices)
+        self.log_probs.extend(other.log_probs)
+        self.values.extend(other.values)
+        self.rewards.extend(other.rewards)
+        self.dones.extend(other.dones)
 
     def size(self) -> int:
         return len(self.states)
@@ -84,6 +94,10 @@ class TrajectoryBuffer:
 
 POSITION_REWARDS = {0: 4.0, 1: 2.0, 2: 1.0, 3: 0.0}
 MAX_ACTIONS = 80
+
+# Reward shaping (small intermediate signals, < 5% of terminal reward)
+CARD_PLAY_REWARD = 0.01   # per card played — encourages shedding
+POWER_GAIN_REWARD = 0.02  # winning a trick — encourages board control
 
 
 def encode_turn(turn: TurnInfo, player: int):
@@ -167,54 +181,64 @@ def collect_trajectories(
     model: TienLenNet,
     device: torch.device,
     target_steps: int,
+    use_shaping: bool = True,
 ) -> tuple[TrajectoryBuffer, dict]:
     """Play games and collect trajectory data until we have enough steps."""
     buf = TrajectoryBuffer()
     games_played = 0
     total_moves = 0
-    win_counts = [0, 0, 0, 0]  # by finish position
 
     while buf.size() < target_steps:
-        # Track where each player's trajectory starts in the buffer
-        player_start = {p: buf.size() for p in range(4)}
-        player_steps = {p: 0 for p in range(4)}
+        # Per-player buffers so each player's trajectory is contiguous
+        player_bufs = {p: TrajectoryBuffer() for p in range(4)}
 
         turn = bridge.new_game()
+        prev_can_pass = False  # first turn is always a lead (can_pass=False)
 
         while True:
             player = turn.player
             state, action_features, action_mask, num_actions = encode_turn(turn, player)
 
             if num_actions > MAX_ACTIONS:
-                # Rare edge case: too many actions, just pick first valid
                 num_actions = MAX_ACTIONS
 
             action_index, log_prob, value = select_action(
                 model, state, action_features, action_mask, num_actions, device
             )
 
-            # Record start of this player's steps if this is their first move
-            if player_steps[player] == 0:
-                player_start[player] = buf.size()
+            # Compute per-step shaping reward
+            shaping = 0.0
+            if use_shaping:
+                is_pass = turn.can_pass and action_index == len(turn.valid_actions)
+                if not is_pass and action_index < len(turn.valid_actions):
+                    num_cards = len(turn.valid_actions[action_index])
+                    shaping = CARD_PLAY_REWARD * num_cards
 
-            buf.add(state, action_features, action_mask, action_index, log_prob, value)
-            player_steps[player] += 1
+            player_bufs[player].add(state, action_features, action_mask, action_index, log_prob, value)
+            player_bufs[player].rewards[-1] = shaping
             total_moves += 1
 
             result = bridge.step(action_index)
 
             if isinstance(result, GameOver):
-                # Assign position rewards
+                # Assign terminal rewards and merge per-player buffers into main buffer
                 for position, player_id in enumerate(result.win_order):
-                    reward = POSITION_REWARDS[position]
-                    start = player_start[player_id]
-                    end = start + player_steps[player_id]
-                    buf.assign_rewards(start, end, reward)
-                    win_counts[position] += 1
+                    pb = player_bufs[player_id]
+                    if pb.size() > 0:
+                        pb.rewards[-1] += POSITION_REWARDS[position]
+                        pb.dones[-1] = True
+                    buf.extend(pb)
 
                 games_played += 1
                 break
 
+            # Detect power gain: round reset means someone won the trick
+            if use_shaping and not result.can_pass and prev_can_pass:
+                power_player = result.player
+                if player_bufs[power_player].size() > 0:
+                    player_bufs[power_player].rewards[-1] += POWER_GAIN_REWARD
+
+            prev_can_pass = result.can_pass
             turn = result
 
     stats = {
@@ -297,6 +321,55 @@ def ppo_update(
     }
 
 
+# ── Inline evaluation ────────────────────────────────────────────────────────
+
+def eval_vs_greedy(
+    bridge: GameBridge,
+    model: TienLenNet,
+    device: torch.device,
+    games: int = 100,
+) -> float:
+    """
+    Play model (seat 0) vs 3 greedy bots. Returns win rate.
+    Uses the PyTorch model directly (no ONNX export needed).
+    """
+    import random
+
+    model.eval()
+    wins = 0
+
+    for _ in range(games):
+        # Randomize model seat
+        model_seat = random.randrange(4)
+        greedy_seats = [s for s in range(4) if s != model_seat]
+
+        result = bridge.new_game(greedy_seats=greedy_seats)
+
+        while not isinstance(result, GameOver):
+            turn = result
+            state, action_features, action_mask, num_actions = encode_turn(turn, turn.player)
+            if num_actions > MAX_ACTIONS:
+                num_actions = MAX_ACTIONS
+
+            # Use argmax (greedy) instead of sampling for eval
+            with torch.no_grad():
+                state_t = torch.from_numpy(state).unsqueeze(0).to(device)
+                actions_t = torch.from_numpy(action_features).unsqueeze(0).to(device)
+                mask_t = torch.from_numpy(action_mask).unsqueeze(0).to(device)
+                scores = model(state_t, actions_t)
+                scores = scores.masked_fill(~mask_t, float("-inf"))
+                action_index = scores[0, :num_actions].argmax().item()
+
+            result = bridge.step(action_index)
+
+        if isinstance(result, GameOver):
+            if result.win_order.index(model_seat) == 0:
+                wins += 1
+
+    model.train()
+    return wins / games
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def train(
@@ -307,6 +380,9 @@ def train(
     ppo_epochs: int = 4,
     clip_ratio: float = 0.2,
     entropy_coef: float = 0.01,
+    eval_interval: int = 100,
+    eval_games: int = 100,
+    use_shaping: bool = True,
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
@@ -316,15 +392,19 @@ def train(
 
     param_count = sum(p.numel() for p in model.parameters())
     print(f"Model parameters: {param_count:,}")
+    print(f"Reward shaping: {'ON' if use_shaping else 'OFF'}")
+    print(f"Eval: every {eval_interval} epochs, {eval_games} games vs greedy")
 
-    best_avg_reward = -float("inf")
+    best_win_rate = -1.0
+    entropy_window: list[float] = []
+    prev_entropy_mean: float | None = None
 
     with GameBridge() as bridge:
         for epoch in range(epochs):
             t0 = time.time()
 
             # Collect trajectories
-            buf, collect_stats = collect_trajectories(bridge, model, device, batch_size)
+            buf, collect_stats = collect_trajectories(bridge, model, device, batch_size, use_shaping)
 
             # PPO update
             update_stats = ppo_update(
@@ -335,25 +415,45 @@ def train(
             )
 
             elapsed = time.time() - t0
-            avg_reward = sum(buf.rewards) / max(collect_stats["games"] * 4, 1)
+            entropy_window.append(update_stats["entropy"])
 
             print(
                 f"Epoch {epoch + 1:4d}/{epochs} | "
                 f"games: {collect_stats['games']:3d} | "
-                f"steps: {collect_stats['steps']:5d} | "
-                f"avg_reward: {avg_reward:.2f} | "
                 f"policy_loss: {update_stats['policy_loss']:.4f} | "
                 f"value_loss: {update_stats['value_loss']:.4f} | "
                 f"entropy: {update_stats['entropy']:.3f} | "
                 f"{elapsed:.1f}s"
             )
 
-            if avg_reward > best_avg_reward:
-                best_avg_reward = avg_reward
-                torch.save(model.state_dict(), output_path)
-                print(f"  → Saved best model (avg_reward={avg_reward:.2f})")
+            # Periodic evaluation vs greedy
+            if (epoch + 1) % eval_interval == 0 or epoch == epochs - 1:
+                win_rate = eval_vs_greedy(bridge, model, device, eval_games)
 
-    print(f"\nBest average reward: {best_avg_reward:.2f}")
+                n = len(entropy_window)
+                e_mean = sum(entropy_window) / n
+                e_min = min(entropy_window)
+                e_max = max(entropy_window)
+                if prev_entropy_mean is not None:
+                    trend = e_mean - prev_entropy_mean
+                    trend_str = f"{'↑' if trend > 0.01 else '↓' if trend < -0.01 else '→'}{trend:+.3f}"
+                else:
+                    trend_str = "n/a"
+                prev_entropy_mean = e_mean
+
+                print(
+                    f"  ▶ Eval: {win_rate:.1%} win rate vs greedy "
+                    f"({eval_games} games, best: {best_win_rate:.1%}) | "
+                    f"entropy [{n} epochs]: mean={e_mean:.3f} min={e_min:.3f} max={e_max:.3f} trend={trend_str}"
+                )
+                entropy_window.clear()
+
+                if win_rate > best_win_rate:
+                    best_win_rate = win_rate
+                    torch.save(model.state_dict(), output_path)
+                    print(f"  → Saved best model (win_rate={win_rate:.1%})")
+
+    print(f"\nBest win rate vs greedy: {best_win_rate:.1%}")
     print(f"Model saved to {output_path}")
 
 
@@ -366,9 +466,14 @@ if __name__ == "__main__":
     parser.add_argument("--ppo-epochs", type=int, default=4)
     parser.add_argument("--clip-ratio", type=float, default=0.2)
     parser.add_argument("--entropy-coef", type=float, default=0.01)
+    parser.add_argument("--eval-interval", type=int, default=100, help="Epochs between vs-greedy evals")
+    parser.add_argument("--eval-games", type=int, default=100, help="Games per eval round")
+    parser.add_argument("--no-shaping", action="store_true", help="Disable reward shaping")
     args = parser.parse_args()
 
     train(
         args.epochs, args.batch_size, args.lr, args.output,
         args.ppo_epochs, args.clip_ratio, args.entropy_coef,
+        args.eval_interval, args.eval_games,
+        use_shaping=not args.no_shaping,
     )

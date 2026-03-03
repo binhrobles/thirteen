@@ -1,19 +1,22 @@
 """
-PPO (Proximal Policy Optimization) training via self-play.
+PPO training with NFSP-inspired opponent pool.
 
-Plays games through the TS game engine bridge, collects trajectories,
-and updates the policy using PPO-Clip.
+Plays games through the TS game engine bridge with mixed opponents
+(self-play, greedy, random, average policy). Only self-play seats
+collect PPO training data. An average policy network is trained via
+supervised learning on the best-response agent's decisions (NFSP).
 
 See docs/rl-training-design.md Section 5B.
 
 Usage:
     python train_ppo.py --epochs 1000 [--batch-size 2048] [--output model.pt]
+    python train_ppo.py --epochs 1000 --no-opponent-pool  # pure self-play (legacy)
 """
 
 import argparse
 import csv
 import os
-import sys
+import random
 import time
 
 import numpy as np
@@ -92,6 +95,47 @@ class TrajectoryBuffer:
         )
 
 
+class ReservoirBuffer:
+    """
+    Reservoir sampling buffer for NFSP average policy training.
+    Stores (state, action_features, action_mask, chosen_action_index).
+    Uses Algorithm R for uniform sampling over all decisions ever seen.
+    """
+
+    def __init__(self, capacity: int = 50_000):
+        self.capacity = capacity
+        self.buffer: list[tuple[np.ndarray, np.ndarray, np.ndarray, int]] = []
+        self.total_seen = 0
+
+    def add(self, state: np.ndarray, action_features: np.ndarray,
+            action_mask: np.ndarray, action_index: int):
+        self.total_seen += 1
+        if len(self.buffer) < self.capacity:
+            self.buffer.append((state, action_features, action_mask, action_index))
+        else:
+            j = random.randrange(self.total_seen)
+            if j < self.capacity:
+                self.buffer[j] = (state, action_features, action_mask, action_index)
+
+    def sample(self, batch_size: int) -> tuple[torch.Tensor, ...]:
+        """Sample a minibatch and return tensors."""
+        indices = random.sample(range(len(self.buffer)), min(batch_size, len(self.buffer)))
+        states = np.stack([self.buffer[i][0] for i in indices])
+        action_feats = np.stack([self.buffer[i][1] for i in indices])
+        action_masks = np.stack([self.buffer[i][2] for i in indices])
+        action_indices = np.array([self.buffer[i][3] for i in indices], dtype=np.int64)
+
+        return (
+            torch.from_numpy(states),
+            torch.from_numpy(action_feats),
+            torch.from_numpy(action_masks),
+            torch.from_numpy(action_indices),
+        )
+
+    def size(self) -> int:
+        return len(self.buffer)
+
+
 # ── Helper functions ─────────────────────────────────────────────────────────
 
 POSITION_REWARDS = {0: 2.25, 1: 0.25, 2: -0.75, 3: -1.75}
@@ -103,10 +147,16 @@ POWER_GAIN_REWARD = 0.02  # winning a trick — encourages board control
 
 
 def encode_turn(turn: TurnInfo, player: int):
-    """Encode a turn into state features and padded action features."""
+    """Encode a turn into state features and padded action features.
+
+    Pass is always included when available — play actions are truncated
+    to MAX_ACTIONS-1 to reserve a slot for it.
+    """
     state = encode_state(turn.state, player)
 
-    action_list = [encode_action(cards) for cards in turn.valid_actions]
+    # Reserve a slot for pass so it's never truncated
+    max_play_slots = MAX_ACTIONS - 1 if turn.can_pass else MAX_ACTIONS
+    action_list = [encode_action(cards) for cards in turn.valid_actions[:max_play_slots]]
     if turn.can_pass:
         action_list.append(encode_pass_action())
 
@@ -114,11 +164,23 @@ def encode_turn(turn: TurnInfo, player: int):
     action_features = np.zeros((MAX_ACTIONS, ACTION_SIZE), dtype=np.float32)
     action_mask = np.zeros(MAX_ACTIONS, dtype=np.bool_)
 
-    for i, af in enumerate(action_list[:MAX_ACTIONS]):
+    for i, af in enumerate(action_list):
         action_features[i] = af
         action_mask[i] = True
 
     return state, action_features, action_mask, num_actions
+
+
+def to_bridge_action(action_index: int, num_actions: int, turn: TurnInfo) -> int:
+    """Translate encoded action index to bridge coordinate.
+
+    The encoded action space may have truncated play actions, so the pass
+    index in encoded space (num_actions-1) may differ from the bridge's
+    pass index (len(valid_actions)).
+    """
+    if turn.can_pass and action_index == num_actions - 1:
+        return len(turn.valid_actions)  # pass in TS coordinates
+    return action_index
 
 
 def select_action(
@@ -147,6 +209,64 @@ def select_action(
         value = model.value(state_t).item()
 
         return action.item(), log_prob, value
+
+
+# ── Opponent pool ────────────────────────────────────────────────────────────
+
+# Early distribution (first 10% of epochs): heavy greedy for stable learning signal
+EARLY_DIST = {"self": 0.2, "greedy": 0.6, "random": 0.1, "average": 0.1}
+
+# Late distribution (after 10% of epochs): NFSP-dominated, greedy residual
+LATE_DIST = {"self": 0.4, "greedy": 0.05, "random": 0.1, "average": 0.45}
+
+
+def get_opponent_dist(epoch: int, total_epochs: int) -> dict[str, float]:
+    """Linearly interpolate between EARLY_DIST and LATE_DIST over first 10% of epochs."""
+    transition_end = max(int(total_epochs * 0.1), 1)
+    if epoch >= transition_end:
+        return LATE_DIST
+    t = epoch / transition_end
+    return {k: EARLY_DIST[k] * (1 - t) + LATE_DIST[k] * t for k in EARLY_DIST}
+
+
+def sample_opponents(dist: dict[str, float]) -> dict[int, str]:
+    """
+    Sample opponent types for seats 1-3.
+    Seat 0 is always 'self'. At least one seat must be non-self.
+    """
+    types = list(dist.keys())
+    weights = [dist[t] for t in types]
+
+    while True:
+        assignments = {
+            seat: random.choices(types, weights=weights, k=1)[0]
+            for seat in range(1, 4)
+        }
+        if any(v != "self" for v in assignments.values()):
+            break
+
+    return assignments
+
+
+def select_action_average(
+    avg_model: TienLenNet,
+    state: np.ndarray,
+    action_features: np.ndarray,
+    action_mask: np.ndarray,
+    num_actions: int,
+    device: torch.device,
+) -> int:
+    """Select action using average policy (sample from softmax, no value/log_prob)."""
+    with torch.no_grad():
+        state_t = torch.from_numpy(state).unsqueeze(0).to(device)
+        actions_t = torch.from_numpy(action_features).unsqueeze(0).to(device)
+        mask_t = torch.from_numpy(action_mask).unsqueeze(0).to(device)
+
+        scores = avg_model(state_t, actions_t)
+        scores = scores.masked_fill(~mask_t, float("-inf"))
+        probs = torch.softmax(scores[0, :num_actions], dim=0)
+        action = torch.distributions.Categorical(probs).sample()
+        return action.item()
 
 
 def compute_gae(
@@ -184,61 +304,104 @@ def collect_trajectories(
     device: torch.device,
     target_steps: int,
     use_shaping: bool = True,
+    avg_model: TienLenNet | None = None,
+    opponent_dist: dict[str, float] | None = None,
+    reservoir: ReservoirBuffer | None = None,
 ) -> tuple[TrajectoryBuffer, dict]:
-    """Play games and collect trajectory data until we have enough steps."""
+    """Play games with mixed opponents, collect PPO data from self-seats only."""
     buf = TrajectoryBuffer()
     games_played = 0
     total_moves = 0
+    opponent_counts: dict[str, int] = {"self": 0, "greedy": 0, "random": 0, "average": 0}
+
+    # Pure self-play fallback (--no-opponent-pool)
+    pure_self_play = opponent_dist is None
 
     while buf.size() < target_steps:
-        # Per-player buffers so each player's trajectory is contiguous
-        player_bufs = {p: TrajectoryBuffer() for p in range(4)}
+        # Assign opponent types for seats 1-3
+        if pure_self_play:
+            seat_types: dict[int, str] = {s: "self" for s in range(4)}
+            greedy_seats: list[int] = []
+        else:
+            assignments = sample_opponents(opponent_dist)
+            seat_types = {0: "self", **assignments}
+            greedy_seats = [s for s, t in seat_types.items() if t == "greedy"]
 
-        turn = bridge.new_game()
-        prev_can_pass = False  # first turn is always a lead (can_pass=False)
+        # Track opponent mix
+        for t in seat_types.values():
+            opponent_counts[t] = opponent_counts.get(t, 0) + 1
+
+        # Only self-seats collect PPO data
+        self_seats = {s for s, t in seat_types.items() if t == "self"}
+        player_bufs = {p: TrajectoryBuffer() for p in self_seats}
+
+        result = bridge.new_game(greedy_seats=greedy_seats if greedy_seats else None)
+
+        # Edge case: all greedy seats finish before any non-greedy turn
+        if isinstance(result, GameOver):
+            games_played += 1
+            continue
+        turn = result
+        prev_can_pass = False
 
         while True:
             player = turn.player
+            seat_type = seat_types.get(player, "self")
+
             state, action_features, action_mask, num_actions = encode_turn(turn, player)
 
-            if num_actions > MAX_ACTIONS:
-                num_actions = MAX_ACTIONS
+            if seat_type == "self":
+                # Current policy — collect PPO data
+                action_index, log_prob, value = select_action(
+                    model, state, action_features, action_mask, num_actions, device
+                )
 
-            action_index, log_prob, value = select_action(
-                model, state, action_features, action_mask, num_actions, device
-            )
+                shaping = 0.0
+                if use_shaping:
+                    is_pass = turn.can_pass and action_index == num_actions - 1
+                    if not is_pass:
+                        num_cards = len(turn.valid_actions[action_index])
+                        shaping = CARD_PLAY_REWARD * num_cards
 
-            # Compute per-step shaping reward
-            shaping = 0.0
-            if use_shaping:
-                is_pass = turn.can_pass and action_index == len(turn.valid_actions)
-                if not is_pass and action_index < len(turn.valid_actions):
-                    num_cards = len(turn.valid_actions[action_index])
-                    shaping = CARD_PLAY_REWARD * num_cards
+                player_bufs[player].add(
+                    state, action_features, action_mask, action_index, log_prob, value
+                )
+                player_bufs[player].rewards[-1] = shaping
 
-            player_bufs[player].add(state, action_features, action_mask, action_index, log_prob, value)
-            player_bufs[player].rewards[-1] = shaping
+                # Store in reservoir for average policy training
+                if reservoir is not None:
+                    reservoir.add(state, action_features, action_mask, action_index)
+
+            elif seat_type == "random":
+                action_index = random.randrange(num_actions)
+
+            elif seat_type == "average" and avg_model is not None:
+                action_index = select_action_average(
+                    avg_model, state, action_features, action_mask, num_actions, device
+                )
+            else:
+                # Fallback (average with no model yet) → random
+                action_index = random.randrange(num_actions)
+
             total_moves += 1
-
-            result = bridge.step(action_index)
+            result = bridge.step(to_bridge_action(action_index, num_actions, turn))
 
             if isinstance(result, GameOver):
-                # Assign terminal rewards and merge per-player buffers into main buffer
                 for position, player_id in enumerate(result.win_order):
-                    pb = player_bufs[player_id]
-                    if pb.size() > 0:
-                        pb.rewards[-1] += POSITION_REWARDS[position]
-                        pb.dones[-1] = True
-                    buf.extend(pb)
-
+                    if player_id in player_bufs:
+                        pb = player_bufs[player_id]
+                        if pb.size() > 0:
+                            pb.rewards[-1] += POSITION_REWARDS[position]
+                            pb.dones[-1] = True
+                        buf.extend(pb)
                 games_played += 1
                 break
 
-            # Detect power gain: round reset means someone won the trick
+            # Power gain shaping — only for self-seats
             assert isinstance(result, TurnInfo)
             if use_shaping and not result.can_pass and prev_can_pass:
                 power_player = result.player
-                if player_bufs[power_player].size() > 0:
+                if power_player in player_bufs and player_bufs[power_player].size() > 0:
                     player_bufs[power_player].rewards[-1] += POWER_GAIN_REWARD
 
             prev_can_pass = result.can_pass
@@ -248,6 +411,7 @@ def collect_trajectories(
         "games": games_played,
         "steps": buf.size(),
         "avg_moves": total_moves / max(games_played, 1),
+        "opponent_counts": opponent_counts,
     }
     return buf, stats
 
@@ -328,6 +492,52 @@ def ppo_update(
     }
 
 
+# ── NFSP average policy training ─────────────────────────────────────────────
+
+def train_average_policy(
+    avg_model: TienLenNet,
+    avg_optimizer: torch.optim.Optimizer,
+    reservoir: ReservoirBuffer,
+    device: torch.device,
+    num_updates: int = 4,
+    batch_size: int = 512,
+) -> dict:
+    """
+    Train average policy via cross-entropy on reservoir buffer samples.
+    Called after each PPO update.
+    """
+    if reservoir.size() < batch_size:
+        return {"avg_loss": 0.0, "avg_updates": 0}
+
+    avg_model.train()
+    total_loss = 0.0
+
+    for _ in range(num_updates):
+        states, action_feats, action_masks, action_indices = reservoir.sample(batch_size)
+        states = states.to(device)
+        action_feats = action_feats.to(device)
+        action_masks = action_masks.to(device)
+        action_indices = action_indices.to(device)
+
+        scores = avg_model(states, action_feats)
+        scores = scores.masked_fill(~action_masks, float("-inf"))
+
+        log_probs = torch.log_softmax(scores, dim=-1)
+        loss = -log_probs.gather(1, action_indices.unsqueeze(1)).squeeze(1).mean()
+
+        avg_optimizer.zero_grad()
+        loss.backward()
+        nn.utils.clip_grad_norm_(avg_model.parameters(), 0.5)
+        avg_optimizer.step()
+
+        total_loss += loss.item()
+
+    return {
+        "avg_loss": total_loss / num_updates,
+        "avg_updates": num_updates,
+    }
+
+
 # ── Inline evaluation ────────────────────────────────────────────────────────
 
 def eval_vs_greedy(
@@ -355,8 +565,6 @@ def eval_vs_greedy(
         while not isinstance(result, GameOver):
             turn = result
             state, action_features, action_mask, num_actions = encode_turn(turn, turn.player)
-            if num_actions > MAX_ACTIONS:
-                num_actions = MAX_ACTIONS
 
             # Use argmax (greedy) instead of sampling for eval
             with torch.no_grad():
@@ -367,7 +575,7 @@ def eval_vs_greedy(
                 scores = scores.masked_fill(~mask_t, float("-inf"))
                 action_index = scores[0, :num_actions].argmax().item()
 
-            result = bridge.step(action_index)
+            result = bridge.step(to_bridge_action(action_index, num_actions, turn))
 
         if isinstance(result, GameOver):
             if result.win_order.index(model_seat) == 0:
@@ -391,15 +599,23 @@ def train(
     eval_games: int = 100,
     use_shaping: bool = True,
     minibatch_size: int = 512,
+    no_opponent_pool: bool = False,
+    reservoir_capacity: int = 50_000,
+    avg_lr: float = 1e-3,
+    avg_updates: int = 4,
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
 
+    use_nfsp = not no_opponent_pool
+    mode = "nfsp" if use_nfsp else "selfplay"
+
     # Build output paths from hyperparameters
     e_str = str(entropy_coef).replace("0.", "").replace(".", "")
-    run_prefix = f"ppo-ep{epochs}-b{batch_size}-e{e_str}{'-shaping' if use_shaping else ''}"
+    run_prefix = f"ppo-{mode}-ep{epochs}-b{batch_size}-e{e_str}{'-shaping' if use_shaping else ''}"
     os.makedirs(output_dir, exist_ok=True)
     model_path = os.path.join(output_dir, f"{run_prefix}-model.pt")
+    avg_model_path = os.path.join(output_dir, f"{run_prefix}-avg-model.pt")
     epoch_csv_path = os.path.join(output_dir, f"{run_prefix}-epoch-stats.csv")
     eval_csv_path = os.path.join(output_dir, f"{run_prefix}-eval-stats.csv")
     print(f"Run prefix: {run_prefix}")
@@ -408,9 +624,22 @@ def train(
     model = TienLenNet().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
+    # NFSP: average policy + reservoir buffer
+    avg_model: TienLenNet | None = None
+    avg_optimizer: torch.optim.Adam | None = None
+    reservoir: ReservoirBuffer | None = None
+    if use_nfsp:
+        avg_model = TienLenNet()
+        avg_model = avg_model.to(device)
+        assert avg_model is not None
+        avg_optimizer = torch.optim.Adam(avg_model.parameters(), lr=avg_lr)
+        reservoir = ReservoirBuffer(capacity=reservoir_capacity)
+        avg_param_count = sum(p.numel() for p in avg_model.parameters())
+        print(f"NFSP: average policy ({avg_param_count:,} params), reservoir capacity={reservoir_capacity:,}")
+
     param_count = sum(p.numel() for p in model.parameters())
     print(f"Model parameters: {param_count:,}")
-    print(f"Reward shaping: {'ON' if use_shaping else 'OFF'}")
+    print(f"Mode: {mode} | Reward shaping: {'ON' if use_shaping else 'OFF'}")
     print(f"Eval: every {eval_interval} epochs, {eval_games} games vs greedy")
 
     best_win_rate = -1.0
@@ -424,7 +653,13 @@ def train(
         GameBridge() as bridge,
     ):
         epoch_writer = csv.writer(epoch_f)
-        epoch_writer.writerow(["epoch", "policy_loss", "value_loss", "entropy", "kl", "games", "elapsed_s"])
+        epoch_header = [
+            "epoch", "policy_loss", "value_loss", "entropy", "kl",
+            "games", "elapsed_s",
+        ]
+        if use_nfsp:
+            epoch_header.extend(["avg_loss", "reservoir_size", "opponent_mix"])
+        epoch_writer.writerow(epoch_header)
 
         eval_writer = csv.writer(eval_f)
         eval_writer.writerow([
@@ -435,8 +670,19 @@ def train(
         for epoch in range(epochs):
             t0 = time.time()
 
+            # Schedule opponent distribution
+            opponent_dist = get_opponent_dist(epoch, epochs) if use_nfsp else None
+
+            if use_nfsp and avg_model is not None:
+                avg_model.eval()
+
             # Collect trajectories
-            buf, collect_stats = collect_trajectories(bridge, model, device, batch_size, use_shaping)
+            buf, collect_stats = collect_trajectories(
+                bridge, model, device, batch_size, use_shaping,
+                avg_model=avg_model,
+                opponent_dist=opponent_dist,
+                reservoir=reservoir,
+            )
             t_collect = time.time() - t0
 
             # PPO update
@@ -450,10 +696,27 @@ def train(
             )
             t_update = time.time() - t1
 
-            elapsed = t_collect + t_update
+            # Average policy update (NFSP)
+            avg_stats: dict = {"avg_loss": 0.0, "avg_updates": 0}
+            t_avg = 0.0
+            if use_nfsp and avg_model is not None and avg_optimizer is not None and reservoir is not None:
+                t2 = time.time()
+                avg_stats = train_average_policy(
+                    avg_model, avg_optimizer, reservoir, device,
+                    num_updates=avg_updates, batch_size=minibatch_size,
+                )
+                t_avg = time.time() - t2
+
+            elapsed = t_collect + t_update + t_avg
             entropy_window.append(update_stats["entropy"])
 
-            epoch_writer.writerow([
+            # Build opponent mix string for logging
+            opp_counts = collect_stats.get("opponent_counts", {})
+            opp_str = "/".join(
+                f"{k[0].upper()}{v}" for k, v in sorted(opp_counts.items())
+            ) if opp_counts else "pure"
+
+            epoch_row = [
                 epoch + 1,
                 f"{update_stats['policy_loss']:.6f}",
                 f"{update_stats['value_loss']:.6f}",
@@ -461,8 +724,24 @@ def train(
                 f"{update_stats['kl']:.6f}",
                 collect_stats["games"],
                 f"{elapsed:.2f}",
-            ])
+            ]
+            if use_nfsp:
+                epoch_row.extend([
+                    f"{avg_stats['avg_loss']:.6f}",
+                    reservoir.size() if reservoir else 0,
+                    opp_str,
+                ])
+            epoch_writer.writerow(epoch_row)
             epoch_f.flush()
+
+            nfsp_suffix = ""
+            if use_nfsp:
+                nfsp_suffix = (
+                    f" | avg_loss: {avg_stats['avg_loss']:.4f}"
+                    f" | res: {reservoir.size() if reservoir else 0}"
+                    f" | opp: {opp_str}"
+                    f" | t_avg={t_avg:.1f}s"
+                )
 
             print(
                 f"Epoch {epoch + 1:4d}/{epochs} | "
@@ -472,6 +751,7 @@ def train(
                 f"entropy: {update_stats['entropy']:.3f} | "
                 f"kl: {update_stats['kl']:.4f} | "
                 f"collect={t_collect:.1f}s update={t_update:.1f}s"
+                f"{nfsp_suffix}"
             )
 
             # Periodic evaluation vs greedy
@@ -496,6 +776,10 @@ def train(
                     torch.save(model.state_dict(), model_path)
                     print(f"  → Saved best model (win_rate={win_rate:.1%}) to {model_path}")
 
+                # Always save avg model at eval time
+                if use_nfsp and avg_model is not None:
+                    torch.save(avg_model.state_dict(), avg_model_path)
+
                 eval_writer.writerow([
                     eval_num, epoch + 1,
                     f"{win_rate:.4f}", f"{best_win_rate:.4f}",
@@ -512,12 +796,14 @@ def train(
 
     print(f"\nBest win rate vs greedy: {best_win_rate:.1%}")
     print(f"Model saved to {model_path}")
+    if use_nfsp:
+        print(f"Avg model saved to {avg_model_path}")
     print(f"Epoch stats: {epoch_csv_path}")
     print(f"Eval stats:  {eval_csv_path}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="PPO training via self-play")
+    parser = argparse.ArgumentParser(description="PPO training with NFSP opponent pool")
     parser.add_argument("--epochs", type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=2048)
     parser.add_argument("--lr", type=float, default=3e-4)
@@ -529,6 +815,15 @@ if __name__ == "__main__":
     parser.add_argument("--eval-games", type=int, default=100, help="Games per eval round")
     parser.add_argument("--no-shaping", action="store_true", help="Disable reward shaping")
     parser.add_argument("--minibatch-size", type=int, default=512)
+    # NFSP / opponent pool
+    parser.add_argument("--no-opponent-pool", action="store_true",
+                        help="Disable opponent pool (pure self-play, all 4 seats train)")
+    parser.add_argument("--reservoir-capacity", type=int, default=50000,
+                        help="NFSP reservoir buffer capacity")
+    parser.add_argument("--avg-lr", type=float, default=1e-3,
+                        help="Average policy learning rate")
+    parser.add_argument("--avg-updates", type=int, default=4,
+                        help="Average policy updates per epoch")
     args = parser.parse_args()
 
     train(
@@ -537,4 +832,8 @@ if __name__ == "__main__":
         args.eval_interval, args.eval_games,
         use_shaping=not args.no_shaping,
         minibatch_size=args.minibatch_size,
+        no_opponent_pool=args.no_opponent_pool,
+        reservoir_capacity=args.reservoir_capacity,
+        avg_lr=args.avg_lr,
+        avg_updates=args.avg_updates,
     )

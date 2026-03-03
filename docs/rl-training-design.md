@@ -164,13 +164,17 @@ Value head (for PPO):
 
 **Implementation:** `packages/training/python/train_ppo.py`
 
-**Training loop:**
-1. Self-play: 4 copies of current policy play a game via the TS game bridge
-2. Collect trajectories: (state, action, log_prob, value, reward) for each player
-3. Assign terminal rewards based on finish position (4/2/1/0)
-4. Compute advantages using GAE (λ=0.95, γ=0.99)
-5. PPO update: clipped surrogate loss + MSE value loss + entropy bonus
-6. Repeat for N epochs per batch
+**Training loop (NFSP-inspired, default):**
+1. Sample opponent types for seats 1-3 from a scheduled distribution (greedy, random, average policy, or self-play). Seat 0 always uses the current policy.
+2. Play a game via the TS game bridge. Greedy seats are auto-played by TS; random/average seats are controlled by Python.
+3. Collect trajectories only from seats using the current policy (π_BR).
+4. Assign zero-sum terminal rewards based on finish position (+2.25/+0.25/-0.75/-1.75).
+5. Compute advantages using GAE (λ=0.95, γ=0.99).
+6. PPO update: clipped surrogate loss + MSE value loss + entropy bonus.
+7. Train the average policy (π_AVG) via cross-entropy on a reservoir buffer of π_BR decisions.
+8. Repeat.
+
+**Opponent schedule:** Early epochs (first 10%) use 60% greedy opponents for stable gradient signal. This tapers to 5% greedy / 45% average policy by 10% of training, letting NFSP dominate later epochs. Use `--no-opponent-pool` for pure self-play (legacy behavior).
 
 **Game Bridge:** Since the game engine is in TypeScript, PPO training communicates with a persistent TS subprocess (`game-server.ts`) via stdin/stdout JSON lines. Python drives all 4 seats, sending `new_game`/`step` commands and receiving game state + valid actions. The `GameBridge` class in `game_bridge.py` manages the subprocess lifecycle.
 
@@ -202,19 +206,24 @@ train_ppo.py → game_bridge.py → [subprocess] game-server.ts → GameState
 
 The TS game server accepts commands (`new_game`, `step`, `quit`) and returns game state snapshots with valid actions. Python controls all 4 seats, selecting actions via the current policy. The TS subprocess stays alive across games for efficiency.
 
-**Current approach:** Pure self-play — 4 copies of the same policy play each game. All 4 seats' trajectories are collected for PPO updates.
+**Current approach:** NFSP-inspired opponent pool. Each game mixes the current policy with opponents sampled from a scheduled distribution:
+
+- **Current policy (π_BR)** — the PPO policy being trained; only these seats collect training data
+- **Average policy (π_AVG)** — a second `TienLenNet` trained via supervised cross-entropy on a reservoir buffer of π_BR's historical decisions. Provides a stable "historical average" opponent (NFSP).
+- **Greedy bot** — the existing `choosePlay()`, always plays lowest valid card. Fixed benchmark.
+- **Random bot** — picks uniformly from valid plays. Maximum diversity.
+
+The opponent distribution shifts over training via linear interpolation:
+- **Early (first 10% of epochs):** 60% greedy, 10% average, 10% random, 20% self
+- **Late (after 10%):** 5% greedy, 45% average, 10% random, 40% self
+
+This addresses the "reward confusion" problem of pure self-play: in a 4-player game, identical strategies get simultaneously rewarded and punished. Fixed opponents and the slowly-evolving average policy provide stable gradient signal.
 
 **Future enhancements:**
-- Pool of N policy checkpoints (random + greedy + historical RL checkpoints)
-- Mixed games: sample players from the pool (newest checkpoint gets 50% of seats)
+- Historical checkpoint pool (league training, AlphaStar-style)
 - Distributed workers for parallel game generation
 - Elo tracking against deterministic greedy bot
 - Human evaluation via multiplayer match logs (see Section 5E)
-
-**Seed opponents (future):**
-- **Deterministic greedy bot** — the existing `choosePlay()`, always plays lowest valid card. Fixed benchmark for Elo measurement.
-- **Epsilon-greedy bot** — same strategy but with probability ε (e.g., 0.1) plays a random valid move instead. Prevents overfitting to one pattern.
-- **Random bot** — picks uniformly from valid plays. Maximum diversity.
 
 **Why not add strategic heuristics (e.g., 2-preservation) to the greedy bot?** Discovering strategies like holding 2s for board control is exactly what RL training should learn on its own. Hand-coding heuristics biases the training toward strategies we *think* are good. The bot might find approaches we wouldn't think of. Keep seed opponents simple; let RL provide the intelligence.
 

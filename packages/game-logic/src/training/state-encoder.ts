@@ -115,5 +115,36 @@ export function encodeState(
     out[offset++] = pos < snapshot.winOrder.length ? 1 : 0;
   }
 
+  // Unseen cards (52) — cards not in our hand and not yet played by anyone
+  // Tells the model what opponents could be holding
+  const myHand = new Set(snapshot.hands[playerIndex].map((c) => c.value));
+  for (let cardVal = 0; cardVal < DECK_SIZE; cardVal++) {
+    // Card is unseen if: not in our hand AND not in the played-total region
+    // (played-total was encoded at offset 52..103, reuse that logic)
+    const inHand = myHand.has(cardVal);
+    let wasPlayed = false;
+    if (played) {
+      for (let p = 0; p < NUM_PLAYERS; p++) {
+        for (const card of played[p]) {
+          if (card.value === cardVal) {
+            wasPlayed = true;
+            break;
+          }
+        }
+        if (wasPlayed) break;
+      }
+    }
+    out[offset + cardVal] = !inHand && !wasPlayed ? 1 : 0;
+  }
+  offset += DECK_SIZE;
+
+  // Relative hand advantage (3) — (myHandSize - opponentHandSize) / 13
+  // Positive = I have more cards (bad), negative = I have fewer (good)
+  const mySize = snapshot.hands[playerIndex].length;
+  for (let rel = 1; rel <= NUM_OPPONENTS; rel++) {
+    const abs = (playerIndex + rel) % NUM_PLAYERS;
+    out[offset++] = (mySize - snapshot.hands[abs].length) / 13;
+  }
+
   return out;
 }

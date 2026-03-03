@@ -142,8 +142,9 @@ POSITION_REWARDS = {0: 2.25, 1: 0.25, 2: -0.75, 3: -1.75}
 MAX_ACTIONS = 80
 
 # Reward shaping (small intermediate signals, < 5% of terminal reward)
-CARD_PLAY_REWARD = 0.01   # per card played — encourages shedding
-POWER_GAIN_REWARD = 0.02  # winning a trick — encourages board control
+CARD_PLAY_REWARD = 0.01       # per card played — encourages shedding
+POWER_GAIN_REWARD = 0.02      # winning a trick — encourages board control
+HAND_ADVANTAGE_REWARD = 0.005 # per turn, scaled by relative card count — gentle nudge
 
 
 def encode_turn(turn: TurnInfo, player: int):
@@ -363,6 +364,15 @@ def collect_trajectories(
                         num_cards = len(turn.valid_actions[action_index])
                         shaping = CARD_PLAY_REWARD * num_cards
 
+                    # Hand advantage: reward having fewer cards than opponents
+                    hands = turn.state["hands"]
+                    my_cards = len(hands[player])
+                    opp_cards = sum(
+                        len(hands[(player + r) % 4]) for r in range(1, 4)
+                    )
+                    avg_opp_cards = opp_cards / 3.0
+                    shaping += HAND_ADVANTAGE_REWARD * (avg_opp_cards - my_cards) / 13.0
+
                 player_bufs[player].add(
                     state, action_features, action_mask, action_index, log_prob, value
                 )
@@ -425,7 +435,8 @@ def ppo_update(
     device: torch.device,
     ppo_epochs: int = 2,
     clip_ratio: float = 0.2,
-    entropy_coef: float = 0.01,
+    entropy_coef: float = 0.05,
+    entropy_target: float = 0.3,
     value_coef: float = 0.5,
     max_grad_norm: float = 0.5,
     minibatch_size: int = 512,
@@ -471,7 +482,11 @@ def ppo_update(
             probs = probs.clamp(min=1e-8)
             entropy = -(probs * torch.log(probs)).sum(dim=-1).mean()
 
-            loss = policy_loss + value_coef * value_loss - entropy_coef * entropy
+            # Adaptive entropy: boost coefficient when entropy drops below target
+            effective_entropy_coef = entropy_coef * max(
+                1.0, entropy_target / max(entropy.item(), 1e-8)
+            )
+            loss = policy_loss + value_coef * value_loss - effective_entropy_coef * entropy
 
             optimizer.zero_grad()
             loss.backward()
@@ -594,7 +609,8 @@ def train(
     output_dir: str = ".",
     ppo_epochs: int = 2,
     clip_ratio: float = 0.2,
-    entropy_coef: float = 0.01,
+    entropy_coef: float = 0.05,
+    entropy_target: float = 0.3,
     eval_interval: int = 100,
     eval_games: int = 100,
     use_shaping: bool = True,
@@ -692,6 +708,7 @@ def train(
                 ppo_epochs=ppo_epochs,
                 clip_ratio=clip_ratio,
                 entropy_coef=entropy_coef,
+                entropy_target=entropy_target,
                 minibatch_size=minibatch_size,
             )
             t_update = time.time() - t1
@@ -738,7 +755,6 @@ def train(
             if use_nfsp:
                 nfsp_suffix = (
                     f" | avg_loss: {avg_stats['avg_loss']:.4f}"
-                    f" | res: {reservoir.size() if reservoir else 0}"
                     f" | opp: {opp_str}"
                     f" | t_avg={t_avg:.1f}s"
                 )
@@ -810,7 +826,9 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", default=".", help="Directory for model and CSV outputs")
     parser.add_argument("--ppo-epochs", type=int, default=2)
     parser.add_argument("--clip-ratio", type=float, default=0.2)
-    parser.add_argument("--entropy-coef", type=float, default=0.01)
+    parser.add_argument("--entropy-coef", type=float, default=0.05)
+    parser.add_argument("--entropy-target", type=float, default=0.3,
+                        help="Entropy floor — adaptive coefficient boosts when below this")
     parser.add_argument("--eval-interval", type=int, default=100, help="Epochs between vs-greedy evals")
     parser.add_argument("--eval-games", type=int, default=100, help="Games per eval round")
     parser.add_argument("--no-shaping", action="store_true", help="Disable reward shaping")
@@ -829,6 +847,7 @@ if __name__ == "__main__":
     train(
         args.epochs, args.batch_size, args.lr, args.output_dir,
         args.ppo_epochs, args.clip_ratio, args.entropy_coef,
+        args.entropy_target,
         args.eval_interval, args.eval_games,
         use_shaping=not args.no_shaping,
         minibatch_size=args.minibatch_size,

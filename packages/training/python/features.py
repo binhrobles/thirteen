@@ -13,7 +13,7 @@ NUM_OPPONENTS = 3
 NUM_COMBO_TYPES = 8  # 7 combos + POWER
 NUM_ACTION_COMBO_TYPES = 7
 
-STATE_SIZE = 337
+STATE_SIZE = 392
 ACTION_SIZE = 63
 
 COMBO_INDEX = {
@@ -106,6 +106,24 @@ def encode_state(snapshot: dict, player_index: int) -> np.ndarray:
     # Win order filled (3) positions 1-3
     for pos in range(3):
         out[offset] = 1 if pos < len(win_order) else 0
+        offset += 1
+
+    # Unseen cards (52) — cards not in our hand and not yet played
+    my_hand_values = {c["value"] for c in hands[player_index]}
+    played_values: set[int] = set()
+    if cards_played:
+        for p in range(NUM_PLAYERS):
+            for card in cards_played[p]:
+                played_values.add(card["value"])
+    for card_val in range(DECK_SIZE):
+        out[offset + card_val] = 1 if (card_val not in my_hand_values and card_val not in played_values) else 0
+    offset += DECK_SIZE
+
+    # Relative hand advantage (3) — (myHandSize - opponentHandSize) / 13
+    my_size = len(hands[player_index])
+    for rel in range(1, NUM_OPPONENTS + 1):
+        abs_p = (player_index + rel) % NUM_PLAYERS
+        out[offset] = (my_size - len(hands[abs_p])) / 13.0
         offset += 1
 
     assert offset == STATE_SIZE

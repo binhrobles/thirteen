@@ -241,6 +241,88 @@ describe("encodeState", () => {
     expect(result[woOffset + 2]).toBe(0); // 3rd place not filled
   });
 
+  it("encodes unseen cards (not in hand, not played)", () => {
+    const snap = emptySnapshot({
+      hands: [
+        [cd(Rank.THREE, Suit.SPADES), cd(Rank.FIVE, Suit.HEARTS)], // values 0, 11
+        [cd(Rank.KING, Suit.CLUBS)], // value 41 — opponent hand, invisible to encoding
+        [],
+        [],
+      ],
+      cardsPlayedByPlayer: [
+        [cd(Rank.FOUR, Suit.CLUBS)], // value 5 — played
+        [cd(Rank.SEVEN, Suit.DIAMONDS)], // value 18 — played
+        [],
+        [],
+      ],
+    });
+
+    const result = encodeState(snap, 0);
+    const unseenOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3; // 337
+
+    // In our hand → NOT unseen
+    expect(result[unseenOffset + 0]).toBe(0); // 3♠ (value 0) in hand
+    expect(result[unseenOffset + 11]).toBe(0); // 5♥ (value 11) in hand
+
+    // Played by someone → NOT unseen
+    expect(result[unseenOffset + 5]).toBe(0); // 4♣ (value 5) played
+    expect(result[unseenOffset + 18]).toBe(0); // 7♦ (value 18) played
+
+    // In opponent's hand but not played and not in our hand → unseen (we don't know)
+    expect(result[unseenOffset + 41]).toBe(1); // K♣ (value 41)
+
+    // Completely unaccounted for card → unseen
+    expect(result[unseenOffset + 30]).toBe(1); // some card nobody holds or played
+  });
+
+  it("encodes unseen cards as all 1s when no cards in hand or played", () => {
+    const snap = emptySnapshot(); // empty hands, no cards played
+    const result = encodeState(snap, 0);
+    const unseenOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3; // 337
+
+    for (let i = 0; i < DECK_SIZE; i++) {
+      expect(result[unseenOffset + i]).toBe(1);
+    }
+  });
+
+  it("encodes relative hand advantage", () => {
+    const snap = emptySnapshot({
+      hands: [
+        Array.from({ length: 10 }, (_, i) => cd(i, 0)), // player 0: 10 cards
+        Array.from({ length: 4 }, (_, i) => cd(i, 1)), // player 1: 4 cards
+        Array.from({ length: 13 }, (_, i) => cd(i, 2)), // player 2: 13 cards
+        [], // player 3: 0 cards
+      ],
+    });
+
+    const result = encodeState(snap, 0);
+    const advOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE; // 389
+
+    // (mySize - oppSize) / 13
+    expect(result[advOffset]).toBeCloseTo((10 - 4) / 13); // rel 1 = player 1: positive (I have more = bad)
+    expect(result[advOffset + 1]).toBeCloseTo((10 - 13) / 13); // rel 2 = player 2: negative (I have fewer = good)
+    expect(result[advOffset + 2]).toBeCloseTo((10 - 0) / 13); // rel 3 = player 3: large positive
+  });
+
+  it("rotates relative hand advantage for different perspectives", () => {
+    const snap = emptySnapshot({
+      hands: [
+        Array.from({ length: 5 }, (_, i) => cd(i, 0)), // player 0: 5
+        Array.from({ length: 8 }, (_, i) => cd(i, 1)), // player 1: 8
+        Array.from({ length: 2 }, (_, i) => cd(i, 2)), // player 2: 2
+        Array.from({ length: 11 }, (_, i) => cd(i, 3)), // player 3: 11
+      ],
+    });
+
+    // From player 2's perspective: my_size=2, opponents are p3(11), p0(5), p1(8)
+    const result = encodeState(snap, 2);
+    const advOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE; // 389
+
+    expect(result[advOffset]).toBeCloseTo((2 - 11) / 13); // rel 1 = player 3
+    expect(result[advOffset + 1]).toBeCloseTo((2 - 5) / 13); // rel 2 = player 0
+    expect(result[advOffset + 2]).toBeCloseTo((2 - 8) / 13); // rel 3 = player 1
+  });
+
   it("handles missing cardsPlayedByPlayer gracefully", () => {
     const snap = emptySnapshot();
     delete snap.cardsPlayedByPlayer;
@@ -256,7 +338,7 @@ describe("encodeState", () => {
     // Verify the last position is writable and nothing goes out of bounds
     const snap = emptySnapshot({ winOrder: [0, 1, 2] });
     const result = encodeState(snap, 0);
-    expect(result[STATE_SIZE - 1]).toBe(1); // 3rd win order slot filled
+    expect(result[336]).toBe(1); // 3rd win order slot filled (offset 334 + 2)
     expect(result.length).toBe(STATE_SIZE);
   });
 });

@@ -18,10 +18,12 @@ A fixed-size tensor encoding the game state from the perspective of the acting p
 | Last play combo type | 8 | One-hot (7 combos + null/power) | SINGLE, PAIR, TRIPLE, QUAD, RUN, BOMB, INVALID, POWER |
 | Last play suited | 1 | Binary | Whether last play was a suited run |
 | Last played by (relative) | 4 | One-hot (self + 3 opponents) | Who made the last play |
-| Players passed this round | 4 | Binary per player | Who has passed |
-| Players still in game | 4 | Binary per player | Who hasn't won yet |
-| Win order filled | 4 | Binary per position | Which finish positions are taken |
-| **Total** | **~337** | | |
+| Players passed this round | 3 | Binary per opponent | Who has passed |
+| Players still in game | 3 | Binary per opponent | Who hasn't won yet |
+| Win order filled | 3 | Binary per position | Which finish positions are taken |
+| Unseen cards | 52 | Binary (0/1 per card) | Cards not in hand and not yet played — what opponents could hold |
+| Relative hand advantage | 3 | Signed float (-1 to 1) | (myHandSize - opponentHandSize) / 13 per opponent |
+| **Total** | **392** | | |
 
 ### Card Encoding
 
@@ -113,19 +115,19 @@ Keep shaping rewards small (< 5% of terminal reward) to avoid distorting the lea
 
 ```
 State encoder (shared):
-  Linear(337, 256) → ReLU → Linear(256, 128) → ReLU
-  Output: state_embedding (128-dim)
+  Linear(392, 256) → ReLU → Linear(256, 256) → ReLU
+  Output: state_embedding (256-dim)
 
 Action encoder:
-  Linear(63, 64) → ReLU
-  Output: action_embedding (64-dim)
+  Linear(63, 128) → ReLU
+  Output: action_embedding (128-dim)
 
 Scorer:
-  Concat(state_embedding, action_embedding) → Linear(192, 64) → ReLU → Linear(64, 1)
+  Concat(state_embedding, action_embedding) → Linear(384, 128) → ReLU → Linear(128, 1)
   Output: score (scalar per action)
 
 Value head (for PPO):
-  Linear(128, 64) → ReLU → Linear(64, 1)
+  Linear(256, 128) → ReLU → Linear(128, 1)
   Output: V(s) state value estimate
 ```
 

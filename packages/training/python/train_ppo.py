@@ -18,6 +18,7 @@ import csv
 import os
 import random
 import time
+from datetime import datetime
 
 import numpy as np
 import torch
@@ -26,6 +27,7 @@ import torch.nn as nn
 from features import encode_state, encode_action, encode_pass_action, STATE_SIZE, ACTION_SIZE
 from model import TienLenNet
 from game_bridge import GameBridge, TurnInfo, GameOver
+from game_logger import GameLogger, GameRecord
 
 
 # ── Trajectory storage ───────────────────────────────────────────────────────
@@ -138,13 +140,20 @@ class ReservoirBuffer:
 
 # ── Helper functions ─────────────────────────────────────────────────────────
 
-POSITION_REWARDS = {0: 2.25, 1: 0.25, 2: -0.75, 3: -1.75}
+POSITION_SCALE = 1.5
+POSITION_REWARDS = {
+    0: 2.25 * POSITION_SCALE,
+    1: 0.25 * POSITION_SCALE,
+    2: -0.75 * POSITION_SCALE,
+    3: -1.75 * POSITION_SCALE
+}
 MAX_ACTIONS = 80
 
 # Reward shaping (small intermediate signals, < 5% of terminal reward)
-CARD_PLAY_REWARD = 0.01       # per card played — encourages shedding
-POWER_GAIN_REWARD = 0.02      # winning a trick — encourages board control
-HAND_ADVANTAGE_REWARD = 0.005 # per turn, scaled by relative card count — gentle nudge
+CARD_PLAY_REWARD = 0.02       # per card played, weighted by card weakness — encourages shedding garbage
+# POWER_GAIN_REWARD = 0.05    # winning a trick — disabled, too noisy
+# HAND_ADVANTAGE_REWARD = 0.005 # per turn, scaled by relative card count — disabled, redundant with terminal
+# OPPONENT_OUT_PENALTY = -0.1 # immediate penalty when an opponent finishes — disabled, noisy proxy
 
 
 def encode_turn(turn: TurnInfo, player: int):
@@ -233,20 +242,21 @@ def get_opponent_dist(epoch: int, total_epochs: int) -> dict[str, float]:
 def sample_opponents(dist: dict[str, float]) -> dict[int, str]:
     """
     Sample opponent types for seats 1-3.
-    Seat 0 is always 'self'. At least one seat must be non-self.
+    Seat 0 is always 'self'. Guarantees 2-3 self seats total (1-2 non-self opponents)
+    so more training data is collected per game.
     """
-    types = list(dist.keys())
-    weights = [dist[t] for t in types]
+    non_self_types = [t for t in dist if t != "self"]
+    non_self_weights = [dist[t] for t in non_self_types]
 
-    while True:
-        assignments = {
-            seat: random.choices(types, weights=weights, k=1)[0]
-            for seat in range(1, 4)
-        }
-        if any(v != "self" for v in assignments.values()):
-            break
+    # 1 or 2 non-self seats (so 3 or 2 self seats total)
+    num_non_self = random.choices([1, 2], weights=[0.5, 0.5])[0]
+    non_self_seats = random.sample(range(1, 4), num_non_self)
 
-    return assignments
+    return {
+        seat: (random.choices(non_self_types, weights=non_self_weights, k=1)[0]
+               if seat in non_self_seats else "self")
+        for seat in range(1, 4)
+    }
 
 
 def select_action_average(
@@ -344,6 +354,9 @@ def collect_trajectories(
             continue
         turn = result
         prev_can_pass = False
+        # Track hand sizes to detect when players go out mid-game
+        prev_hand_sizes = {p: len(turn.state["hands"][p]) for p in range(4)}
+        finish_position = 0  # next position to assign (0=1st, 1=2nd, ...)
 
         while True:
             player = turn.player
@@ -361,17 +374,27 @@ def collect_trajectories(
                 if use_shaping:
                     is_pass = turn.can_pass and action_index == num_actions - 1
                     if not is_pass:
-                        num_cards = len(turn.valid_actions[action_index])
-                        shaping = CARD_PLAY_REWARD * num_cards
+                        # Reward shedding cards, weighted by how weak they are.
+                        # Low cards (3-7) are dead weight — high reward to dump them.
+                        # High cards (A, 2) are valuable — less reward for spending them.
+                        # rank: 0=3, 1=4, ... 11=A, 12=2
+                        cards = turn.valid_actions[action_index]
+                        for card in cards:
+                            weight = (12 - card["rank"]) / 12  # 3→1.0, 2→0.0
+                            shaping += CARD_PLAY_REWARD * weight
 
-                    # Hand advantage: reward having fewer cards than opponents
-                    hands = turn.state["hands"]
-                    my_cards = len(hands[player])
-                    opp_cards = sum(
-                        len(hands[(player + r) % 4]) for r in range(1, 4)
-                    )
-                    avg_opp_cards = opp_cards / 3.0
-                    shaping += HAND_ADVANTAGE_REWARD * (avg_opp_cards - my_cards) / 13.0
+                    # # Hand advantage: disabled — redundant with terminal reward
+                    # hands = turn.state["hands"]
+                    # my_cards = len(hands[player])
+                    # opp_cards = [
+                    #     len(hands[p])
+                    #     for p in range(len(hands))
+                    #     if p != player
+                    # ]
+                    # min_opp_cards = min(opp_cards)
+                    # delta = min_opp_cards - my_cards
+                    # delta = max(-5, min(5, delta))  # clip
+                    # shaping += HAND_ADVANTAGE_REWARD * delta / 13.0
 
                 player_bufs[player].add(
                     state, action_features, action_mask, action_index, log_prob, value
@@ -397,22 +420,48 @@ def collect_trajectories(
             result = bridge.step(to_bridge_action(action_index, num_actions, turn))
 
             if isinstance(result, GameOver):
+                # Assign position rewards for any players not yet rewarded
+                # (the last two finish simultaneously at game_over)
                 for position, player_id in enumerate(result.win_order):
                     if player_id in player_bufs:
                         pb = player_bufs[player_id]
                         if pb.size() > 0:
-                            pb.rewards[-1] += POSITION_REWARDS[position]
+                            # Only add position reward if not already assigned mid-game
+                            if position >= finish_position:
+                                pb.rewards[-1] += POSITION_REWARDS[position]
                             pb.dones[-1] = True
                         buf.extend(pb)
                 games_played += 1
                 break
 
-            # Power gain shaping — only for self-seats
+            # Detect players who just went out (hand dropped to 0)
             assert isinstance(result, TurnInfo)
-            if use_shaping and not result.can_pass and prev_can_pass:
-                power_player = result.player
-                if power_player in player_bufs and player_bufs[power_player].size() > 0:
-                    player_bufs[power_player].rewards[-1] += POWER_GAIN_REWARD
+            curr_hand_sizes = {p: len(result.state["hands"][p]) for p in range(4)}
+            for p in range(4):
+                if prev_hand_sizes[p] > 0 and curr_hand_sizes[p] == 0:
+                    position = finish_position
+                    finish_position += 1
+
+                    # Immediate position reward for self-seats that just finished
+                    if p in player_bufs and player_bufs[p].size() > 0:
+                        player_bufs[p].rewards[-1] += POSITION_REWARDS[position]
+
+                    # # Distribute penalty across all prior turns — disabled, noisy proxy
+                    # if use_shaping:
+                    #     for s in self_seats:
+                    #         if s != p and curr_hand_sizes[s] > 0 and player_bufs[s].size() > 0:
+                    #             n_steps = player_bufs[s].size()
+                    #             per_step = OPPONENT_OUT_PENALTY / n_steps
+                    #             for i in range(n_steps):
+                    #                 player_bufs[s].rewards[i] += per_step
+
+            prev_hand_sizes = curr_hand_sizes
+
+            # # Power gain shaping — disabled, too noisy
+            # if use_shaping and not result.can_pass and prev_can_pass:
+            #     power_player = result.player
+            #     if power_player in player_bufs and player_bufs[power_player].size() > 0:
+            #         player_bufs[power_player].rewards[-1] += POWER_GAIN_REWARD
 
             prev_can_pass = result.can_pass
             turn = result
@@ -560,20 +609,27 @@ def eval_vs_greedy(
     model: TienLenNet,
     device: torch.device,
     games: int = 100,
-) -> float:
+    logger: GameLogger | None = None,
+    eval_num: int = 0,
+) -> tuple[float, float, list[GameRecord]]:  # (win_rate, avg_position, records)
     """
-    Play model (seat 0) vs 3 greedy bots. Returns win rate.
+    Play model (seat 0) vs 3 greedy bots. Returns (win_rate, avg_position, game_records).
     Uses the PyTorch model directly (no ONNX export needed).
     """
     import random
 
     model.eval()
     wins = 0
+    total_position = 0
+    records: list[GameRecord] = []
 
-    for _ in range(games):
+    for g in range(games):
         # Randomize model seat
         model_seat = random.randrange(4)
         greedy_seats = [s for s in range(4) if s != model_seat]
+
+        if logger:
+            logger.start_game(eval_num, g, model_seat)
 
         result = bridge.new_game(greedy_seats=greedy_seats)
 
@@ -590,14 +646,33 @@ def eval_vs_greedy(
                 scores = scores.masked_fill(~mask_t, float("-inf"))
                 action_index = scores[0, :num_actions].argmax().item()
 
+                # Compute softmax probs for logging
+                probs_np = None
+                if logger:
+                    probs = torch.softmax(scores[0, :num_actions], dim=0)
+                    probs_np = probs.cpu().numpy()
+
+            if logger:
+                logger.record_move(
+                    turn.state, turn.player, turn.valid_actions, turn.can_pass,
+                    action_index, num_actions, probs_np, is_model=True,
+                )
+
             result = bridge.step(to_bridge_action(action_index, num_actions, turn))
 
         if isinstance(result, GameOver):
-            if result.win_order.index(model_seat) == 0:
+            position = result.win_order.index(model_seat) + 1  # 1-indexed
+            total_position += position
+            if position == 1:
                 wins += 1
+            if logger:
+                records.append(logger.end_game(result.win_order))
+
+    if logger and records:
+        logger.write_eval_batch(eval_num, records)
 
     model.train()
-    return wins / games
+    return wins / games, total_position / games, records
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -619,6 +694,8 @@ def train(
     reservoir_capacity: int = 50_000,
     avg_lr: float = 1e-3,
     avg_updates: int = 4,
+    resume_model: str | None = None,
+    resume_avg_model: str | None = None,
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
@@ -626,18 +703,24 @@ def train(
     use_nfsp = not no_opponent_pool
     mode = "nfsp" if use_nfsp else "selfplay"
 
-    # Build output paths from hyperparameters
+    # Build run directory: {output_dir}/{YYYYMMDD}-{HHMM}-{prefix}/
     e_str = str(entropy_coef).replace("0.", "").replace(".", "")
     run_prefix = f"ppo-{mode}-ep{epochs}-b{batch_size}-e{e_str}{'-shaping' if use_shaping else ''}"
-    os.makedirs(output_dir, exist_ok=True)
-    model_path = os.path.join(output_dir, f"{run_prefix}-model.pt")
-    avg_model_path = os.path.join(output_dir, f"{run_prefix}-avg-model.pt")
-    epoch_csv_path = os.path.join(output_dir, f"{run_prefix}-epoch-stats.csv")
-    eval_csv_path = os.path.join(output_dir, f"{run_prefix}-eval-stats.csv")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M")
+    run_dir = os.path.join(output_dir, f"{timestamp}-{run_prefix}")
+    os.makedirs(run_dir, exist_ok=True)
+    model_path = os.path.join(run_dir, "model.pt")
+    model_latest_path = os.path.join(run_dir, "model-latest.pt")
+    avg_model_path = os.path.join(run_dir, "avg-model.pt")
+    epoch_csv_path = os.path.join(run_dir, "epoch-stats.csv")
+    eval_csv_path = os.path.join(run_dir, "eval-stats.csv")
     print(f"Run prefix: {run_prefix}")
-    print(f"Output dir: {output_dir}")
+    print(f"Run dir: {run_dir}")
 
     model = TienLenNet().to(device)
+    if resume_model:
+        model.load_state_dict(torch.load(resume_model, map_location=device, weights_only=True))
+        print(f"Resumed model from {resume_model}")
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # NFSP: average policy + reservoir buffer
@@ -647,6 +730,9 @@ def train(
     if use_nfsp:
         avg_model = TienLenNet()
         avg_model = avg_model.to(device)
+        if resume_avg_model:
+            avg_model.load_state_dict(torch.load(resume_avg_model, map_location=device, weights_only=True))
+            print(f"Resumed avg model from {resume_avg_model}")
         assert avg_model is not None
         avg_optimizer = torch.optim.Adam(avg_model.parameters(), lr=avg_lr)
         reservoir = ReservoirBuffer(capacity=reservoir_capacity)
@@ -658,10 +744,13 @@ def train(
     print(f"Mode: {mode} | Reward shaping: {'ON' if use_shaping else 'OFF'}")
     print(f"Eval: every {eval_interval} epochs, {eval_games} games vs greedy")
 
+    best_score = -999.0  # combined metric: win_rate - (avg_position - 1) / 3
     best_win_rate = -1.0
+    best_avg_position = 4.0
     entropy_window: list[float] = []
     prev_entropy_mean: float | None = None
     eval_num = 0
+    logger = GameLogger(run_dir)
 
     with (
         open(epoch_csv_path, "w", newline="") as epoch_f,
@@ -679,7 +768,8 @@ def train(
 
         eval_writer = csv.writer(eval_f)
         eval_writer.writerow([
-            "eval_num", "epoch", "win_rate", "best_win_rate",
+            "eval_num", "epoch", "win_rate", "avg_position", "score",
+            "best_win_rate", "best_avg_position", "best_score",
             "entropy_mean", "entropy_min", "entropy_max", "entropy_trend",
         ])
 
@@ -729,8 +819,9 @@ def train(
 
             # Build opponent mix string for logging
             opp_counts = collect_stats.get("opponent_counts", {})
-            opp_str = "/".join(
-                f"{k[0].upper()}{v}" for k, v in sorted(opp_counts.items())
+            opp_total = sum(opp_counts.values()) or 1
+            opp_str = " ".join(
+                f"{k[0].upper()}:{v/opp_total:.0%}" for k, v in sorted(opp_counts.items())
             ) if opp_counts else "pure"
 
             epoch_row = [
@@ -770,10 +861,19 @@ def train(
                 f"{nfsp_suffix}"
             )
 
+            # Save latest model every epoch for resuming
+            torch.save(model.state_dict(), model_latest_path)
+
             # Periodic evaluation vs greedy
             if (epoch + 1) % eval_interval == 0 or epoch == epochs - 1:
-                win_rate = eval_vs_greedy(bridge, model, device, eval_games)
                 eval_num += 1
+                win_rate, avg_position, _ = eval_vs_greedy(
+                    bridge, model, device, eval_games,
+                    logger=logger, eval_num=eval_num,
+                )
+                # Combined score: higher win rate + lower avg position = better
+                # avg_position in [1,4], normalize to [0,1] then invert
+                score = win_rate + (1.0 - (avg_position - 1.0) / 3.0)
 
                 n = len(entropy_window)
                 e_mean = sum(entropy_window) / n
@@ -787,10 +887,12 @@ def train(
                     trend_str = "n/a"
                 prev_entropy_mean = e_mean
 
-                if win_rate > best_win_rate:
+                if score > best_score:
+                    best_score = score
                     best_win_rate = win_rate
+                    best_avg_position = avg_position
                     torch.save(model.state_dict(), model_path)
-                    print(f"  → Saved best model (win_rate={win_rate:.1%}) to {model_path}")
+                    print(f"  → Saved best model (win={win_rate:.1%}, avg_pos={avg_position:.2f}, score={score:.4f}) to {model_path}")
 
                 # Always save avg model at eval time
                 if use_nfsp and avg_model is not None:
@@ -798,15 +900,16 @@ def train(
 
                 eval_writer.writerow([
                     eval_num, epoch + 1,
-                    f"{win_rate:.4f}", f"{best_win_rate:.4f}",
+                    f"{win_rate:.4f}", f"{avg_position:.4f}", f"{score:.4f}",
+                    f"{best_win_rate:.4f}", f"{best_avg_position:.4f}", f"{best_score:.4f}",
                     f"{e_mean:.6f}", f"{e_min:.6f}", f"{e_max:.6f}", f"{trend:.6f}",
                 ])
                 eval_f.flush()
                 entropy_window.clear()
 
                 print(
-                    f"  ▶ Eval: {win_rate:.1%} win rate vs greedy "
-                    f"({eval_games} games, best: {best_win_rate:.1%}) | "
+                    f"  ▶ Eval: {win_rate:.1%} win rate, avg pos {avg_position:.2f} "
+                    f"(score={score:.4f}, best={best_score:.4f}) | "
                     f"entropy [{n} epochs]: mean={e_mean:.3f} min={e_min:.3f} max={e_max:.3f} trend={trend_str}"
                 )
 
@@ -842,6 +945,11 @@ if __name__ == "__main__":
                         help="Average policy learning rate")
     parser.add_argument("--avg-updates", type=int, default=4,
                         help="Average policy updates per epoch")
+    # Resume from a previous run
+    parser.add_argument("--resume-model", type=str, default=None,
+                        help="Path to model.pt to resume training from")
+    parser.add_argument("--resume-avg-model", type=str, default=None,
+                        help="Path to avg-model.pt to resume training from")
     args = parser.parse_args()
 
     train(
@@ -855,4 +963,6 @@ if __name__ == "__main__":
         reservoir_capacity=args.reservoir_capacity,
         avg_lr=args.avg_lr,
         avg_updates=args.avg_updates,
+        resume_model=args.resume_model,
+        resume_avg_model=args.resume_avg_model,
     )

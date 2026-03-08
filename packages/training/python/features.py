@@ -13,7 +13,7 @@ NUM_OPPONENTS = 3
 NUM_COMBO_TYPES = 8  # 7 combos + POWER
 NUM_ACTION_COMBO_TYPES = 7
 
-STATE_SIZE = 413
+STATE_SIZE = 419
 ACTION_SIZE = 63
 
 COMBO_INDEX = {
@@ -135,6 +135,14 @@ def encode_state(snapshot: dict, player_index: int) -> np.ndarray:
             for combo_name, idx in COMBO_INDEX.items():
                 out[offset + idx] = player_combos.get(combo_name, 0) / 5.0
         offset += NUM_ACTION_COMBO_TYPES
+
+    # Hand combo potential (6) — how many of each combo type own hand can form
+    # [singles, pairs, triples, quads, runs, bombs], normalized
+    combo_counts = snapshot.get("handComboCounts")
+    if combo_counts:
+        for i in range(6):
+            out[offset + i] = combo_counts[i] / 13.0
+    offset += 6
 
     assert offset == STATE_SIZE
     return out

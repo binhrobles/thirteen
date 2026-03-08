@@ -22,7 +22,7 @@ class TienLenNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # State encoder: 413 → 256 → 256
+        # State encoder: 419 → 256 → 256
         self.state_encoder = nn.Sequential(
             nn.Linear(STATE_SIZE, 256),
             nn.ReLU(),

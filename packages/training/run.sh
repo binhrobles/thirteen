@@ -40,8 +40,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-MODEL_FILE="$DATA_DIR/model.pt"
-ONNX_FILE="$DATA_DIR/bot.onnx"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
@@ -67,9 +65,21 @@ uv run train_ppo.py \
   --epochs "$EPOCHS" \
   --batch-size "$BATCH_SIZE" \
   --lr "$LR" \
-  --output "$MODEL_FILE"
+  --output-dir "$DATA_DIR"
 
 log "Training complete"
+
+# Find the run directory (most recently created timestamped dir)
+RUN_DIR="$(ls -dt "$DATA_DIR"/[0-9]*-ppo-* 2>/dev/null | head -1)"
+if [[ -z "$RUN_DIR" ]]; then
+  echo "ERROR: Could not find run directory in $DATA_DIR" >&2
+  exit 1
+fi
+log "Run directory: $RUN_DIR"
+
+# Find the model file in the run directory
+MODEL_FILE="$RUN_DIR/model.pt"
+ONNX_FILE="$RUN_DIR/bot.onnx"
 
 # ── 3. Export to ONNX ────────────────────────────────────────────────────────
 log "Exporting to ONNX..."
@@ -85,7 +95,11 @@ log "Model uploaded"
 log "Running evaluation..."
 uv run evaluate.py --model "$ONNX_FILE" --vs-greedy --games 1000
 
-# ── 6. Summary ───────────────────────────────────────────────────────────────
+# ── 6. Play style analytics ─────────────────────────────────────────────────
+log "Generating play style analytics..."
+uv run play_style_analytics.py --run-dir "$RUN_DIR" --plot || true
+
+# ── 7. Summary ───────────────────────────────────────────────────────────────
 echo ""
 echo "════════════════════════════════════════════"
 echo "  Training Run Complete: $RUN_ID"

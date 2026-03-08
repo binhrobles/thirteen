@@ -68,6 +68,20 @@ function getTurnResponse() {
   const validPlays = getAllPlays(evaluation);
   const canPass = game.lastPlay !== null;
 
+  // Per-card combo participation: how many valid plays each card appears in.
+  // Encodes card versatility — high count = flexible, 0 = dead weight (single only).
+  // Per-card combo participation: 0 = not in hand, 1+ = number of combos card appears in.
+  // Singles count, so any card in hand is at least 1.
+  const potential = evaluate(hand, null);
+  const allPotentialPlays = getAllPlays(potential);
+  const participation = new Array(52).fill(0);
+  for (const play of allPotentialPlays) {
+    for (const card of play) {
+      participation[card.value]++;
+    }
+  }
+  snapshot.handComboCounts = participation;
+
   return {
     type: "turn",
     state: snapshot,

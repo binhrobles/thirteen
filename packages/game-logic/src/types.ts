@@ -30,6 +30,8 @@ export interface GameStateSnapshot {
   cardsPlayedByPlayer?: CardData[][];
   /** Combo type counts per player (indexed by absolute player). Maps combo string → count. */
   combosPlayedByPlayer?: Record<string, number>[];
+  /** Combo potential of own hand: [singles, pairs, triples, quads, runs, bombs]. */
+  handComboCounts?: number[];
 }
 
 export interface GameSnapshot {

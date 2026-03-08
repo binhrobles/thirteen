@@ -372,6 +372,32 @@ describe("encodeState", () => {
     expect(result[comboOffset + 14 + 0]).toBe(0);
   });
 
+  it("encodes card combo participation", () => {
+    // participation[5] = 0.8, participation[10] = 0.4, all others 0
+    const participation = new Array(52).fill(0);
+    participation[5] = 0.8;
+    participation[10] = 0.4;
+    const snap = emptySnapshot({ handComboCounts: participation });
+
+    const result = encodeState(snap, 0);
+    const potentialOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE + 3 + 21; // 413
+
+    expect(result[potentialOffset + 5]).toBeCloseTo(0.8);
+    expect(result[potentialOffset + 10]).toBeCloseTo(0.4);
+    expect(result[potentialOffset + 0]).toBe(0);
+    expect(result[potentialOffset + 51]).toBe(0);
+  });
+
+  it("handles missing handComboCounts gracefully", () => {
+    const snap = emptySnapshot();
+    const result = encodeState(snap, 0);
+    const potentialOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE + 3 + 21; // 413
+
+    for (let i = 0; i < DECK_SIZE; i++) {
+      expect(result[potentialOffset + i]).toBe(0);
+    }
+  });
+
   it("handles missing cardsPlayedByPlayer gracefully", () => {
     const snap = emptySnapshot();
     delete snap.cardsPlayedByPlayer;

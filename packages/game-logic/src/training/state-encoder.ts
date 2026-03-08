@@ -160,5 +160,15 @@ export function encodeState(
     offset += NUM_ACTION_COMBO_TYPES;
   }
 
+  // Card combo participation (52) — per-card count of combos it appears in.
+  // 0 = not in hand, 1+ = number of combos (singles count, so always ≥1 if held).
+  const comboCounts = snapshot.handComboCounts;
+  if (comboCounts) {
+    for (let i = 0; i < DECK_SIZE; i++) {
+      out[offset + i] = comboCounts[i];
+    }
+  }
+  offset += DECK_SIZE;
+
   return out;
 }

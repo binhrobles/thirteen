@@ -204,6 +204,28 @@ def find_eval_files(run_dir: str) -> list[tuple[int, str]]:
     return sorted(results)
 
 
+def load_entropy_by_eval(run_dir: str) -> dict[int, dict]:
+    """Load eval-stats.csv and return entropy stats per eval_num."""
+    eval_csv = os.path.join(run_dir, "eval-stats.csv")
+    if not os.path.exists(eval_csv):
+        return {}
+    result: dict[int, dict] = {}
+    with open(eval_csv) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                eval_num = int(row["eval_num"])
+                result[eval_num] = {
+                    "mean": float(row["entropy_mean"]),
+                    "min": float(row["entropy_min"]),
+                    "max": float(row["entropy_max"]),
+                    "trend": float(row["entropy_trend"]),
+                }
+            except (KeyError, ValueError):
+                continue
+    return result
+
+
 def load_value_loss_by_eval(run_dir: str) -> dict[int, float]:
     """Load epoch-stats.csv and return avg value_loss per eval window, keyed by eval_num."""
     epoch_csv = os.path.join(run_dir, "epoch-stats.csv")
@@ -257,6 +279,7 @@ def analyze_run(run_dir: str) -> list[dict]:
         return []
 
     value_loss_by_eval = load_value_loss_by_eval(run_dir)
+    entropy_by_eval = load_entropy_by_eval(run_dir)
 
     all_metrics = []
     for eval_num, path in files:
@@ -264,6 +287,10 @@ def analyze_run(run_dir: str) -> list[dict]:
         metrics = compute_metrics(games)
         metrics["eval_num"] = eval_num
         metrics["avg_value_loss"] = value_loss_by_eval.get(eval_num, None)
+        ent = entropy_by_eval.get(eval_num, {})
+        metrics["entropy_mean"] = ent.get("mean")
+        metrics["entropy_min"] = ent.get("min")
+        metrics["entropy_max"] = ent.get("max")
         all_metrics.append(metrics)
         print(f"  Eval {eval_num}: {metrics['games']} games, "
               f"win={metrics['win_rate']:.1%}, "
@@ -396,8 +423,20 @@ def plot_metrics(metrics_list: list[dict], output_path: str):
     ax.set_ylim(1, 4)
     ax.invert_yaxis()
 
-    # Hide unused subplot slot
-    axes[2][2].set_visible(False)
+    # 8. Entropy (mean with min/max band)
+    ax = axes[2][2]
+    ent_evals = [e for e, m in zip(evals, metrics_list) if m.get("entropy_mean") is not None]
+    ent_mean = [m["entropy_mean"] for m in metrics_list if m.get("entropy_mean") is not None]
+    ent_min = [m["entropy_min"] for m in metrics_list if m.get("entropy_min") is not None]
+    ent_max = [m["entropy_max"] for m in metrics_list if m.get("entropy_max") is not None]
+    if ent_mean:
+        ax.plot(ent_evals, ent_mean, "b-o", label="Mean entropy", markersize=4)
+        ax.fill_between(ent_evals, ent_min, ent_max, alpha=0.2, color="blue", label="Min/max range")
+    ax.axhline(y=0.5, color="red", linestyle="--", alpha=0.6, label="Target (0.5)")
+    ax.set_title("Policy Entropy")
+    ax.set_ylabel("Entropy (nats)")
+    ax.legend(fontsize=8)
+    ax.set_ylim(0, 1.0)
 
     for row in axes:
         for ax in row:

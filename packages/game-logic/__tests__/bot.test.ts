@@ -67,7 +67,7 @@ describe("BotHandEvaluator", () => {
     expect(result.singles[0][0].rank).toBe(Rank.NINE);
   });
 
-  it("finds bombs", () => {
+  it("finds bombs only when responding to 2s, not on opening", () => {
     const hand = [
       c(Rank.THREE, Suit.SPADES),
       c(Rank.THREE, Suit.CLUBS),
@@ -76,8 +76,11 @@ describe("BotHandEvaluator", () => {
       c(Rank.FIVE, Suit.SPADES),
       c(Rank.FIVE, Suit.CLUBS),
     ];
-    const result = evaluate(hand, null);
-    expect(result.bombs.length).toBeGreaterThanOrEqual(1);
+    // Bombs cannot open a round
+    expect(evaluate(hand, null).bombs.length).toBe(0);
+    // Bombs are valid when chopping 2s
+    const lastPlay = new Play(Combo.SINGLE, [c(Rank.TWO, Suit.HEARTS)]);
+    expect(evaluate(hand, lastPlay).bombs.length).toBeGreaterThanOrEqual(1);
   });
 
   it("finds quads for chopping 2s", () => {

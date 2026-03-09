@@ -3,6 +3,11 @@ Feature encoding for Tiến Lên RL training.
 
 Mirrors the TypeScript encoders in packages/game-logic/src/training/.
 Must produce identical output for the same input.
+
+⚠️  SYNC WARNING: STATE_SIZE and every feature block here must exactly match
+    packages/game-logic/src/training/state-encoder.ts and constants.ts.
+    A mismatch breaks ONNX inference without any compile-time error.
+    When changing either file, update the other immediately.
 """
 
 import numpy as np
@@ -13,7 +18,7 @@ NUM_OPPONENTS = 3
 NUM_COMBO_TYPES = 8  # 7 combos + POWER
 NUM_ACTION_COMBO_TYPES = 7
 
-STATE_SIZE = 419
+STATE_SIZE = 465
 ACTION_SIZE = 63
 
 COMBO_INDEX = {
@@ -136,13 +141,14 @@ def encode_state(snapshot: dict, player_index: int) -> np.ndarray:
                 out[offset + idx] = player_combos.get(combo_name, 0) / 5.0
         offset += NUM_ACTION_COMBO_TYPES
 
-    # Hand combo potential (6) — how many of each combo type own hand can form
-    # [singles, pairs, triples, quads, runs, bombs], normalized
+    # Card combo participation (52) — per-card count of combos it appears in.
+    # 0 = not in hand, 1+ = number of combos the card participates in.
+    # Populated by toSnapshot() when handComboCounts is computed; zeros otherwise.
     combo_counts = snapshot.get("handComboCounts")
     if combo_counts:
-        for i in range(6):
-            out[offset + i] = combo_counts[i] / 13.0
-    offset += 6
+        for i in range(DECK_SIZE):
+            out[offset + i] = combo_counts[i]
+    offset += DECK_SIZE
 
     assert offset == STATE_SIZE
     return out

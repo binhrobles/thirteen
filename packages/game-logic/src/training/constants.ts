@@ -1,3 +1,7 @@
+// ⚠️  SYNC WARNING: STATE_SIZE and feature layout here must exactly match
+// packages/training/python/features.py. A mismatch breaks ONNX inference
+// without any compile-time error. When changing either file, update the other.
+
 export const DECK_SIZE = 52;
 export const NUM_PLAYERS = 4;
 export const NUM_OPPONENTS = 3;

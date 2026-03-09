@@ -227,11 +227,13 @@ def select_action(
 EARLY_DIST = {"self": 0.2, "greedy": 0.6, "random": 0.1, "average": 0.1}
 
 # Late distribution (after 10% of epochs): NFSP-dominated, greedy residual
-LATE_DIST = {"self": 0.4, "greedy": 0.05, "random": 0.1, "average": 0.45}
+LATE_DIST = {"self": 0.4, "greedy": 0.05, "random": 0.0, "average": 0.55}
 
 
-def get_opponent_dist(epoch: int, total_epochs: int) -> dict[str, float]:
+def get_opponent_dist(epoch: int, total_epochs: int, resumed: bool = False) -> dict[str, float]:
     """Linearly interpolate between EARLY_DIST and LATE_DIST over first 10% of epochs."""
+    if resumed:
+        return LATE_DIST
     transition_end = max(int(total_epochs * 0.1), 1)
     if epoch >= transition_end:
         return LATE_DIST
@@ -485,7 +487,7 @@ def ppo_update(
     ppo_epochs: int = 2,
     clip_ratio: float = 0.2,
     entropy_coef: float = 0.05,
-    entropy_target: float = 0.3,
+    entropy_target: float = 0.5,
     value_coef: float = 0.5,
     max_grad_norm: float = 0.5,
     minibatch_size: int = 512,
@@ -507,8 +509,9 @@ def ppo_update(
     num_updates = 0
 
     for _ in range(ppo_epochs):
+        perm = torch.randperm(n, device=device)
         for start in range(0, n, minibatch_size):
-            mb = torch.randperm(n, device=device)[start:start + minibatch_size]
+            mb = perm[start:start + minibatch_size]
 
             scores = model(states[mb], actions_feat[mb])
             scores = scores.masked_fill(~action_masks[mb], float("-inf"))
@@ -685,7 +688,7 @@ def train(
     ppo_epochs: int = 2,
     clip_ratio: float = 0.2,
     entropy_coef: float = 0.05,
-    entropy_target: float = 0.3,
+    entropy_target: float = 0.5,
     eval_interval: int = 100,
     eval_games: int = 100,
     use_shaping: bool = True,
@@ -777,7 +780,7 @@ def train(
             t0 = time.time()
 
             # Schedule opponent distribution
-            opponent_dist = get_opponent_dist(epoch, epochs) if use_nfsp else None
+            opponent_dist = get_opponent_dist(epoch, epochs, resumed=bool(resume_model)) if use_nfsp else None
 
             if use_nfsp and avg_model is not None:
                 avg_model.eval()

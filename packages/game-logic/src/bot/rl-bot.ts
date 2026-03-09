@@ -11,13 +11,12 @@ import { STATE_SIZE, ACTION_SIZE } from "../training/constants.js";
 /**
  * RL bot using an ONNX model for inference.
  *
- * ONNX model inputs (must match Python export):
- *   - "state":  Float32[N, 465]
- *   - "action": Float32[N, 63]
+ * ONNX model inputs (must match Python export_onnx.py):
+ *   - "state":          Float32[1, 465]   — game state
+ *   - "action_features": Float32[1, N, 63] — all N candidate actions
  * ONNX model output:
- *   - "score":  Float32[N] or Float32[N, 1]
+ *   - "scores": Float32[1, N] — score per candidate action
  *
- * Each row is one (state, action) pair; the same state is repeated N times.
  * The highest-scoring candidate is chosen.
  */
 export class RLBot {
@@ -46,11 +45,10 @@ export class RLBot {
 
     const N = candidates.length;
 
-    // State batch: same state repeated N times → [N, STATE_SIZE]
-    const stateBatch = new Float32Array(N * STATE_SIZE);
-    for (let i = 0; i < N; i++) stateBatch.set(stateFeats, i * STATE_SIZE);
+    // state: [1, STATE_SIZE]
+    const stateTensor = new Tensor("float32", stateFeats, [1, STATE_SIZE]);
 
-    // Action batch: one encoded action per candidate → [N, ACTION_SIZE]
+    // action_features: [1, N, ACTION_SIZE]
     const actionBatch = new Float32Array(N * ACTION_SIZE);
     for (let i = 0; i < N; i++) {
       const feats =
@@ -59,13 +57,15 @@ export class RLBot {
           : encodePassAction();
       actionBatch.set(feats, i * ACTION_SIZE);
     }
+    const actionTensor = new Tensor("float32", actionBatch, [1, N, ACTION_SIZE]);
 
     const results = await this.session.run({
-      state: new Tensor("float32", stateBatch, [N, STATE_SIZE]),
-      action: new Tensor("float32", actionBatch, [N, ACTION_SIZE]),
+      state: stateTensor,
+      action_features: actionTensor,
     });
 
-    const scores = results["score"].data as Float32Array;
+    // scores: [1, N]
+    const scores = results["scores"].data as Float32Array;
 
     let bestIdx = 0;
     for (let i = 1; i < N; i++) {

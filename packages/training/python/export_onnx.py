@@ -48,6 +48,10 @@ def export(model_path: str, output_path: str, max_actions: int = 80):
     onnx.checker.check_model(onnx_model)
     print("ONNX model validation passed")
 
+    # Re-save with weights inline — avoids .data sidecar file which onnxruntime-web can't load
+    onnx.save(onnx_model, output_path, save_as_external_data=False)
+    print("Saved with inline weights (no external data file)")
+
     # Test inference
     session = ort.InferenceSession(output_path)
     state_np = dummy_state.numpy()

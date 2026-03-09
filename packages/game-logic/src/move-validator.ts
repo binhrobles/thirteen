@@ -18,6 +18,7 @@ function fail(error: string): MoveResult {
 function tryOpeningMove(cards: Card[]): MoveResult {
   const combo = Play.determineCombo(cards);
   if (combo === Combo.INVALID) return fail("That's not a valid hand");
+  if (combo === Combo.BOMB) return fail("Bombs can only be used to chop 2s");
   const suited = Play.isRun(cards) && Play.isSuited(cards);
   return ok(new Play(combo, cards, suited));
 }

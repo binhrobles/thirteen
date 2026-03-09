@@ -12,7 +12,8 @@ export async function getRLSession(): Promise<InferenceSession | null> {
 
   try {
     const ort = await import("onnxruntime-web");
-    cachedSession = await ort.InferenceSession.create("/models/bot.onnx");
+    ort.env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort-wasm/`;
+    cachedSession = await ort.InferenceSession.create(`${import.meta.env.BASE_URL}models/bot.onnx`);
     return cachedSession;
   } catch (err) {
     console.info("[rl-session] ONNX model not available, bots will use greedy:", err);

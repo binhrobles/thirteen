@@ -15,6 +15,7 @@ export {
   greedyBot,
   type BotStrategy,
 } from "./bot/bot-player.js";
+export { RLBot } from "./bot/rl-bot.js";
 export {
   Tourney,
   Seat,

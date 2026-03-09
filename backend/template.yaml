@@ -26,6 +26,17 @@ Parameters:
     Description: Deployment stage
 
 Resources:
+  # Lambda Layer: onnxruntime-node (native binaries, can't be bundled by esbuild)
+  OnnxRuntimeLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub 'onnxruntime-node-${Stage}'
+      ContentUri: layers/onnxruntime/
+      CompatibleRuntimes:
+        - nodejs20.x
+    Metadata:
+      BuildMethod: nodejs20.x
+
   # WebSocket API Gateway
   WebSocketApi:
     Type: AWS::ApiGatewayV2::Api
@@ -175,6 +186,8 @@ Resources:
       FunctionName: !Sub 'thirteen-default-${Stage}'
       CodeUri: ../packages/server/dist/default/
       Handler: index.handler
+      Layers:
+        - !Ref OnnxRuntimeLayer
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ConnectionsTable
@@ -185,6 +198,11 @@ Resources:
               Action:
                 - execute-api:ManageConnections
               Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/${Stage}/POST/@connections/*'
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: 'arn:aws:s3:::thirteen-training/models/*'
 
   DefaultPermission:
     Type: AWS::Lambda::Permission

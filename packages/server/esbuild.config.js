@@ -11,6 +11,8 @@ const shared = {
     "@aws-sdk/client-dynamodb",
     "@aws-sdk/lib-dynamodb",
     "@aws-sdk/client-apigatewaymanagementapi",
+    "@aws-sdk/client-s3",
+    "onnxruntime-node",  // native binaries — deployed via Lambda Layer
   ],
   banner: {
     // Shim require for ESM compatibility in Lambda

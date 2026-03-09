@@ -50,7 +50,7 @@ export async function sendError(
 export async function broadcastTourneyUpdate(tourney: Tourney): Promise<void> {
   const message: OutgoingMessage = {
     type: "tourney/updated",
-    payload: tourney.toClientState() as Record<string, unknown>,
+    payload: tourney.toClientState(),
   };
 
   // Gather all connection IDs from seats + connections table

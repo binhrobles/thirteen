@@ -1,9 +1,11 @@
 import {
   GameState,
+  RLBot,
   deal,
   choosePlay,
   type GameEvent,
 } from "@thirteen/game-logic";
+import { getRLSession } from "../bot/rl-session.js";
 
 /** The human player's seat (always 0 in local play) */
 export const HUMAN_PLAYER = 0;
@@ -156,7 +158,10 @@ async function runBotTurns(): Promise<void> {
     await new Promise((r) => setTimeout(r, 1000));
 
     const hand = game.gameState.getHand(player);
-    const cards = choosePlay(hand, game.gameState.lastPlay);
+    const session = await getRLSession();
+    const cards = session
+      ? await new RLBot(session).choosePlay(hand, game.gameState.lastPlay, game.gameState.toSnapshot(), player)
+      : choosePlay(hand, game.gameState.lastPlay);
 
     if (cards.length > 0) {
       const result = game.gameState.playCards(player, cards);

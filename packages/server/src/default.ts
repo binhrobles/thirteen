@@ -1,10 +1,12 @@
 import {
   Card,
   GameState,
+  RLBot,
   TourneyStatus,
   choosePlay,
   type Tourney,
 } from "@thirteen/game-logic";
+import { getRLSession } from "./lib/rl-session.js";
 import {
   getConnection,
   getOrCreateTourney,
@@ -106,7 +108,7 @@ async function handleTourneyInfo(connectionId: string): Promise<LambdaResult> {
   }
   await sendToConnection(connectionId, {
     type: "tourney/updated",
-    payload: tourney.toClientState() as Record<string, unknown>,
+    payload: tourney.toClientState(),
   });
   return { statusCode: 200 };
 }
@@ -206,7 +208,7 @@ async function handleReconnect(
     // Send tourney update with scores
     await sendToConnection(connectionId, {
       type: "tourney/updated",
-      payload: tourney.toClientState() as Record<string, unknown>,
+      payload: tourney.toClientState(),
     });
 
     // If just completed, also send game over
@@ -223,10 +225,7 @@ async function handleReconnect(
         payload: {
           winOrder: lastGame.winOrder,
           pointsAwarded: lastGame.pointsAwarded,
-          leaderboard: leaderboard.map((entry) => ({
-            name: entry.playerName ?? "Unknown",
-            score: entry.totalScore,
-          })),
+          leaderboard,
           tourneyComplete: true,
           winner,
         },
@@ -236,7 +235,7 @@ async function handleReconnect(
     // WAITING or STARTING - just send tourney update
     await sendToConnection(connectionId, {
       type: "tourney/updated",
-      payload: tourney.toClientState() as Record<string, unknown>,
+      payload: tourney.toClientState(),
     });
   }
 
@@ -335,7 +334,7 @@ async function handleAddBot(
   }
 
   const tourney = await getOrCreateTourney();
-  const botProfile = payload.botProfile as string | undefined;
+  const botProfile = (payload.botProfile as string | undefined) ?? "rl";
   const [success, errorCode] = tourney.addBot(seatPosition, botProfile);
 
   if (!success) {
@@ -484,7 +483,7 @@ async function handleDebugQuickStart(
 
   // Fill with bots
   for (let i = 0; i < 4; i++) {
-    if (tourney.seats[i].isEmpty()) tourney.addBot(i);
+    if (tourney.seats[i].isEmpty()) tourney.addBot(i, "rl");
   }
 
   tourney.setReady(playerId, true);
@@ -539,7 +538,24 @@ async function executeBotTurnsWithBroadcast(
     }
 
     const hand = game.getHand(pos);
-    const cardsToPlay = choosePlay(hand, game.lastPlay);
+    let cardsToPlay: Card[];
+    if (seat.botProfile === "rl") {
+      try {
+        const session = await getRLSession();
+        const rlBot = new RLBot(session);
+        cardsToPlay = await rlBot.choosePlay(
+          hand,
+          game.lastPlay,
+          game.toSnapshot(),
+          pos,
+        );
+      } catch (err) {
+        console.warn(`[botTurns] RLBot inference failed for seat ${pos}, falling back to greedy:`, err);
+        cardsToPlay = choosePlay(hand, game.lastPlay);
+      }
+    } else {
+      cardsToPlay = choosePlay(hand, game.lastPlay);
+    }
 
     if (cardsToPlay.length > 0) {
       console.log(`[botTurns] Bot ${pos} playing ${cardsToPlay.length} cards`);

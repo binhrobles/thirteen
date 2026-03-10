@@ -149,6 +149,10 @@ def compute_metrics(games: list[dict]) -> dict:
     metrics["avg_position"] = round(
         sum(p * position_counts[p] for p in range(1, 5)) / n_games, 4
     ) if n_games else 2.5
+    ppg_table = {1: 4, 2: 2, 3: 1, 4: 0}
+    metrics["avg_ppg"] = round(
+        sum(ppg_table[p] * position_counts[p] for p in range(1, 5)) / n_games, 4
+    ) if n_games else 1.75
 
     # Rounds to finish (model_moves as proxy for turns taken)
     metrics["avg_rounds"] = round(sum(model_moves_all) / len(model_moves_all), 2) if model_moves_all else 0
@@ -294,7 +298,7 @@ def analyze_run(run_dir: str) -> list[dict]:
         all_metrics.append(metrics)
         print(f"  Eval {eval_num}: {metrics['games']} games, "
               f"win={metrics['win_rate']:.1%}, "
-              f"avg_pos={metrics['avg_position']:.2f}, "
+              f"ppg={metrics['avg_ppg']:.2f}, "
               f"rounds={metrics['avg_rounds']:.1f} (win={metrics['avg_rounds_win']:.1f} loss={metrics['avg_rounds_loss']:.1f}), "
               f"val_loss={metrics['avg_value_loss']:.4f}" if metrics['avg_value_loss'] else "")
 
@@ -307,7 +311,7 @@ def write_csv(metrics_list: list[dict], output_path: str = "play-style.csv"):
         return
 
     fieldnames = [
-        "eval_num", "games", "win_rate", "avg_position", "avg_value_loss",
+        "eval_num", "games", "win_rate", "avg_ppg", "avg_position", "avg_value_loss",
         "avg_rounds", "avg_rounds_win", "avg_rounds_loss",
         "position_1_pct", "position_2_pct", "position_3_pct", "position_4_pct",
         "pass_rate", "tactical_pass_rate",
@@ -413,15 +417,14 @@ def plot_metrics(metrics_list: list[dict], output_path: str):
     ax.set_ylabel("Model turns taken")
     ax.legend(fontsize=8)
 
-    # 7. Average finish position
+    # 7. Average PPG (points per game)
     ax = axes[2][1]
-    ax.plot(evals, [m["avg_position"] for m in metrics_list], "r-o", markersize=4)
-    ax.set_title("Avg Finish Position")
-    ax.set_ylabel("Position (lower = better)")
-    ax.axhline(y=2.5, color="gray", linestyle="--", alpha=0.5, label="Random (2.5)")
+    ax.plot(evals, [m["avg_ppg"] for m in metrics_list], "g-o", markersize=4)
+    ax.set_title("Avg PPG")
+    ax.set_ylabel("Points per game (higher = better)")
+    ax.axhline(y=1.75, color="gray", linestyle="--", alpha=0.5, label="Random (1.75)")
     ax.legend(fontsize=8)
-    ax.set_ylim(1, 4)
-    ax.invert_yaxis()
+    ax.set_ylim(0, 4)
 
     # 8. Entropy (mean with min/max band)
     ax = axes[2][2]

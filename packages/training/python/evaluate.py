@@ -102,12 +102,13 @@ def _print_eval_results(label: str, all_positions: list[int], games: int):
     """Print evaluation results for a configuration."""
     n = len(all_positions)
     wins = sum(1 for p in all_positions if p == 1)
-    avg = sum(all_positions) / n if n else 0
+    ppg_table = {1: 4, 2: 2, 3: 1, 4: 0}
+    avg_ppg = sum(ppg_table[p] for p in all_positions) / n if n else 0
     pos_counts = [sum(1 for p in all_positions if p == rank) for rank in range(1, 5)]
 
     print(f"\n  {label} ({games} games, {n} model finishes):")
     print(f"    Win rate:    {wins}/{n} ({wins/n:.1%})")
-    print(f"    Avg finish:  {avg:.2f} (1.0 = always 1st, 2.5 = random)")
+    print(f"    Avg PPG:     {avg_ppg:.2f} (1.75 = random)")
     print(f"    1st: {pos_counts[0]:4d}  2nd: {pos_counts[1]:4d}  3rd: {pos_counts[2]:4d}  4th: {pos_counts[3]:4d}")
 
 

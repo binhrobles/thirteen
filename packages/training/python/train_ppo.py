@@ -151,7 +151,7 @@ MAX_ACTIONS = 80
 
 # Reward shaping (small intermediate signals, < 5% of terminal reward)
 CARD_PLAY_REWARD = 0.02       # per card played, weighted by card weakness — encourages shedding garbage
-# POWER_GAIN_REWARD = 0.05    # winning a trick — disabled, too noisy
+POWER_GAIN_REWARD = 0.025     # winning a trick — flat reward for gaining control
 # HAND_ADVANTAGE_REWARD = 0.005 # per turn, scaled by relative card count — disabled, redundant with terminal
 # OPPONENT_OUT_PENALTY = -0.1 # immediate penalty when an opponent finishes — disabled, noisy proxy
 
@@ -459,11 +459,11 @@ def collect_trajectories(
 
             prev_hand_sizes = curr_hand_sizes
 
-            # # Power gain shaping — disabled, too noisy
-            # if use_shaping and not result.can_pass and prev_can_pass:
-            #     power_player = result.player
-            #     if power_player in player_bufs and player_bufs[power_player].size() > 0:
-            #         player_bufs[power_player].rewards[-1] += POWER_GAIN_REWARD
+            # Power gain shaping — flat reward for seizing control
+            if use_shaping and not result.can_pass and prev_can_pass:
+                power_player = result.player
+                if power_player in player_bufs and player_bufs[power_player].size() > 0:
+                    player_bufs[power_player].rewards[-1] += POWER_GAIN_REWARD
 
             prev_can_pass = result.can_pass
             turn = result

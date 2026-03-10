@@ -499,8 +499,6 @@ def ppo_update(
     ) = buf.to_tensors(device)
 
     advantages, returns = compute_gae(rewards, old_values, dones)
-    # Normalize returns to stabilize value targets against non-stationary opponent mix
-    returns = (returns - returns.mean()) / (returns.std() + 1e-8) * old_values.std() + old_values.mean()
     advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
     n = states.shape[0]

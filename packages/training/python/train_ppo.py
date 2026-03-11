@@ -227,7 +227,7 @@ def select_action(
 EARLY_DIST = {"self": 0.2, "greedy": 0.6, "random": 0.1, "average": 0.1}
 
 # Late distribution (after 10% of epochs): NFSP-dominated, greedy residual
-LATE_DIST = {"self": 0.4, "greedy": 0.05, "random": 0.0, "average": 0.55}
+LATE_DIST = {"self": 0.35, "greedy": 0.15, "random": 0.0, "average": 0.5}
 
 
 def get_opponent_dist(epoch: int, total_epochs: int, resumed: bool = False) -> dict[str, float]:

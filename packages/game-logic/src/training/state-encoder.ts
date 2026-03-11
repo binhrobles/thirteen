@@ -47,9 +47,17 @@ export function encodeState(
   const out = new Float32Array(STATE_SIZE);
   let offset = 0;
 
-  // Own hand (52)
-  setCardBits(snapshot.hands[playerIndex], out, offset);
-  offset += DECK_SIZE;
+  // Hand combo type map (52 × 7 = 364) — per-card combo type breakdown
+  // Replaces both "own hand" and "card combo participation" with richer info.
+  // For each card: [single_count, pair_count, triple_count, quad_count, run_count, bomb_count, 0]
+  // A nonzero row means the card is in hand. Slot 6 (INVALID) is unused but keeps alignment.
+  const comboTypeMap = snapshot.handComboTypeMap;
+  if (comboTypeMap) {
+    for (let i = 0; i < DECK_SIZE * NUM_ACTION_COMBO_TYPES; i++) {
+      out[offset + i] = comboTypeMap[i];
+    }
+  }
+  offset += DECK_SIZE * NUM_ACTION_COMBO_TYPES;
 
   // Cards played total (52) — union of all players
   const played = snapshot.cardsPlayedByPlayer;
@@ -159,16 +167,6 @@ export function encodeState(
     }
     offset += NUM_ACTION_COMBO_TYPES;
   }
-
-  // Card combo participation (52) — per-card count of combos it appears in.
-  // 0 = not in hand, 1+ = number of combos (singles count, so always ≥1 if held).
-  const comboCounts = snapshot.handComboCounts;
-  if (comboCounts) {
-    for (let i = 0; i < DECK_SIZE; i++) {
-      out[offset + i] = comboCounts[i];
-    }
-  }
-  offset += DECK_SIZE;
 
   return out;
 }

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Rank, Suit } from "../src/card.js";
 import type { GameStateSnapshot, CardData } from "../src/types.js";
 import { encodeState } from "../src/training/state-encoder.js";
-import { STATE_SIZE, DECK_SIZE } from "../src/training/constants.js";
+import { STATE_SIZE, DECK_SIZE, NUM_ACTION_COMBO_TYPES } from "../src/training/constants.js";
 
 const cd = (rank: number, suit: number): CardData => ({
   rank,
@@ -24,6 +24,23 @@ function emptySnapshot(overrides?: Partial<GameStateSnapshot>): GameStateSnapsho
   };
 }
 
+// First block is now handComboTypeMap (52×7 = 364), not own hand (52)
+const COMBO_MAP_SIZE = DECK_SIZE * NUM_ACTION_COMBO_TYPES; // 364
+// Offsets for blocks after the combo type map
+const TOTAL_PLAYED_OFFSET = COMBO_MAP_SIZE; // 364
+const OPP_PLAYED_OFFSET = COMBO_MAP_SIZE + DECK_SIZE; // 416
+const HAND_SIZE_OFFSET = OPP_PLAYED_OFFSET + DECK_SIZE * 3; // 572
+const LAST_PLAY_OFFSET = HAND_SIZE_OFFSET + 3; // 575
+const COMBO_TYPE_OFFSET = LAST_PLAY_OFFSET + DECK_SIZE; // 627
+const SUITED_OFFSET = COMBO_TYPE_OFFSET + 8; // 635
+const PLAYED_BY_OFFSET = SUITED_OFFSET + 1; // 636
+const PASSED_OFFSET = PLAYED_BY_OFFSET + 4; // 640
+const IN_GAME_OFFSET = PASSED_OFFSET + 3; // 643
+const WIN_ORDER_OFFSET = IN_GAME_OFFSET + 3; // 646
+const UNSEEN_OFFSET = WIN_ORDER_OFFSET + 3; // 649
+const ADVANTAGE_OFFSET = UNSEEN_OFFSET + DECK_SIZE; // 701
+const COMBO_HISTORY_OFFSET = ADVANTAGE_OFFSET + 3; // 704
+
 describe("encodeState", () => {
   it("returns Float32Array of STATE_SIZE length", () => {
     const result = encodeState(emptySnapshot(), 0);
@@ -31,35 +48,28 @@ describe("encodeState", () => {
     expect(result.length).toBe(STATE_SIZE);
   });
 
-  it("encodes own hand in first 52 positions", () => {
-    const snap = emptySnapshot({
-      hands: [
-        [cd(Rank.THREE, Suit.SPADES), cd(Rank.TWO, Suit.HEARTS)],
-        [],
-        [],
-        [],
-      ],
-    });
+  it("encodes hand combo type map in first 364 positions", () => {
+    // Card value 0 (3♠) appears in 1 single → slot [0*7 + 0] = 1
+    // Card value 51 (2♥) appears in 1 single → slot [51*7 + 0] = 1
+    const comboTypeMap = new Array(364).fill(0);
+    comboTypeMap[0 * 7 + 0] = 1; // 3♠ in 1 single
+    comboTypeMap[51 * 7 + 0] = 1; // 2♥ in 1 single
+    comboTypeMap[0 * 7 + 1] = 2; // 3♠ in 2 pairs
+
+    const snap = emptySnapshot({ handComboTypeMap: comboTypeMap });
     const result = encodeState(snap, 0);
-    expect(result[0]).toBe(1); // 3♠ = value 0
-    expect(result[51]).toBe(1); // 2♥ = value 51
-    expect(result[1]).toBe(0); // 3♣ not held
+    expect(result[0 * 7 + 0]).toBe(1); // 3♠ single count
+    expect(result[0 * 7 + 1]).toBe(2); // 3♠ pair count
+    expect(result[51 * 7 + 0]).toBe(1); // 2♥ single count
+    expect(result[1 * 7 + 0]).toBe(0); // 3♣ not in hand
   });
 
-  it("rotates perspective for different playerIndex", () => {
-    const snap = emptySnapshot({
-      hands: [
-        [cd(Rank.THREE, Suit.SPADES)],
-        [],
-        [cd(Rank.ACE, Suit.HEARTS)],
-        [],
-      ],
-    });
-
-    // From player 2's perspective, own hand is A♥
-    const result = encodeState(snap, 2);
-    expect(result[Rank.ACE * 4 + Suit.HEARTS]).toBe(1); // A♥ in own hand
-    expect(result[0]).toBe(0); // 3♠ is not in player 2's hand
+  it("handles missing handComboTypeMap gracefully", () => {
+    const snap = emptySnapshot();
+    const result = encodeState(snap, 0);
+    for (let i = 0; i < COMBO_MAP_SIZE; i++) {
+      expect(result[i]).toBe(0);
+    }
   });
 
   it("encodes cards played total as union", () => {
@@ -72,10 +82,9 @@ describe("encodeState", () => {
       ],
     });
     const result = encodeState(snap, 0);
-    const totalOffset = DECK_SIZE; // starts at 52
-    expect(result[totalOffset + 0]).toBe(1); // 3♠
-    expect(result[totalOffset + Rank.KING * 4 + Suit.HEARTS]).toBe(1); // K♥
-    expect(result[totalOffset + 1]).toBe(0); // 3♣ not played
+    expect(result[TOTAL_PLAYED_OFFSET + 0]).toBe(1); // 3♠
+    expect(result[TOTAL_PLAYED_OFFSET + Rank.KING * 4 + Suit.HEARTS]).toBe(1); // K♥
+    expect(result[TOTAL_PLAYED_OFFSET + 1]).toBe(0); // 3♣ not played
   });
 
   it("encodes per-opponent cards played in relative order", () => {
@@ -88,15 +97,11 @@ describe("encodeState", () => {
       ],
     });
 
-    // From player 0's perspective:
-    // rel 1 = abs 1, rel 2 = abs 2, rel 3 = abs 3
     const result = encodeState(snap, 0);
-    const oppOffset = DECK_SIZE * 2; // after own hand (52) + total played (52)
-
     // Opponent slot 0 (rel 1 = abs player 1): 4♣
-    expect(result[oppOffset + Rank.FOUR * 4 + Suit.CLUBS]).toBe(1);
+    expect(result[OPP_PLAYED_OFFSET + Rank.FOUR * 4 + Suit.CLUBS]).toBe(1);
     // Opponent slot 2 (rel 3 = abs player 3): K♠
-    expect(result[oppOffset + 2 * DECK_SIZE + Rank.KING * 4 + Suit.SPADES]).toBe(1);
+    expect(result[OPP_PLAYED_OFFSET + 2 * DECK_SIZE + Rank.KING * 4 + Suit.SPADES]).toBe(1);
   });
 
   it("rotates opponent cards played for different perspectives", () => {
@@ -111,27 +116,24 @@ describe("encodeState", () => {
 
     // From player 2's perspective: player 0 is relative slot 2
     const result = encodeState(snap, 2);
-    const oppOffset = DECK_SIZE * 2;
     // rel 1 = abs 3, rel 2 = abs 0, rel 3 = abs 1
-    // So player 0's cards should be in slot index 1 (rel 2, zero-indexed from rel 1)
-    expect(result[oppOffset + 1 * DECK_SIZE + Rank.ACE * 4 + Suit.DIAMONDS]).toBe(1);
+    expect(result[OPP_PLAYED_OFFSET + 1 * DECK_SIZE + Rank.ACE * 4 + Suit.DIAMONDS]).toBe(1);
   });
 
   it("encodes opponent hand sizes normalized by 13", () => {
     const snap = emptySnapshot({
       hands: [
-        Array.from({ length: 13 }, (_, i) => cd(i, 0)), // player 0: 13 cards
-        Array.from({ length: 7 }, (_, i) => cd(i, 1)), // player 1: 7 cards
-        [cd(0, 2)], // player 2: 1 card
-        [], // player 3: 0 cards
+        Array.from({ length: 13 }, (_, i) => cd(i, 0)),
+        Array.from({ length: 7 }, (_, i) => cd(i, 1)),
+        [cd(0, 2)],
+        [],
       ],
     });
 
     const result = encodeState(snap, 0);
-    const sizeOffset = DECK_SIZE * 2 + DECK_SIZE * 3; // 52 + 52 + 156 = 260
-    expect(result[sizeOffset]).toBeCloseTo(7 / 13); // rel 1 = abs 1
-    expect(result[sizeOffset + 1]).toBeCloseTo(1 / 13); // rel 2 = abs 2
-    expect(result[sizeOffset + 2]).toBeCloseTo(0); // rel 3 = abs 3
+    expect(result[HAND_SIZE_OFFSET]).toBeCloseTo(7 / 13);
+    expect(result[HAND_SIZE_OFFSET + 1]).toBeCloseTo(1 / 13);
+    expect(result[HAND_SIZE_OFFSET + 2]).toBeCloseTo(0);
   });
 
   it("encodes last play cards and combo type", () => {
@@ -145,23 +147,18 @@ describe("encodeState", () => {
     });
 
     const result = encodeState(snap, 0);
-    const lastPlayOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3; // 263
-    // K♠ and K♣
-    expect(result[lastPlayOffset + Rank.KING * 4 + Suit.SPADES]).toBe(1);
-    expect(result[lastPlayOffset + Rank.KING * 4 + Suit.CLUBS]).toBe(1);
-
-    const comboOffset = lastPlayOffset + DECK_SIZE; // 315
-    expect(result[comboOffset + 1]).toBe(1); // PAIR = index 1
-    expect(result[comboOffset + 0]).toBe(0); // SINGLE = 0, not set
+    expect(result[LAST_PLAY_OFFSET + Rank.KING * 4 + Suit.SPADES]).toBe(1);
+    expect(result[LAST_PLAY_OFFSET + Rank.KING * 4 + Suit.CLUBS]).toBe(1);
+    expect(result[COMBO_TYPE_OFFSET + 1]).toBe(1); // PAIR = index 1
+    expect(result[COMBO_TYPE_OFFSET + 0]).toBe(0); // SINGLE not set
   });
 
   it("encodes power state (null lastPlay) as combo index 7", () => {
-    const snap = emptySnapshot(); // lastPlay is null
+    const snap = emptySnapshot();
     const result = encodeState(snap, 0);
-    const comboOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE; // 315
-    expect(result[comboOffset + 7]).toBe(1); // POWER index
+    expect(result[COMBO_TYPE_OFFSET + 7]).toBe(1); // POWER index
     for (let i = 0; i < 7; i++) {
-      expect(result[comboOffset + i]).toBe(0);
+      expect(result[COMBO_TYPE_OFFSET + i]).toBe(0);
     }
   });
 
@@ -179,8 +176,7 @@ describe("encodeState", () => {
       lastPlayBy: 2,
     });
     const result = encodeState(snap, 0);
-    const suitedOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8; // 323
-    expect(result[suitedOffset]).toBe(1);
+    expect(result[SUITED_OFFSET]).toBe(1);
   });
 
   it("encodes lastPlayBy as relative one-hot", () => {
@@ -193,209 +189,148 @@ describe("encodeState", () => {
       lastPlayBy: 3,
     });
 
-    // From player 0: abs 3 = rel 3
     const result = encodeState(snap, 0);
-    const byOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1; // 324
-    expect(result[byOffset + 3]).toBe(1);
-    expect(result[byOffset + 0]).toBe(0);
+    expect(result[PLAYED_BY_OFFSET + 3]).toBe(1);
+    expect(result[PLAYED_BY_OFFSET + 0]).toBe(0);
 
-    // From player 2: abs 3 = rel 1
     const result2 = encodeState(snap, 2);
-    expect(result2[byOffset + 1]).toBe(1);
-    expect(result2[byOffset + 3]).toBe(0);
+    expect(result2[PLAYED_BY_OFFSET + 1]).toBe(1);
+    expect(result2[PLAYED_BY_OFFSET + 3]).toBe(0);
   });
 
   it("encodes passed players (opponents only)", () => {
     const snap = emptySnapshot({
-      passedPlayers: [false, true, false, true], // players 1 and 3 passed
+      passedPlayers: [false, true, false, true],
     });
 
     const result = encodeState(snap, 0);
-    const passedOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4; // 328
-    expect(result[passedOffset]).toBe(1); // rel 1 = abs 1: passed
-    expect(result[passedOffset + 1]).toBe(0); // rel 2 = abs 2: not passed
-    expect(result[passedOffset + 2]).toBe(1); // rel 3 = abs 3: passed
+    expect(result[PASSED_OFFSET]).toBe(1);
+    expect(result[PASSED_OFFSET + 1]).toBe(0);
+    expect(result[PASSED_OFFSET + 2]).toBe(1);
   });
 
   it("encodes players in game (opponents only)", () => {
     const snap = emptySnapshot({
-      playersInGame: [true, false, true, true], // player 1 won
+      playersInGame: [true, false, true, true],
     });
 
     const result = encodeState(snap, 0);
-    const igOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3; // 331
-    expect(result[igOffset]).toBe(0); // rel 1 = abs 1: out
-    expect(result[igOffset + 1]).toBe(1); // rel 2 = abs 2: in
-    expect(result[igOffset + 2]).toBe(1); // rel 3 = abs 3: in
+    expect(result[IN_GAME_OFFSET]).toBe(0);
+    expect(result[IN_GAME_OFFSET + 1]).toBe(1);
+    expect(result[IN_GAME_OFFSET + 2]).toBe(1);
   });
 
   it("encodes win order filled (positions 1-3)", () => {
     const snap = emptySnapshot({
-      winOrder: [2, 0], // 2 players have finished
+      winOrder: [2, 0],
     });
 
     const result = encodeState(snap, 0);
-    const woOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3; // 334
-    expect(result[woOffset]).toBe(1); // 1st place filled
-    expect(result[woOffset + 1]).toBe(1); // 2nd place filled
-    expect(result[woOffset + 2]).toBe(0); // 3rd place not filled
+    expect(result[WIN_ORDER_OFFSET]).toBe(1);
+    expect(result[WIN_ORDER_OFFSET + 1]).toBe(1);
+    expect(result[WIN_ORDER_OFFSET + 2]).toBe(0);
   });
 
   it("encodes unseen cards (not in hand, not played)", () => {
     const snap = emptySnapshot({
       hands: [
-        [cd(Rank.THREE, Suit.SPADES), cd(Rank.FIVE, Suit.HEARTS)], // values 0, 11
-        [cd(Rank.KING, Suit.CLUBS)], // value 41 — opponent hand, invisible to encoding
+        [cd(Rank.THREE, Suit.SPADES), cd(Rank.FIVE, Suit.HEARTS)],
+        [cd(Rank.KING, Suit.CLUBS)],
         [],
         [],
       ],
       cardsPlayedByPlayer: [
-        [cd(Rank.FOUR, Suit.CLUBS)], // value 5 — played
-        [cd(Rank.SEVEN, Suit.DIAMONDS)], // value 18 — played
+        [cd(Rank.FOUR, Suit.CLUBS)],
+        [cd(Rank.SEVEN, Suit.DIAMONDS)],
         [],
         [],
       ],
     });
 
     const result = encodeState(snap, 0);
-    const unseenOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3; // 337
-
-    // In our hand → NOT unseen
-    expect(result[unseenOffset + 0]).toBe(0); // 3♠ (value 0) in hand
-    expect(result[unseenOffset + 11]).toBe(0); // 5♥ (value 11) in hand
-
-    // Played by someone → NOT unseen
-    expect(result[unseenOffset + 5]).toBe(0); // 4♣ (value 5) played
-    expect(result[unseenOffset + 18]).toBe(0); // 7♦ (value 18) played
-
-    // In opponent's hand but not played and not in our hand → unseen (we don't know)
-    expect(result[unseenOffset + 41]).toBe(1); // K♣ (value 41)
-
-    // Completely unaccounted for card → unseen
-    expect(result[unseenOffset + 30]).toBe(1); // some card nobody holds or played
+    expect(result[UNSEEN_OFFSET + 0]).toBe(0); // 3♠ in hand
+    expect(result[UNSEEN_OFFSET + 11]).toBe(0); // 5♥ in hand
+    expect(result[UNSEEN_OFFSET + 5]).toBe(0); // 4♣ played
+    expect(result[UNSEEN_OFFSET + 18]).toBe(0); // 7♦ played
+    expect(result[UNSEEN_OFFSET + 41]).toBe(1); // K♣ unseen
+    expect(result[UNSEEN_OFFSET + 30]).toBe(1); // unaccounted card
   });
 
   it("encodes unseen cards as all 1s when no cards in hand or played", () => {
-    const snap = emptySnapshot(); // empty hands, no cards played
+    const snap = emptySnapshot();
     const result = encodeState(snap, 0);
-    const unseenOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3; // 337
-
     for (let i = 0; i < DECK_SIZE; i++) {
-      expect(result[unseenOffset + i]).toBe(1);
+      expect(result[UNSEEN_OFFSET + i]).toBe(1);
     }
   });
 
   it("encodes relative hand advantage", () => {
     const snap = emptySnapshot({
       hands: [
-        Array.from({ length: 10 }, (_, i) => cd(i, 0)), // player 0: 10 cards
-        Array.from({ length: 4 }, (_, i) => cd(i, 1)), // player 1: 4 cards
-        Array.from({ length: 13 }, (_, i) => cd(i, 2)), // player 2: 13 cards
-        [], // player 3: 0 cards
+        Array.from({ length: 10 }, (_, i) => cd(i, 0)),
+        Array.from({ length: 4 }, (_, i) => cd(i, 1)),
+        Array.from({ length: 13 }, (_, i) => cd(i, 2)),
+        [],
       ],
     });
 
     const result = encodeState(snap, 0);
-    const advOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE; // 389
-
-    // (mySize - oppSize) / 13
-    expect(result[advOffset]).toBeCloseTo((10 - 4) / 13); // rel 1 = player 1: positive (I have more = bad)
-    expect(result[advOffset + 1]).toBeCloseTo((10 - 13) / 13); // rel 2 = player 2: negative (I have fewer = good)
-    expect(result[advOffset + 2]).toBeCloseTo((10 - 0) / 13); // rel 3 = player 3: large positive
+    expect(result[ADVANTAGE_OFFSET]).toBeCloseTo((10 - 4) / 13);
+    expect(result[ADVANTAGE_OFFSET + 1]).toBeCloseTo((10 - 13) / 13);
+    expect(result[ADVANTAGE_OFFSET + 2]).toBeCloseTo((10 - 0) / 13);
   });
 
   it("rotates relative hand advantage for different perspectives", () => {
     const snap = emptySnapshot({
       hands: [
-        Array.from({ length: 5 }, (_, i) => cd(i, 0)), // player 0: 5
-        Array.from({ length: 8 }, (_, i) => cd(i, 1)), // player 1: 8
-        Array.from({ length: 2 }, (_, i) => cd(i, 2)), // player 2: 2
-        Array.from({ length: 11 }, (_, i) => cd(i, 3)), // player 3: 11
+        Array.from({ length: 5 }, (_, i) => cd(i, 0)),
+        Array.from({ length: 8 }, (_, i) => cd(i, 1)),
+        Array.from({ length: 2 }, (_, i) => cd(i, 2)),
+        Array.from({ length: 11 }, (_, i) => cd(i, 3)),
       ],
     });
 
-    // From player 2's perspective: my_size=2, opponents are p3(11), p0(5), p1(8)
     const result = encodeState(snap, 2);
-    const advOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE; // 389
-
-    expect(result[advOffset]).toBeCloseTo((2 - 11) / 13); // rel 1 = player 3
-    expect(result[advOffset + 1]).toBeCloseTo((2 - 5) / 13); // rel 2 = player 0
-    expect(result[advOffset + 2]).toBeCloseTo((2 - 8) / 13); // rel 3 = player 1
+    expect(result[ADVANTAGE_OFFSET]).toBeCloseTo((2 - 11) / 13);
+    expect(result[ADVANTAGE_OFFSET + 1]).toBeCloseTo((2 - 5) / 13);
+    expect(result[ADVANTAGE_OFFSET + 2]).toBeCloseTo((2 - 8) / 13);
   });
 
   it("encodes combo history per opponent", () => {
     const snap = emptySnapshot({
       combosPlayedByPlayer: [
-        {}, // player 0: no combos
-        { SINGLE: 3, PAIR: 1 }, // player 1
-        { RUN: 2 }, // player 2
-        { BOMB: 1, TRIPLE: 4 }, // player 3
+        {},
+        { SINGLE: 3, PAIR: 1 },
+        { RUN: 2 },
+        { BOMB: 1, TRIPLE: 4 },
       ],
     });
 
     const result = encodeState(snap, 0);
-    const comboOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE + 3; // 392
-
-    // rel 1 = player 1: SINGLE=3/5, PAIR=1/5
-    expect(result[comboOffset + 0]).toBeCloseTo(3 / 5); // SINGLE
-    expect(result[comboOffset + 1]).toBeCloseTo(1 / 5); // PAIR
-    expect(result[comboOffset + 2]).toBe(0); // TRIPLE
-    expect(result[comboOffset + 4]).toBe(0); // RUN
-
-    // rel 2 = player 2: RUN=2/5
-    expect(result[comboOffset + 7 + 4]).toBeCloseTo(2 / 5); // RUN (offset 7 for next opponent)
-    expect(result[comboOffset + 7 + 0]).toBe(0); // SINGLE
-
-    // rel 3 = player 3: BOMB=1/5, TRIPLE=4/5
-    expect(result[comboOffset + 14 + 5]).toBeCloseTo(1 / 5); // BOMB
-    expect(result[comboOffset + 14 + 2]).toBeCloseTo(4 / 5); // TRIPLE
+    expect(result[COMBO_HISTORY_OFFSET + 0]).toBeCloseTo(3 / 5); // SINGLE
+    expect(result[COMBO_HISTORY_OFFSET + 1]).toBeCloseTo(1 / 5); // PAIR
+    expect(result[COMBO_HISTORY_OFFSET + 2]).toBe(0); // TRIPLE
+    expect(result[COMBO_HISTORY_OFFSET + 4]).toBe(0); // RUN
+    expect(result[COMBO_HISTORY_OFFSET + 7 + 4]).toBeCloseTo(2 / 5); // opp 2 RUN
+    expect(result[COMBO_HISTORY_OFFSET + 7 + 0]).toBe(0);
+    expect(result[COMBO_HISTORY_OFFSET + 14 + 5]).toBeCloseTo(1 / 5); // opp 3 BOMB
+    expect(result[COMBO_HISTORY_OFFSET + 14 + 2]).toBeCloseTo(4 / 5); // opp 3 TRIPLE
   });
 
   it("rotates combo history for different perspectives", () => {
     const snap = emptySnapshot({
       combosPlayedByPlayer: [
-        { SINGLE: 5 }, // player 0
-        {}, // player 1
-        {}, // player 2
-        {}, // player 3
+        { SINGLE: 5 },
+        {},
+        {},
+        {},
       ],
     });
 
-    // From player 2's perspective: rel 1=p3, rel 2=p0, rel 3=p1
     const result = encodeState(snap, 2);
-    const comboOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE + 3; // 392
-
-    // Player 0's combos should be in rel 2 slot (offset + 7)
-    expect(result[comboOffset + 7 + 0]).toBeCloseTo(5 / 5); // SINGLE = 1.0
-    // rel 1 (player 3) and rel 3 (player 1) should be empty
-    expect(result[comboOffset + 0]).toBe(0);
-    expect(result[comboOffset + 14 + 0]).toBe(0);
-  });
-
-  it("encodes card combo participation", () => {
-    // participation[5] = 0.8, participation[10] = 0.4, all others 0
-    const participation = new Array(52).fill(0);
-    participation[5] = 0.8;
-    participation[10] = 0.4;
-    const snap = emptySnapshot({ handComboCounts: participation });
-
-    const result = encodeState(snap, 0);
-    const potentialOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE + 3 + 21; // 413
-
-    expect(result[potentialOffset + 5]).toBeCloseTo(0.8);
-    expect(result[potentialOffset + 10]).toBeCloseTo(0.4);
-    expect(result[potentialOffset + 0]).toBe(0);
-    expect(result[potentialOffset + 51]).toBe(0);
-  });
-
-  it("handles missing handComboCounts gracefully", () => {
-    const snap = emptySnapshot();
-    const result = encodeState(snap, 0);
-    const potentialOffset = DECK_SIZE * 2 + DECK_SIZE * 3 + 3 + DECK_SIZE + 8 + 1 + 4 + 3 + 3 + 3 + DECK_SIZE + 3 + 21; // 413
-
-    for (let i = 0; i < DECK_SIZE; i++) {
-      expect(result[potentialOffset + i]).toBe(0);
-    }
+    expect(result[COMBO_HISTORY_OFFSET + 7 + 0]).toBeCloseTo(5 / 5);
+    expect(result[COMBO_HISTORY_OFFSET + 0]).toBe(0);
+    expect(result[COMBO_HISTORY_OFFSET + 14 + 0]).toBe(0);
   });
 
   it("handles missing cardsPlayedByPlayer gracefully", () => {
@@ -403,17 +338,15 @@ describe("encodeState", () => {
     delete snap.cardsPlayedByPlayer;
 
     const result = encodeState(snap, 0);
-    // Cards played sections should all be zeros
-    for (let i = DECK_SIZE; i < DECK_SIZE * 2 + DECK_SIZE * 3; i++) {
+    for (let i = TOTAL_PLAYED_OFFSET; i < OPP_PLAYED_OFFSET + DECK_SIZE * 3; i++) {
       expect(result[i]).toBe(0);
     }
   });
 
   it("fills exactly STATE_SIZE floats", () => {
-    // Verify the last position is writable and nothing goes out of bounds
     const snap = emptySnapshot({ winOrder: [0, 1, 2] });
     const result = encodeState(snap, 0);
-    expect(result[336]).toBe(1); // 3rd win order slot filled (offset 334 + 2)
+    expect(result[WIN_ORDER_OFFSET + 2]).toBe(1); // 3rd win order slot filled
     expect(result.length).toBe(STATE_SIZE);
   });
 });

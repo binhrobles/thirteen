@@ -57,33 +57,45 @@ class OnnxBot:
         return int(np.argmax(scores[:num_actions]))
 
 
-def _run_eval(bridge, bot, games: int, num_model_seats: int):
-    """Play games with randomized seat assignments and collect model finish positions."""
+def _run_eval(bridge, bot, games: int, num_model_seats: int, opponent: str = "greedy"):
+    """Play games with randomized seat assignments and collect model finish positions.
+
+    opponent: "greedy" (handled by bridge) or "random" (handled in Python).
+    """
     import random
     from game_bridge import GameOver
 
     all_positions: list[int] = []  # 1-indexed finish positions for model seats
 
     for g in range(games):
-        # Randomly assign which seats are model vs greedy
         seats = list(range(4))
         random.shuffle(seats)
         model_seats = set(seats[:num_model_seats])
-        greedy_seats = [s for s in range(4) if s not in model_seats]
 
-        result = bridge.new_game(greedy_seats=greedy_seats)
+        if opponent == "greedy":
+            greedy_seats = [s for s in range(4) if s not in model_seats]
+            result = bridge.new_game(greedy_seats=greedy_seats)
+        else:
+            # All seats handled in Python (model + random)
+            result = bridge.new_game()
 
         while not isinstance(result, GameOver):
             turn = result
-            state = encode_state(turn.state, turn.player)
-            action_list = [encode_action(cards) for cards in turn.valid_actions]
-            if turn.can_pass:
-                action_list.append(encode_pass_action())
+            num_actions = len(turn.valid_actions) + (1 if turn.can_pass else 0)
 
-            if len(action_list) == 0:
+            if num_actions == 0:
                 break
 
-            choice = bot.choose_action_index(state, action_list)
+            if turn.player in model_seats:
+                state = encode_state(turn.state, turn.player)
+                action_list = [encode_action(cards) for cards in turn.valid_actions]
+                if turn.can_pass:
+                    action_list.append(encode_pass_action())
+                choice = bot.choose_action_index(state, action_list)
+            else:
+                # Random opponent: uniform random action
+                choice = random.randrange(num_actions)
+
             result = bridge.step(choice)
 
         if isinstance(result, GameOver):
@@ -114,28 +126,26 @@ def _print_eval_results(label: str, all_positions: list[int], games: int):
 
 def evaluate_vs_greedy(model_path: str, games: int = 1000):
     """
-    Evaluate ONNX model against greedy bots in three configurations
-    with randomized seat assignments each game:
-      1v3: 1 model vs 3 greedy
-      2v2: 2 model vs 2 greedy
-      3v1: 3 model vs 1 greedy
+    Evaluate ONNX model against greedy and random bots
+    with randomized seat assignments each game.
     """
     from game_bridge import GameBridge
 
     bot = OnnxBot(model_path)
 
     configs = [
-        ("1 model vs 3 greedy", 1),
-        ("2 model vs 2 greedy", 2),
-        ("3 model vs 1 greedy", 3),
+        ("1 model vs 3 greedy", 1, "greedy"),
+        ("2 model vs 2 greedy", 2, "greedy"),
+        ("3 model vs 1 greedy", 3, "greedy"),
+        ("1 model vs 3 random", 1, "random"),
     ]
 
-    print(f"Evaluating model against greedy bots ({games} games per config)...")
+    print(f"Evaluating model ({games} games per config)...")
 
     with GameBridge() as bridge:
-        for label, num_model_seats in configs:
+        for label, num_model_seats, opponent in configs:
             print(f"\n  Running: {label}...", file=sys.stderr)
-            positions = _run_eval(bridge, bot, games, num_model_seats)
+            positions = _run_eval(bridge, bot, games, num_model_seats, opponent)
             _print_eval_results(label, positions, games)
 
 

@@ -18,7 +18,7 @@ NUM_OPPONENTS = 3
 NUM_COMBO_TYPES = 8  # 7 combos + POWER
 NUM_ACTION_COMBO_TYPES = 7
 
-STATE_SIZE = 465
+STATE_SIZE = 725
 ACTION_SIZE = 63
 
 COMBO_INDEX = {
@@ -46,10 +46,13 @@ def encode_state(snapshot: dict, player_index: int) -> np.ndarray:
     win_order = snapshot["winOrder"]
     cards_played = snapshot.get("cardsPlayedByPlayer")
 
-    # Own hand (52)
-    for card in hands[player_index]:
-        out[offset + card["value"]] = 1
-    offset += DECK_SIZE
+    # Hand combo type map (52 × 7 = 364) — per-card combo type breakdown
+    # For each card: [single_count, pair_count, triple_count, quad_count, run_count, bomb_count, 0]
+    combo_type_map = snapshot.get("handComboTypeMap")
+    if combo_type_map:
+        for i in range(DECK_SIZE * NUM_ACTION_COMBO_TYPES):
+            out[offset + i] = combo_type_map[i]
+    offset += DECK_SIZE * NUM_ACTION_COMBO_TYPES
 
     # Cards played total (52)
     if cards_played:
@@ -140,15 +143,6 @@ def encode_state(snapshot: dict, player_index: int) -> np.ndarray:
             for combo_name, idx in COMBO_INDEX.items():
                 out[offset + idx] = player_combos.get(combo_name, 0) / 5.0
         offset += NUM_ACTION_COMBO_TYPES
-
-    # Card combo participation (52) — per-card count of combos it appears in.
-    # 0 = not in hand, 1+ = number of combos the card participates in.
-    # Populated by toSnapshot() when handComboCounts is computed; zeros otherwise.
-    combo_counts = snapshot.get("handComboCounts")
-    if combo_counts:
-        for i in range(DECK_SIZE):
-            out[offset + i] = combo_counts[i]
-    offset += DECK_SIZE
 
     assert offset == STATE_SIZE
     return out

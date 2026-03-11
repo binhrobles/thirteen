@@ -685,6 +685,52 @@ def eval_vs_greedy(
     return wins / games, total_ppg / games, records
 
 
+def eval_vs_random(
+    bridge: GameBridge,
+    model: TienLenNet,
+    device: torch.device,
+    games: int = 100,
+) -> tuple[float, float]:  # (win_rate, avg_ppg)
+    """Play model (1 seat) vs 3 random bots. Returns (win_rate, avg_ppg)."""
+    import random
+
+    model.eval()
+    wins = 0
+    total_ppg = 0.0
+    ppg_table = {0: 4, 1: 2, 2: 1, 3: 0}
+
+    for g in range(games):
+        model_seat = random.randrange(4)
+        # All seats handled in Python (no greedy_seats)
+        result = bridge.new_game()
+
+        while not isinstance(result, GameOver):
+            turn = result
+            state, action_features, action_mask, num_actions = encode_turn(turn, turn.player)
+
+            if turn.player == model_seat:
+                with torch.no_grad():
+                    state_t = torch.from_numpy(state).unsqueeze(0).to(device)
+                    actions_t = torch.from_numpy(action_features).unsqueeze(0).to(device)
+                    mask_t = torch.from_numpy(action_mask).unsqueeze(0).to(device)
+                    scores = model(state_t, actions_t)
+                    scores = scores.masked_fill(~mask_t, float("-inf"))
+                    action_index = scores[0, :num_actions].argmax().item()
+            else:
+                action_index = random.randrange(num_actions)
+
+            result = bridge.step(to_bridge_action(action_index, num_actions, turn))
+
+        if isinstance(result, GameOver):
+            position = result.win_order.index(model_seat)
+            total_ppg += ppg_table[position]
+            if position == 0:
+                wins += 1
+
+    model.train()
+    return wins / games, total_ppg / games
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def train(
@@ -732,14 +778,7 @@ def train(
         model.load_state_dict(torch.load(resume_model, map_location=device, weights_only=True))
         print(f"Resumed model from {resume_model}")
 
-    # Separate learning rates: slower for value head to stabilize against non-stationary opponents
-    value_params = list(model.value_head.parameters())
-    value_param_ids = {id(p) for p in value_params}
-    policy_params = [p for p in model.parameters() if id(p) not in value_param_ids]
-    optimizer = torch.optim.Adam([
-        {"params": policy_params, "lr": lr},
-        {"params": value_params, "lr": lr * 0.3},
-    ])
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # NFSP: average policy + reservoir buffer
     avg_model: TienLenNet | None = None
@@ -787,6 +826,7 @@ def train(
         eval_writer = csv.writer(eval_f)
         eval_writer.writerow([
             "eval_num", "epoch", "win_rate", "avg_ppg", "score",
+            "vs_random_wr", "vs_random_ppg",
             "best_win_rate", "best_avg_ppg", "best_score",
             "entropy_mean", "entropy_min", "entropy_max", "entropy_trend",
         ])
@@ -887,9 +927,12 @@ def train(
                     bridge, model, device, eval_games,
                     logger=logger, eval_num=eval_num,
                 )
-                # Combined score: win_rate + normalized avg_ppg
+                rand_wr, rand_ppg = eval_vs_random(
+                    bridge, model, device, eval_games,
+                )
+                # Combined score: greedy performance + small random bonus
                 # avg_ppg in [0,4], random baseline = 1.75
-                score = win_rate + avg_ppg / 4.0
+                score = (win_rate + avg_ppg / 4.0) + 0.25 * (rand_wr + rand_ppg / 4.0)
 
                 n = len(entropy_window)
                 e_mean = sum(entropy_window) / n
@@ -917,6 +960,7 @@ def train(
                 eval_writer.writerow([
                     eval_num, epoch + 1,
                     f"{win_rate:.4f}", f"{avg_ppg:.4f}", f"{score:.4f}",
+                    f"{rand_wr:.4f}", f"{rand_ppg:.4f}",
                     f"{best_win_rate:.4f}", f"{best_avg_ppg:.4f}", f"{best_score:.4f}",
                     f"{e_mean:.6f}", f"{e_min:.6f}", f"{e_max:.6f}", f"{trend:.6f}",
                 ])
@@ -926,6 +970,7 @@ def train(
                 print(
                     f"  ▶ Eval: {win_rate:.1%} win rate, ppg={avg_ppg:.2f} "
                     f"(score={score:.4f}, best={best_score:.4f}) | "
+                    f"vs_random: {rand_wr:.1%} wr, {rand_ppg:.2f} ppg | "
                     f"entropy [{n} epochs]: mean={e_mean:.3f} min={e_min:.3f} max={e_max:.3f} trend={trend_str}"
                 )
 

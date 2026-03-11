@@ -68,19 +68,29 @@ function getTurnResponse() {
   const validPlays = getAllPlays(evaluation);
   const canPass = game.lastPlay !== null;
 
-  // Per-card combo participation: how many valid plays each card appears in.
-  // Encodes card versatility — high count = flexible, 0 = dead weight (single only).
-  // Per-card combo participation: 0 = not in hand, 1+ = number of combos card appears in.
-  // Singles count, so any card in hand is at least 1.
+  // ⚠️  SYNC WARNING: This must match packages/training/python/features.py encode_state().
+  // Per-card combo type breakdown: 52×7 flat array.
+  // For each card, tracks how many combos of each type (SINGLE=0..BOMB=5, INVALID=6) it appears in.
+  // Encodes both card versatility AND combo strength — a card in a bomb is very different from one only in singles.
   const potential = evaluate(hand, null);
-  const allPotentialPlays = getAllPlays(potential);
-  const participation = new Array(52).fill(0);
-  for (const play of allPotentialPlays) {
-    for (const card of play) {
-      participation[card.value]++;
+  const comboTypeMap = new Array(52 * 7).fill(0);
+  const comboGroups: [string, Card[][]][] = [
+    ["SINGLE", potential.singles],
+    ["PAIR", potential.pairs],
+    ["TRIPLE", potential.triples],
+    ["QUAD", potential.quads],
+    ["RUN", potential.runs],
+    ["BOMB", potential.bombs],
+  ];
+  for (const [comboName, plays] of comboGroups) {
+    const comboIdx = comboName === "SINGLE" ? 0 : comboName === "PAIR" ? 1 : comboName === "TRIPLE" ? 2 : comboName === "QUAD" ? 3 : comboName === "RUN" ? 4 : 5;
+    for (const play of plays) {
+      for (const card of play) {
+        comboTypeMap[card.value * 7 + comboIdx]++;
+      }
     }
   }
-  snapshot.handComboCounts = participation;
+  snapshot.handComboTypeMap = comboTypeMap;
 
   return {
     type: "turn",

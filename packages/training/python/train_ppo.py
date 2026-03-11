@@ -150,7 +150,7 @@ POSITION_REWARDS = {
 MAX_ACTIONS = 80
 
 # Reward shaping (small intermediate signals, < 5% of terminal reward)
-CARD_PLAY_REWARD = 0.02       # per card played, weighted by card weakness — encourages shedding garbage
+# CARD_PLAY_REWARD = 0.02       # per card played, weighted by card weakness — encourages shedding garbage - disabled, maybe encouraging breaking up valuable combos early
 POWER_GAIN_REWARD = 0.025     # winning a trick — flat reward for gaining control
 # HAND_ADVANTAGE_REWARD = 0.005 # per turn, scaled by relative card count — disabled, redundant with terminal
 # OPPONENT_OUT_PENALTY = -0.1 # immediate penalty when an opponent finishes — disabled, noisy proxy
@@ -375,15 +375,15 @@ def collect_trajectories(
                 shaping = 0.0
                 if use_shaping:
                     is_pass = turn.can_pass and action_index == num_actions - 1
-                    if not is_pass:
+                    # if not is_pass:
                         # Reward shedding cards, weighted by how weak they are.
                         # Low cards (3-7) are dead weight — high reward to dump them.
                         # High cards (A, 2) are valuable — less reward for spending them.
                         # rank: 0=3, 1=4, ... 11=A, 12=2
-                        cards = turn.valid_actions[action_index]
-                        for card in cards:
-                            weight = (12 - card["rank"]) / 12  # 3→1.0, 2→0.0
-                            shaping += CARD_PLAY_REWARD * weight
+                        # cards = turn.valid_actions[action_index]
+                        # for card in cards:
+                        #     weight = (12 - card["rank"]) / 12  # 3→1.0, 2→0.0
+                        #     shaping += CARD_PLAY_REWARD * weight
 
                     # # Hand advantage: disabled — redundant with terminal reward
                     # hands = turn.state["hands"]

@@ -22,6 +22,51 @@ from glob import glob
 COMBO_TYPES = ["SINGLE", "PAIR", "TRIPLE", "QUAD", "RUN", "BOMB"]
 
 
+def _ranks_in_pairs(hand_ranks: list[int]) -> set[int]:
+    from collections import Counter
+    counts = Counter(hand_ranks)
+    return {r for r, n in counts.items() if n >= 2}
+
+
+def _ranks_in_triples(hand_ranks: list[int]) -> set[int]:
+    from collections import Counter
+    counts = Counter(hand_ranks)
+    return {r for r, n in counts.items() if n >= 3}
+
+
+def _ranks_in_runs(hand_ranks: list[int]) -> set[int]:
+    """Ranks that are part of a valid run (3+ consecutive, rank < 12)."""
+    eligible = sorted(set(r for r in hand_ranks if r < 12))
+    in_run: set[int] = set()
+    i = 0
+    while i < len(eligible):
+        j = i
+        while j + 1 < len(eligible) and eligible[j + 1] == eligible[j] + 1:
+            j += 1
+        if j - i + 1 >= 3:
+            in_run.update(eligible[i:j + 1])
+        i = j + 1
+    return in_run
+
+
+def _max_run_len_for_ranks(hand_ranks: list[int], played_ranks: list[int]) -> int:
+    """Longest contiguous run possible in hand that contains any of the played ranks."""
+    eligible = sorted(set(r for r in hand_ranks if r < 12))
+    eligible_set = set(eligible)
+    best = len(played_ranks)
+    for rank in played_ranks:
+        if rank not in eligible_set:
+            continue
+        left = rank
+        while left - 1 in eligible_set:
+            left -= 1
+        right = rank
+        while right + 1 in eligible_set:
+            right += 1
+        best = max(best, right - left + 1)
+    return best
+
+
 def load_games(path: str) -> list[dict]:
     """Load games from a JSONL file."""
     games = []
@@ -52,6 +97,11 @@ def compute_metrics(games: list[dict]) -> dict:
     trick_opportunities = 0
     confidences: list[float] = []
     wins = 0
+    cb_single_pair = 0    # single played, card was part of a pair in hand
+    cb_single_triple = 0  # single played, card was part of a triple in hand
+    cb_single_run = 0     # single played, card was part of a run in hand
+    cb_pair_triple = 0    # pair played, rank was a triple in hand
+    cb_run_short = 0      # run played shorter than max possible
 
     position_counts = {1: 0, 2: 0, 3: 0, 4: 0}
     model_moves_all: list[int] = []
@@ -117,6 +167,33 @@ def compute_metrics(games: list[dict]) -> dict:
             else:
                 total_plays += 1
                 cards_per_play.append(move["combo_size"])
+
+                # Combo-break detection
+                hand = move.get("hand") or []
+                cards = move.get("cards") or []
+                if hand and cards:
+                    hand_ranks = [c["rank"] for c in hand]
+                    played_ranks = [c["rank"] for c in cards]
+                    combo_type = move.get("combo_type")
+                    if combo_type == "SINGLE":
+                        rank = played_ranks[0]
+                        triples = _ranks_in_triples(hand_ranks)
+                        pairs = _ranks_in_pairs(hand_ranks)
+                        run_ranks = _ranks_in_runs(hand_ranks)
+                        if rank in triples:
+                            cb_single_triple += 1
+                        elif rank in pairs:
+                            cb_single_pair += 1
+                        if rank in run_ranks:
+                            cb_single_run += 1
+                    elif combo_type == "PAIR":
+                        rank = played_ranks[0]
+                        if rank in _ranks_in_triples(hand_ranks):
+                            cb_pair_triple += 1
+                    elif combo_type == "RUN":
+                        max_len = _max_run_len_for_ranks(hand_ranks, played_ranks)
+                        if max_len > len(played_ranks):
+                            cb_run_short += 1
 
                 # Track 2s retention
                 if move["cards"]:
@@ -192,6 +269,16 @@ def compute_metrics(games: list[dict]) -> dict:
     metrics["avg_confidence"] = (
         round(sum(confidences) / len(confidences), 4) if confidences else 0
     )
+
+    # Combo-break rates (denominator = total non-pass plays)
+    metrics["cb_single_from_pair_rate"] = round(cb_single_pair / total_plays, 4) if total_plays else 0
+    metrics["cb_single_from_triple_rate"] = round(cb_single_triple / total_plays, 4) if total_plays else 0
+    metrics["cb_single_from_run_rate"] = round(cb_single_run / total_plays, 4) if total_plays else 0
+    metrics["cb_pair_from_triple_rate"] = round(cb_pair_triple / total_plays, 4) if total_plays else 0
+    metrics["cb_run_short_rate"] = round(cb_run_short / total_plays, 4) if total_plays else 0
+    metrics["cb_any_rate"] = round(
+        (cb_single_pair + cb_single_triple + cb_single_run + cb_pair_triple + cb_run_short) / total_plays, 4
+    ) if total_plays else 0
 
     return metrics
 
@@ -319,6 +406,8 @@ def write_csv(metrics_list: list[dict], output_path: str = "play-style.csv"):
         "combo_pct_triple", "combo_pct_quad", "combo_pct_bomb",
         "avg_cards_per_play", "run_len_3", "run_len_4", "run_len_5", "run_len_6plus",
         "twos_retention", "trick_win_rate",
+        "cb_single_from_pair_rate", "cb_single_from_triple_rate", "cb_single_from_run_rate",
+        "cb_pair_from_triple_rate", "cb_run_short_rate", "cb_any_rate",
     ]
 
     with open(output_path, "w", newline="") as f:
@@ -343,7 +432,7 @@ def plot_metrics(metrics_list: list[dict], output_path: str):
 
     evals = [m["eval_num"] for m in metrics_list]
 
-    fig, axes = plt.subplots(3, 3, figsize=(15, 14))
+    fig, axes = plt.subplots(4, 3, figsize=(15, 18))
     fig.suptitle("Play Style Evolution Over Training", fontsize=14)
 
     # 0. Finish position distribution (stacked area)
@@ -440,6 +529,22 @@ def plot_metrics(metrics_list: list[dict], output_path: str):
     ax.set_ylabel("Entropy (nats)")
     ax.legend(fontsize=8)
     ax.set_ylim(0, 1.0)
+
+    # 9. Combo-break rates
+    ax = axes[3][0]
+    ax.plot(evals, [m.get("cb_single_from_pair_rate", 0) for m in metrics_list], "b-o", label="Single from pair", markersize=4)
+    ax.plot(evals, [m.get("cb_single_from_run_rate", 0) for m in metrics_list], "g-s", label="Single from run", markersize=4)
+    ax.plot(evals, [m.get("cb_single_from_triple_rate", 0) for m in metrics_list], "r-^", label="Single from triple", markersize=4)
+    ax.plot(evals, [m.get("cb_pair_from_triple_rate", 0) for m in metrics_list], "m-D", label="Pair from triple", markersize=4)
+    ax.plot(evals, [m.get("cb_run_short_rate", 0) for m in metrics_list], "c-v", label="Run suboptimal", markersize=4)
+    ax.set_title("Combo-Break Rates (per play)")
+    ax.set_ylabel("Rate")
+    ax.legend(fontsize=7)
+    ax.set_ylim(0, 0.4)
+
+    # Hide unused panels in last row
+    for col in [1, 2]:
+        axes[3][col].set_visible(False)
 
     for row in axes:
         for ax in row:

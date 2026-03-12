@@ -121,7 +121,7 @@ def _print_eval_results(label: str, all_positions: list[int], games: int):
     print(f"\n  {label} ({games} games, {n} model finishes):")
     print(f"    Win rate:    {wins}/{n} ({wins/n:.1%})")
     print(f"    Avg PPG:     {avg_ppg:.2f} (1.75 = random)")
-    print(f"    1st: {pos_counts[0]:4d}  2nd: {pos_counts[1]:4d}  3rd: {pos_counts[2]:4d}  4th: {pos_counts[3]:4d}")
+    print(f"    1st: {pos_counts[0]:4d} ({pos_counts[0]/n:.1%})  2nd: {pos_counts[1]:4d} ({pos_counts[1]/n:.1%})  3rd: {pos_counts[2]:4d} ({pos_counts[2]/n:.1%})  4th: {pos_counts[3]:4d} ({pos_counts[3]/n:.1%})")
 
 
 def evaluate_vs_greedy(model_path: str, games: int = 1000):

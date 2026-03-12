@@ -226,15 +226,17 @@ def select_action(
 # Early distribution (first 10% of epochs): heavy greedy for stable learning signal
 EARLY_DIST = {"self": 0.2, "greedy": 0.6, "random": 0.1, "average": 0.1}
 
-# Late distribution (after 10% of epochs): NFSP-dominated, greedy residual
-LATE_DIST = {"self": 0.35, "greedy": 0.15, "random": 0.0, "average": 0.5}
+# Late distribution (after 50% of epochs): moderate greedy held steady to prevent
+# circular self-play equilibria that cause plateaus. Average policy provides NFSP
+# diversity benefit so raw self% can stay low.
+LATE_DIST = {"self": 0.20, "greedy": 0.20, "random": 0.0, "average": 0.60}
 
 
 def get_opponent_dist(epoch: int, total_epochs: int, resumed: bool = False) -> dict[str, float]:
-    """Linearly interpolate between EARLY_DIST and LATE_DIST over first 10% of epochs."""
+    """Linearly interpolate between EARLY_DIST and LATE_DIST over first 50% of epochs."""
     if resumed:
         return LATE_DIST
-    transition_end = max(int(total_epochs * 0.1), 1)
+    transition_end = max(int(total_epochs * 0.5), 1)
     if epoch >= transition_end:
         return LATE_DIST
     t = epoch / transition_end

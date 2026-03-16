@@ -35,6 +35,11 @@ function send(obj: unknown) {
 let game: GameState | null = null;
 let greedySeats: Set<number> = new Set();
 
+let tourneyScores: number[] = [0, 0, 0, 0];
+let tourneyGameNumber = 0;
+let tourneyTargetScore = 21;
+let tourneyMode = false;
+
 /**
  * Auto-play greedy seats until it's a non-greedy player's turn or game over.
  * Returns the response for the next non-greedy turn (or game_over).
@@ -92,6 +97,18 @@ function getTurnResponse() {
   }
   snapshot.handComboTypeMap = comboTypeMap;
 
+  if (tourneyMode) {
+    // Estimate expected total games: target_score / avg_ppg_per_game
+    // Average PPG per player = 7/4 = 1.75, so ~12 games to reach 21
+    const expectedTotal = Math.ceil(tourneyTargetScore / 1.75);
+    snapshot.tourneyContext = {
+      scores: [...tourneyScores],
+      targetScore: tourneyTargetScore,
+      gameNumber: tourneyGameNumber,
+      expectedTotalGames: expectedTotal,
+    };
+  }
+
   return {
     type: "turn",
     state: snapshot,
@@ -102,7 +119,7 @@ function getTurnResponse() {
 }
 
 function handleCommand(line: string) {
-  let msg: { cmd: string; action_index?: number; greedy_seats?: number[] };
+  let msg: { cmd: string; action_index?: number; greedy_seats?: number[]; target_score?: number; win_order?: number[] };
   try {
     msg = JSON.parse(line);
   } catch {
@@ -112,9 +129,57 @@ function handleCommand(line: string) {
 
   switch (msg.cmd) {
     case "new_game": {
+      tourneyMode = false;
       const hands = deal();
       game = new GameState(hands);
       greedySeats = new Set(msg.greedy_seats ?? []);
+      send(advancePastGreedy());
+      break;
+    }
+
+    case "new_tourney": {
+      tourneyMode = true;
+      tourneyScores = [0, 0, 0, 0];
+      tourneyGameNumber = 0;
+      tourneyTargetScore = msg.target_score ?? 21;
+      // Start first game
+      const hands = deal();
+      game = new GameState(hands);
+      greedySeats = new Set(msg.greedy_seats ?? []);
+      tourneyGameNumber = 1;
+      send(advancePastGreedy());
+      break;
+    }
+
+    case "next_game": {
+      if (!tourneyMode) {
+        send({ type: "error", message: "Not in tournament mode" });
+        break;
+      }
+      // Update scores from the win order of the previous game
+      const winOrder: number[] = msg.win_order!;
+      const points = [4, 2, 1, 0];
+      for (let i = 0; i < winOrder.length; i++) {
+        tourneyScores[winOrder[i]] += points[i];
+      }
+
+      // Check if tournament is over
+      const maxScore = Math.max(...tourneyScores);
+      if (maxScore >= tourneyTargetScore) {
+        send({
+          type: "tourney_over",
+          scores: [...tourneyScores],
+          games_played: tourneyGameNumber,
+        });
+        tourneyMode = false;
+        break;
+      }
+
+      // Start next game
+      const hands = deal();
+      game = new GameState(hands);
+      greedySeats = new Set(msg.greedy_seats ?? []);
+      tourneyGameNumber++;
       send(advancePastGreedy());
       break;
     }

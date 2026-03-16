@@ -18,7 +18,9 @@ import csv
 import os
 import random
 import time
+from dataclasses import dataclass as dc_dataclass
 from datetime import datetime
+from typing import Callable
 
 import numpy as np
 import torch
@@ -154,6 +156,11 @@ MAX_ACTIONS = 80
 POWER_GAIN_REWARD = 0.025     # winning a trick — flat reward for gaining control
 # HAND_ADVANTAGE_REWARD = 0.005 # per turn, scaled by relative card count — disabled, redundant with terminal
 # OPPONENT_OUT_PENALTY = -0.1 # immediate penalty when an opponent finishes — disabled, noisy proxy
+
+# Tournament-aware reward adjustments
+LEADER_BEATEN_BONUS = 0.5       # bonus when you finish above the tournament leader
+LEADER_WON_PENALTY = -0.3       # penalty when leader wins the game (for non-leaders)
+TRAILING_URGENCY_SCALE = 0.5    # scale factor for trailing player urgency
 
 
 def encode_turn(turn: TurnInfo, player: int):
@@ -311,6 +318,154 @@ def compute_gae(
     return advantages, returns
 
 
+# ── Tournament reward shaping ─────────────────────────────────────────────────
+
+def compute_tourney_reward(
+    base_reward: float,
+    finish_pos: int,
+    player_seat: int,
+    win_order: list[int],
+    tourney_scores: list[int],
+    target_score: int,
+) -> float:
+    """Adjust per-game position reward based on tournament standings.
+
+    Only applies tournament adjustments when win_order is complete (at GameOver).
+    For mid-game finishes (incomplete win_order), returns base_reward unchanged.
+    """
+    reward = base_reward
+
+    if not tourney_scores or target_score <= 0:
+        return reward
+
+    # Skip tournament adjustments if win_order is incomplete (mid-game finish).
+    # leader_pos / leader_won checks require the full win_order.
+    if len(win_order) < 4:
+        return reward
+
+    # Who is the tournament leader?
+    leader_seat = max(range(len(tourney_scores)), key=lambda p: tourney_scores[p])
+    leader_score = tourney_scores[leader_seat]
+    my_score = tourney_scores[player_seat]
+
+    if leader_seat == player_seat:
+        # I'm the leader — no anti-leader adjustments for me
+        return reward
+
+    # Bonus for finishing above the tournament leader
+    leader_pos = win_order.index(leader_seat)
+    if finish_pos < leader_pos:
+        reward += LEADER_BEATEN_BONUS
+
+    # Penalty if the tournament leader won this game
+    if win_order[0] == leader_seat:
+        reward += LEADER_WON_PENALTY
+
+    # Urgency scaling when trailing
+    score_gap = leader_score - my_score
+    if score_gap > 0 and target_score > 0:
+        urgency = score_gap / target_score
+        reward *= 1.0 + urgency * TRAILING_URGENCY_SCALE
+
+    return reward
+
+
+# ── Game loop helper ──────────────────────────────────────────────────────────
+
+@dc_dataclass
+class GameResult:
+    player_bufs: dict[int, TrajectoryBuffer]
+    win_order: list[int]
+    moves: int
+
+
+def play_one_game(
+    bridge: GameBridge,
+    first_turn: TurnInfo,
+    model: TienLenNet,
+    device: torch.device,
+    seat_types: dict[int, str],
+    self_seats: set[int],
+    use_shaping: bool,
+    avg_model: TienLenNet | None = None,
+    reservoir: ReservoirBuffer | None = None,
+    reward_fn: Callable[[float, int, int, list[int]], float] | None = None,
+) -> GameResult:
+    """Play a single game, collecting PPO data for self-seats.
+
+    reward_fn: optional (base_reward, position, player_seat, win_order) -> adjusted_reward.
+    If None, uses base_reward directly (individual game behavior).
+    """
+    player_bufs = {p: TrajectoryBuffer() for p in self_seats}
+    turn = first_turn
+    prev_can_pass = False
+    prev_hand_sizes = {p: len(turn.state["hands"][p]) for p in range(4)}
+    finish_position = 0
+    total_moves = 0
+
+    while True:
+        player = turn.player
+        seat_type = seat_types.get(player, "self")
+        state, action_features, action_mask, num_actions = encode_turn(turn, player)
+
+        if seat_type == "self":
+            action_index, log_prob, value = select_action(
+                model, state, action_features, action_mask, num_actions, device
+            )
+            player_bufs[player].add(
+                state, action_features, action_mask, action_index, log_prob, value
+            )
+            player_bufs[player].rewards[-1] = 0.0  # shaping added below
+            if reservoir is not None:
+                reservoir.add(state, action_features, action_mask, action_index)
+        elif seat_type == "random":
+            action_index = random.randrange(num_actions)
+        elif seat_type == "average" and avg_model is not None:
+            action_index = select_action_average(
+                avg_model, state, action_features, action_mask, num_actions, device
+            )
+        else:
+            action_index = random.randrange(num_actions)
+
+        total_moves += 1
+        result = bridge.step(to_bridge_action(action_index, num_actions, turn))
+
+        if isinstance(result, GameOver):
+            win_order = result.win_order
+            for position, player_id in enumerate(win_order):
+                if player_id in player_bufs:
+                    pb = player_bufs[player_id]
+                    if pb.size() > 0:
+                        base = POSITION_REWARDS[position]
+                        r = reward_fn(base, position, player_id, win_order) if reward_fn else base
+                        if position >= finish_position:
+                            pb.rewards[-1] += r
+                        pb.dones[-1] = True
+            return GameResult(player_bufs, win_order, total_moves)
+
+        assert isinstance(result, TurnInfo)
+        curr_hand_sizes = {p: len(result.state["hands"][p]) for p in range(4)}
+        for p in range(4):
+            if prev_hand_sizes[p] > 0 and curr_hand_sizes[p] == 0:
+                position = finish_position
+                finish_position += 1
+                if p in player_bufs and player_bufs[p].size() > 0:
+                    base = POSITION_REWARDS[position]
+                    # Mid-game: pass incomplete win_order — reward_fn should handle gracefully
+                    r = reward_fn(base, position, p, []) if reward_fn else base
+                    player_bufs[p].rewards[-1] += r
+
+        prev_hand_sizes = curr_hand_sizes
+
+        if use_shaping and not result.can_pass and prev_can_pass:
+            power_player = result.player
+            if power_player in player_bufs and player_bufs[power_player].size() > 0:
+                player_bufs[power_player].rewards[-1] += POWER_GAIN_REWARD
+
+        prev_can_pass = result.can_pass
+        turn = result
+
+
 # ── Data collection ──────────────────────────────────────────────────────────
 
 def collect_trajectories(
@@ -348,7 +503,6 @@ def collect_trajectories(
 
         # Only self-seats collect PPO data
         self_seats = {s for s, t in seat_types.items() if t == "self"}
-        player_bufs = {p: TrajectoryBuffer() for p in self_seats}
 
         result = bridge.new_game(greedy_seats=greedy_seats if greedy_seats else None)
 
@@ -356,122 +510,112 @@ def collect_trajectories(
         if isinstance(result, GameOver):
             games_played += 1
             continue
-        turn = result
-        prev_can_pass = False
-        # Track hand sizes to detect when players go out mid-game
-        prev_hand_sizes = {p: len(turn.state["hands"][p]) for p in range(4)}
-        finish_position = 0  # next position to assign (0=1st, 1=2nd, ...)
 
-        while True:
-            player = turn.player
-            seat_type = seat_types.get(player, "self")
+        game_result = play_one_game(
+            bridge, result, model, device, seat_types, self_seats,
+            use_shaping, avg_model, reservoir,
+            reward_fn=None,
+        )
 
-            state, action_features, action_mask, num_actions = encode_turn(turn, player)
-
-            if seat_type == "self":
-                # Current policy — collect PPO data
-                action_index, log_prob, value = select_action(
-                    model, state, action_features, action_mask, num_actions, device
-                )
-
-                shaping = 0.0
-                if use_shaping:
-                    is_pass = turn.can_pass and action_index == num_actions - 1
-                    # if not is_pass:
-                        # Reward shedding cards, weighted by how weak they are.
-                        # Low cards (3-7) are dead weight — high reward to dump them.
-                        # High cards (A, 2) are valuable — less reward for spending them.
-                        # rank: 0=3, 1=4, ... 11=A, 12=2
-                        # cards = turn.valid_actions[action_index]
-                        # for card in cards:
-                        #     weight = (12 - card["rank"]) / 12  # 3→1.0, 2→0.0
-                        #     shaping += CARD_PLAY_REWARD * weight
-
-                    # # Hand advantage: disabled — redundant with terminal reward
-                    # hands = turn.state["hands"]
-                    # my_cards = len(hands[player])
-                    # opp_cards = [
-                    #     len(hands[p])
-                    #     for p in range(len(hands))
-                    #     if p != player
-                    # ]
-                    # min_opp_cards = min(opp_cards)
-                    # delta = min_opp_cards - my_cards
-                    # delta = max(-5, min(5, delta))  # clip
-                    # shaping += HAND_ADVANTAGE_REWARD * delta / 13.0
-
-                player_bufs[player].add(
-                    state, action_features, action_mask, action_index, log_prob, value
-                )
-                player_bufs[player].rewards[-1] = shaping
-
-                # Store in reservoir for average policy training
-                if reservoir is not None:
-                    reservoir.add(state, action_features, action_mask, action_index)
-
-            elif seat_type == "random":
-                action_index = random.randrange(num_actions)
-
-            elif seat_type == "average" and avg_model is not None:
-                action_index = select_action_average(
-                    avg_model, state, action_features, action_mask, num_actions, device
-                )
-            else:
-                # Fallback (average with no model yet) → random
-                action_index = random.randrange(num_actions)
-
-            total_moves += 1
-            result = bridge.step(to_bridge_action(action_index, num_actions, turn))
-
-            if isinstance(result, GameOver):
-                # Assign position rewards for any players not yet rewarded
-                # (the last two finish simultaneously at game_over)
-                for position, player_id in enumerate(result.win_order):
-                    if player_id in player_bufs:
-                        pb = player_bufs[player_id]
-                        if pb.size() > 0:
-                            # Only add position reward if not already assigned mid-game
-                            if position >= finish_position:
-                                pb.rewards[-1] += POSITION_REWARDS[position]
-                            pb.dones[-1] = True
-                        buf.extend(pb)
-                games_played += 1
-                break
-
-            # Detect players who just went out (hand dropped to 0)
-            assert isinstance(result, TurnInfo)
-            curr_hand_sizes = {p: len(result.state["hands"][p]) for p in range(4)}
-            for p in range(4):
-                if prev_hand_sizes[p] > 0 and curr_hand_sizes[p] == 0:
-                    position = finish_position
-                    finish_position += 1
-
-                    # Immediate position reward for self-seats that just finished
-                    if p in player_bufs and player_bufs[p].size() > 0:
-                        player_bufs[p].rewards[-1] += POSITION_REWARDS[position]
-
-                    # # Distribute penalty across all prior turns — disabled, noisy proxy
-                    # if use_shaping:
-                    #     for s in self_seats:
-                    #         if s != p and curr_hand_sizes[s] > 0 and player_bufs[s].size() > 0:
-                    #             n_steps = player_bufs[s].size()
-                    #             per_step = OPPONENT_OUT_PENALTY / n_steps
-                    #             for i in range(n_steps):
-                    #                 player_bufs[s].rewards[i] += per_step
-
-            prev_hand_sizes = curr_hand_sizes
-
-            # Power gain shaping — flat reward for seizing control
-            if use_shaping and not result.can_pass and prev_can_pass:
-                power_player = result.player
-                if power_player in player_bufs and player_bufs[power_player].size() > 0:
-                    player_bufs[power_player].rewards[-1] += POWER_GAIN_REWARD
-
-            prev_can_pass = result.can_pass
-            turn = result
+        total_moves += game_result.moves
+        for pb in game_result.player_bufs.values():
+            buf.extend(pb)
+        games_played += 1
 
     stats = {
         "games": games_played,
+        "steps": buf.size(),
+        "avg_moves": total_moves / max(games_played, 1),
+        "opponent_counts": opponent_counts,
+    }
+    return buf, stats
+
+
+def collect_tourney_trajectories(
+    bridge: GameBridge,
+    model: TienLenNet,
+    device: torch.device,
+    target_steps: int,
+    use_shaping: bool = True,
+    avg_model: TienLenNet | None = None,
+    opponent_dist: dict[str, float] | None = None,
+    reservoir: ReservoirBuffer | None = None,
+    target_score: int = 21,
+) -> tuple[TrajectoryBuffer, dict]:
+    """Play tournaments, collect PPO data with tournament-aware rewards."""
+    from game_bridge import TourneyOver
+
+    buf = TrajectoryBuffer()
+    games_played = 0
+    tourneys_played = 0
+    total_moves = 0
+    opponent_counts: dict[str, int] = {"self": 0, "greedy": 0, "random": 0, "average": 0}
+
+    pure_self_play = opponent_dist is None
+
+    while buf.size() < target_steps:
+        if pure_self_play:
+            seat_types: dict[int, str] = {s: "self" for s in range(4)}
+            greedy_seats: list[int] = []
+        else:
+            assignments = sample_opponents(opponent_dist)
+            seat_types = {0: "self", **assignments}
+            greedy_seats = [s for s, t in seat_types.items() if t == "greedy"]
+
+        for t in seat_types.values():
+            opponent_counts[t] = opponent_counts.get(t, 0) + 1
+
+        self_seats = {s for s, t in seat_types.items() if t == "self"}
+
+        # Start a tournament
+        result = bridge.new_tourney(
+            greedy_seats=greedy_seats if greedy_seats else None,
+            target_score=target_score,
+        )
+
+        # Track scores locally for reward shaping.
+        tourney_scores = [0, 0, 0, 0]
+
+        while True:
+            if isinstance(result, GameOver):
+                # Edge case: all greedy seats finish immediately
+                win_order = result.win_order
+                games_played += 1
+            else:
+                # Build reward closure that captures current tourney_scores
+                scores_snapshot = list(tourney_scores)  # snapshot for this game
+                def tourney_reward_fn(base, pos, seat, wo,
+                                     _scores=scores_snapshot, _target=target_score):
+                    return compute_tourney_reward(base, pos, seat, wo, _scores, _target)
+
+                game_result = play_one_game(
+                    bridge, result, model, device, seat_types, self_seats,
+                    use_shaping, avg_model, reservoir,
+                    reward_fn=tourney_reward_fn,
+                )
+                win_order = game_result.win_order
+                total_moves += game_result.moves
+                for pb in game_result.player_bufs.values():
+                    buf.extend(pb)
+                games_played += 1
+
+            # Update local tourney scores
+            points = [4, 2, 1, 0]
+            for i, seat in enumerate(win_order):
+                tourney_scores[seat] += points[i]
+
+            # Start next game or end tournament
+            result = bridge.next_game(
+                win_order=win_order,
+                greedy_seats=greedy_seats if greedy_seats else None,
+            )
+            if isinstance(result, TourneyOver):
+                tourneys_played += 1
+                break
+
+    stats = {
+        "games": games_played,
+        "tourneys": tourneys_played,
         "steps": buf.size(),
         "avg_moves": total_moves / max(games_played, 1),
         "opponent_counts": opponent_counts,

@@ -879,14 +879,20 @@ def eval_vs_random(
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
-def get_tourney_fraction(epoch: int, total_epochs: int) -> float:
+def get_tourney_fraction(epoch: int, total_epochs: int, resumed: bool = False) -> float:
     """Fraction of games that should be tournament games this epoch.
 
-    Curriculum:
+    Curriculum (from scratch):
       Epochs 0-20%:    0% tournament (pure individual game training)
       Epochs 20-40%:   linear ramp 0% → 50%
       Epochs 40%+:     70% tournament, 30% individual
+
+    When resumed (--expand-from or --resume-model), skips warmup and
+    goes straight to 70% tournament, matching get_opponent_dist behavior.
     """
+    if resumed:
+        return 0.7
+
     phase1_end = int(total_epochs * 0.2)
     phase2_end = int(total_epochs * 0.4)
 
@@ -1015,13 +1021,14 @@ def train(
             t0 = time.time()
 
             # Schedule opponent distribution
-            opponent_dist = get_opponent_dist(epoch, epochs, resumed=bool(resume_model)) if use_nfsp else None
+            is_resumed = bool(resume_model or expand_from)
+            opponent_dist = get_opponent_dist(epoch, epochs, resumed=is_resumed) if use_nfsp else None
 
             if use_nfsp and avg_model is not None:
                 avg_model.eval()
 
             # Collect trajectories
-            use_tourney = tourney_mode and random.random() < get_tourney_fraction(epoch, epochs)
+            use_tourney = tourney_mode and random.random() < get_tourney_fraction(epoch, epochs, resumed=is_resumed)
 
             if use_tourney:
                 buf, collect_stats = collect_tourney_trajectories(
@@ -1089,7 +1096,7 @@ def train(
                     opp_str,
                 ])
             if tourney_mode:
-                tourney_frac = get_tourney_fraction(epoch, epochs)
+                tourney_frac = get_tourney_fraction(epoch, epochs, resumed=is_resumed)
                 epoch_row.extend([
                     f"{tourney_frac:.4f}",
                     int(use_tourney),
@@ -1106,7 +1113,7 @@ def train(
 
             tourney_suffix = ""
             if tourney_mode:
-                tourney_frac = get_tourney_fraction(epoch, epochs)
+                tourney_frac = get_tourney_fraction(epoch, epochs, resumed=is_resumed)
                 tourney_suffix = f" | tourney: {'YES' if use_tourney else 'no'} ({tourney_frac:.0%})"
 
             print(

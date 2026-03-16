@@ -228,7 +228,7 @@ def evaluate_tourney(model_path: str, tourneys: int = 100, target_score: int = 2
 
     Reports: tournament win rate, average finish position, score distribution.
     """
-    from game_bridge import GameBridge, TourneyOver
+    from game_bridge import GameBridge, GameOver, TourneyOver
 
     bot = OnnxBot(model_path)
     tourney_wins = 0

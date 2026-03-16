@@ -5,6 +5,7 @@ import {
   NUM_OPPONENTS,
   NUM_COMBO_TYPES,
   NUM_ACTION_COMBO_TYPES,
+  TOURNEY_FEATURES_SIZE,
   STATE_SIZE,
 } from "./constants.js";
 
@@ -166,6 +167,56 @@ export function encodeState(
       }
     }
     offset += NUM_ACTION_COMBO_TYPES;
+  }
+
+  // Tournament context (15) — all zeros when not in tournament
+  const tourney = snapshot.tourneyContext;
+  if (tourney) {
+    const target = tourney.targetScore;
+
+    // My tournament score (1)
+    out[offset++] = tourney.scores[playerIndex] / target;
+
+    // Opponent tournament scores (3)
+    for (let rel = 1; rel <= NUM_OPPONENTS; rel++) {
+      const abs = (playerIndex + rel) % NUM_PLAYERS;
+      out[offset++] = tourney.scores[abs] / target;
+    }
+
+    // Score gaps: me vs each opponent (3)
+    const myScore = tourney.scores[playerIndex];
+    for (let rel = 1; rel <= NUM_OPPONENTS; rel++) {
+      const abs = (playerIndex + rel) % NUM_PLAYERS;
+      out[offset++] = (myScore - tourney.scores[abs]) / target;
+    }
+
+    // Tournament leader one-hot (4) — relative indexing
+    let leaderAbs = 0;
+    let leaderScore = tourney.scores[0];
+    for (let p = 1; p < NUM_PLAYERS; p++) {
+      if (tourney.scores[p] > leaderScore) {
+        leaderAbs = p;
+        leaderScore = tourney.scores[p];
+      }
+    }
+    const leaderRel = (leaderAbs - playerIndex + NUM_PLAYERS) % NUM_PLAYERS;
+    out[offset + leaderRel] = 1;
+    offset += NUM_PLAYERS;
+
+    // Games played ratio (1)
+    out[offset++] = tourney.gameNumber / tourney.expectedTotalGames;
+
+    // Clinch proximity per opponent (3)
+    for (let rel = 1; rel <= NUM_OPPONENTS; rel++) {
+      const abs = (playerIndex + rel) % NUM_PLAYERS;
+      out[offset++] = (target - tourney.scores[abs]) / target;
+    }
+  } else {
+    offset += TOURNEY_FEATURES_SIZE;
+  }
+
+  if (offset !== STATE_SIZE) {
+    throw new Error(`State encoder offset mismatch: ${offset} !== ${STATE_SIZE}`);
   }
 
   return out;

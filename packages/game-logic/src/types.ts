@@ -18,6 +18,13 @@ export interface MoveEntry {
   cards?: CardData[];
 }
 
+export interface TourneyContext {
+  scores: number[];        // tournament score per seat [4]
+  targetScore: number;     // e.g. 21
+  gameNumber: number;      // current game number (1-indexed)
+  expectedTotalGames: number; // estimated total games in tournament
+}
+
 export interface GameStateSnapshot {
   hands: CardData[][];
   currentPlayer: number;
@@ -32,6 +39,8 @@ export interface GameStateSnapshot {
   combosPlayedByPlayer?: Record<string, number>[];
   /** Per-card combo type breakdown: 52×7 flat array, [card0_single, card0_pair, ..., card0_bomb, card1_single, ...]. */
   handComboTypeMap?: number[];
+  /** Tournament context for tournament-aware training. Undefined when not in a tournament. */
+  tourneyContext?: TourneyContext;
 }
 
 export interface GameSnapshot {

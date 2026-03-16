@@ -108,3 +108,36 @@ class TienLenNet(nn.Module):
         """Estimate state value (for PPO). Shape: (batch, STATE_SIZE) → (batch, 1)"""
         state_emb = self.encode_state(state)
         return self.value_head(state_emb)
+
+
+def load_expanded_state_dict(
+    model: TienLenNet,
+    checkpoint_path: str,
+    old_state_size: int = 725,
+    device: torch.device | None = None,
+) -> None:
+    """Load a checkpoint trained with a smaller STATE_SIZE.
+
+    Zero-pads the first linear layer's weight matrix so the new features
+    start with no influence — the model begins from its prior skill level.
+    """
+    old_state = torch.load(checkpoint_path, map_location=device, weights_only=True)
+    new_state = model.state_dict()
+
+    for key in old_state:
+        if key == "state_encoder.0.weight":
+            # Shape: (256, old_state_size) → (256, STATE_SIZE)
+            old_w = old_state[key]
+            new_w = new_state[key].clone()  # starts as random init
+            new_w.zero_()
+            new_w[:, :old_state_size] = old_w
+            new_state[key] = new_w
+        elif old_state[key].shape == new_state[key].shape:
+            new_state[key] = old_state[key]
+        else:
+            raise ValueError(
+                f"Shape mismatch for {key}: "
+                f"checkpoint {old_state[key].shape} vs model {new_state[key].shape}"
+            )
+
+    model.load_state_dict(new_state)

@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import json
+import random
 import sys
 from pathlib import Path
 
@@ -222,17 +223,86 @@ def evaluate_replay(model_path: str, data_path: str, games: int = 1000):
     print(f"  (1.0 = perfect clone of greedy bot)")
 
 
+def evaluate_tourney(model_path: str, tourneys: int = 100, target_score: int = 21):
+    """Run full tournaments: 1 model seat vs 3 greedy bots.
+
+    Reports: tournament win rate, average finish position, score distribution.
+    """
+    from game_bridge import GameBridge, TourneyOver
+
+    bot = OnnxBot(model_path)
+    tourney_wins = 0
+    tourney_positions = []  # 1=1st, 2=2nd, etc. in final standings
+
+    with GameBridge() as bridge:
+        for t in range(tourneys):
+            model_seat = random.randrange(4)
+            greedy_seats = [s for s in range(4) if s != model_seat]
+
+            result = bridge.new_tourney(greedy_seats=greedy_seats, target_score=target_score)
+
+            while True:
+                # Play one game
+                while not isinstance(result, GameOver):
+                    turn = result
+                    state = encode_state(turn.state, turn.player)
+                    action_list = [encode_action(cards) for cards in turn.valid_actions]
+                    if turn.can_pass:
+                        action_list.append(encode_pass_action())
+
+                    if not action_list:
+                        break
+
+                    choice = bot.choose_action_index(state, action_list)
+                    result = bridge.step(choice)
+
+                if isinstance(result, GameOver):
+                    win_order = result.win_order
+                    result = bridge.next_game(win_order=win_order, greedy_seats=greedy_seats)
+
+                if isinstance(result, TourneyOver):
+                    # Determine model's final position
+                    scores = result.scores
+                    ranked = sorted(range(4), key=lambda p: scores[p], reverse=True)
+                    model_pos = ranked.index(model_seat) + 1
+                    tourney_positions.append(model_pos)
+                    if model_pos == 1:
+                        tourney_wins += 1
+                    break
+
+            if (t + 1) % 10 == 0:
+                wr = tourney_wins / (t + 1)
+                print(f"\r  {t+1}/{tourneys} tourneys, win rate: {wr:.1%}", end="", file=sys.stderr)
+
+    n = len(tourney_positions)
+    print(f"\n\nTournament Results ({tourneys} tournaments, target={target_score}):")
+    print(f"  Win rate: {tourney_wins}/{n} ({tourney_wins/n:.1%})")
+    pos_counts = [sum(1 for p in tourney_positions if p == rank) for rank in range(1, 5)]
+    print(f"  1st: {pos_counts[0]:4d} ({pos_counts[0]/n:.1%})  "
+          f"2nd: {pos_counts[1]:4d} ({pos_counts[1]/n:.1%})  "
+          f"3rd: {pos_counts[2]:4d} ({pos_counts[2]/n:.1%})  "
+          f"4th: {pos_counts[3]:4d} ({pos_counts[3]/n:.1%})")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate ONNX model")
     parser.add_argument("--model", required=True, help="Path to .onnx model")
     parser.add_argument("--data", help="Path to JSONL game data for replay evaluation")
     parser.add_argument("--vs-greedy", action="store_true", help="Evaluate model vs greedy bots (1v3, 2v2, 3v1)")
+    parser.add_argument("--vs-greedy-tourney", action="store_true",
+                        help="Evaluate model in full tournaments vs greedy bots")
     parser.add_argument("--games", type=int, default=1000)
+    parser.add_argument("--tourneys", type=int, default=100,
+                        help="Number of tournaments to play")
+    parser.add_argument("--target-score", type=int, default=21,
+                        help="Tournament target score")
     args = parser.parse_args()
 
     if args.vs_greedy:
         evaluate_vs_greedy(args.model, args.games)
+    elif args.vs_greedy_tourney:
+        evaluate_tourney(args.model, args.tourneys, args.target_score)
     elif args.data:
         evaluate_replay(args.model, args.data, args.games)
     else:
-        parser.error("Must specify either --vs-greedy or --data")
+        parser.error("Must specify either --vs-greedy, --vs-greedy-tourney, or --data")

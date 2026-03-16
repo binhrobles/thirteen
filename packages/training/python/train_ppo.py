@@ -879,6 +879,26 @@ def eval_vs_random(
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
+def get_tourney_fraction(epoch: int, total_epochs: int) -> float:
+    """Fraction of games that should be tournament games this epoch.
+
+    Curriculum:
+      Epochs 0-20%:    0% tournament (pure individual game training)
+      Epochs 20-40%:   linear ramp 0% → 50%
+      Epochs 40%+:     70% tournament, 30% individual
+    """
+    phase1_end = int(total_epochs * 0.2)
+    phase2_end = int(total_epochs * 0.4)
+
+    if epoch < phase1_end:
+        return 0.0
+    elif epoch < phase2_end:
+        t = (epoch - phase1_end) / max(phase2_end - phase1_end, 1)
+        return 0.5 * t
+    else:
+        return 0.7
+
+
 def train(
     epochs: int = 1000,
     batch_size: int = 2048,
@@ -898,6 +918,9 @@ def train(
     avg_updates: int = 4,
     resume_model: str | None = None,
     resume_avg_model: str | None = None,
+    expand_from: str | None = None,
+    tourney_mode: bool = False,
+    tourney_target_score: int = 21,
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
@@ -920,7 +943,16 @@ def train(
     print(f"Run dir: {run_dir}")
 
     model = TienLenNet().to(device)
-    if resume_model:
+    if expand_from and resume_model:
+        raise ValueError("Cannot use both --expand-from and --resume-model. "
+                         "Use --expand-from for first fine-tune from 725→740, "
+                         "or --resume-model for continuing a 740-feature training run.")
+
+    if expand_from:
+        from model import load_expanded_state_dict
+        load_expanded_state_dict(model, expand_from, old_state_size=725, device=device)
+        print(f"Expanded model from 725→{STATE_SIZE} features using {expand_from}")
+    elif resume_model:
         model.load_state_dict(torch.load(resume_model, map_location=device, weights_only=True))
         print(f"Resumed model from {resume_model}")
 
@@ -967,6 +999,8 @@ def train(
         ]
         if use_nfsp:
             epoch_header.extend(["avg_loss", "reservoir_size", "opponent_mix"])
+        if tourney_mode:
+            epoch_header.extend(["tourney_frac", "used_tourney"])
         epoch_writer.writerow(epoch_header)
 
         eval_writer = csv.writer(eval_f)
@@ -987,12 +1021,23 @@ def train(
                 avg_model.eval()
 
             # Collect trajectories
-            buf, collect_stats = collect_trajectories(
-                bridge, model, device, batch_size, use_shaping,
-                avg_model=avg_model,
-                opponent_dist=opponent_dist,
-                reservoir=reservoir,
-            )
+            use_tourney = tourney_mode and random.random() < get_tourney_fraction(epoch, epochs)
+
+            if use_tourney:
+                buf, collect_stats = collect_tourney_trajectories(
+                    bridge, model, device, batch_size, use_shaping,
+                    avg_model=avg_model,
+                    opponent_dist=opponent_dist,
+                    reservoir=reservoir,
+                    target_score=tourney_target_score,
+                )
+            else:
+                buf, collect_stats = collect_trajectories(
+                    bridge, model, device, batch_size, use_shaping,
+                    avg_model=avg_model,
+                    opponent_dist=opponent_dist,
+                    reservoir=reservoir,
+                )
             t_collect = time.time() - t0
 
             # PPO update
@@ -1043,6 +1088,12 @@ def train(
                     reservoir.size() if reservoir else 0,
                     opp_str,
                 ])
+            if tourney_mode:
+                tourney_frac = get_tourney_fraction(epoch, epochs)
+                epoch_row.extend([
+                    f"{tourney_frac:.4f}",
+                    int(use_tourney),
+                ])
             epoch_writer.writerow(epoch_row)
             epoch_f.flush()
 
@@ -1053,6 +1104,11 @@ def train(
                     f" | opp: {opp_str}"
                 )
 
+            tourney_suffix = ""
+            if tourney_mode:
+                tourney_frac = get_tourney_fraction(epoch, epochs)
+                tourney_suffix = f" | tourney: {'YES' if use_tourney else 'no'} ({tourney_frac:.0%})"
+
             print(
                 f"Epoch {epoch + 1:4d}/{epochs} | "
                 f"policy_loss: {update_stats['policy_loss']:.4f} | "
@@ -1061,6 +1117,7 @@ def train(
                 f"kl: {update_stats['kl']:.4f} | "
                 f"collect={t_collect:.1f}s update={t_update:.1f}s"
                 f"{nfsp_suffix}"
+                f"{tourney_suffix}"
             )
 
             # Save latest model every epoch for resuming
@@ -1157,6 +1214,13 @@ if __name__ == "__main__":
                         help="Path to model.pt to resume training from")
     parser.add_argument("--resume-avg-model", type=str, default=None,
                         help="Path to avg-model.pt to resume training from")
+    # Tournament training
+    parser.add_argument("--tourney-mode", action="store_true",
+                        help="Enable tournament-aware training with curriculum")
+    parser.add_argument("--tourney-target-score", type=int, default=21,
+                        help="Target score for tournament games")
+    parser.add_argument("--expand-from", type=str, default=None,
+                        help="Path to 725-feature model to expand to 740 features (for first fine-tune)")
     args = parser.parse_args()
 
     train(
@@ -1172,4 +1236,7 @@ if __name__ == "__main__":
         avg_updates=args.avg_updates,
         resume_model=args.resume_model,
         resume_avg_model=args.resume_avg_model,
+        expand_from=args.expand_from,
+        tourney_mode=args.tourney_mode,
+        tourney_target_score=args.tourney_target_score,
     )

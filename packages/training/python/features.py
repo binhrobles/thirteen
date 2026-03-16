@@ -18,7 +18,8 @@ NUM_OPPONENTS = 3
 NUM_COMBO_TYPES = 8  # 7 combos + POWER
 NUM_ACTION_COMBO_TYPES = 7
 
-STATE_SIZE = 725
+TOURNEY_FEATURES_SIZE = 15
+STATE_SIZE = 740
 ACTION_SIZE = 63
 
 COMBO_INDEX = {
@@ -143,6 +144,47 @@ def encode_state(snapshot: dict, player_index: int) -> np.ndarray:
             for combo_name, idx in COMBO_INDEX.items():
                 out[offset + idx] = player_combos.get(combo_name, 0) / 5.0
         offset += NUM_ACTION_COMBO_TYPES
+
+    # Tournament context (15) — all zeros when not in tournament
+    tourney = snapshot.get("tourneyContext")
+    if tourney:
+        target = tourney["targetScore"]
+        scores = tourney["scores"]
+
+        # My tournament score (1)
+        out[offset] = scores[player_index] / target
+        offset += 1
+
+        # Opponent tournament scores (3)
+        for rel in range(1, NUM_OPPONENTS + 1):
+            abs_p = (player_index + rel) % NUM_PLAYERS
+            out[offset] = scores[abs_p] / target
+            offset += 1
+
+        # Score gaps: me vs each opponent (3)
+        my_score = scores[player_index]
+        for rel in range(1, NUM_OPPONENTS + 1):
+            abs_p = (player_index + rel) % NUM_PLAYERS
+            out[offset] = (my_score - scores[abs_p]) / target
+            offset += 1
+
+        # Tournament leader one-hot (4) — relative indexing
+        leader_abs = max(range(NUM_PLAYERS), key=lambda p: scores[p])
+        leader_rel = (leader_abs - player_index + NUM_PLAYERS) % NUM_PLAYERS
+        out[offset + leader_rel] = 1
+        offset += NUM_PLAYERS
+
+        # Games played ratio (1)
+        out[offset] = tourney["gameNumber"] / tourney["expectedTotalGames"]
+        offset += 1
+
+        # Clinch proximity per opponent (3)
+        for rel in range(1, NUM_OPPONENTS + 1):
+            abs_p = (player_index + rel) % NUM_PLAYERS
+            out[offset] = (target - scores[abs_p]) / target
+            offset += 1
+    else:
+        offset += TOURNEY_FEATURES_SIZE
 
     assert offset == STATE_SIZE
     return out

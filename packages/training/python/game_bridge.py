@@ -25,6 +25,12 @@ class GameOver:
     win_order: list[int]
 
 
+@dataclass
+class TourneyOver:
+    scores: list[int]
+    games_played: int
+
+
 class GameBridge:
     """Manages a persistent TS game server subprocess."""
 
@@ -81,11 +87,36 @@ class GameBridge:
         else:
             raise RuntimeError(f"Unexpected response type: {resp['type']}")
 
+    def _parse_tourney_response(self, resp: dict) -> TurnInfo | GameOver | TourneyOver:
+        if resp["type"] == "tourney_over":
+            return TourneyOver(scores=resp["scores"], games_played=resp["games_played"])
+        return self._parse_response(resp)
+
     def new_game(self, greedy_seats: list[int] | None = None) -> TurnInfo | GameOver:
         cmd: dict = {"cmd": "new_game"}
         if greedy_seats:
             cmd["greedy_seats"] = greedy_seats
         return self._parse_response(self._send(cmd))
+
+    def new_tourney(
+        self,
+        greedy_seats: list[int] | None = None,
+        target_score: int = 21,
+    ) -> TurnInfo | GameOver:
+        cmd: dict = {"cmd": "new_tourney", "target_score": target_score}
+        if greedy_seats:
+            cmd["greedy_seats"] = greedy_seats
+        return self._parse_response(self._send(cmd))
+
+    def next_game(
+        self,
+        win_order: list[int],
+        greedy_seats: list[int] | None = None,
+    ) -> TurnInfo | GameOver | TourneyOver:
+        cmd: dict = {"cmd": "next_game", "win_order": win_order}
+        if greedy_seats:
+            cmd["greedy_seats"] = greedy_seats
+        return self._parse_tourney_response(self._send(cmd))
 
     def step(self, action_index: int) -> TurnInfo | GameOver:
         return self._parse_response(
